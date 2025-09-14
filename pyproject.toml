@@ -9,3 +9,9 @@ requires-python = ">=3.10"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
