@@ -1,0 +1,1190 @@
+[
+  {
+    "ticker": "9501.T",
+    "total_rows": 9564,
+    "made_files": 5433,
+    "status": "OK"
+  },
+  {
+    "ticker": "6740.T",
+    "total_rows": 9564,
+    "made_files": 5433,
+    "status": "OK"
+  },
+  {
+    "ticker": "8729.T",
+    "total_rows": 12382,
+    "made_files": 5438,
+    "status": "OK"
+  },
+  {
+    "ticker": "9432.T",
+    "total_rows": 9564,
+    "made_files": 5433,
+    "status": "OK"
+  },
+  {
+    "ticker": "9434.T",
+    "total_rows": 9564,
+    "made_files": 5433,
+    "status": "OK"
+  },
+  {
+    "ticker": "5016.T",
+    "total_rows": 9564,
+    "made_files": 5433,
+    "status": "OK"
+  },
+  {
+    "ticker": "8136.T",
+    "total_rows": 6325,
+    "made_files": 3735,
+    "status": "OK"
+  },
+  {
+    "ticker": "8306.T",
+    "total_rows": 6325,
+    "made_files": 3735,
+    "status": "OK"
+  },
+  {
+    "ticker": "7203.T",
+    "total_rows": 8014,
+    "made_files": 4948,
+    "status": "OK"
+  },
+  {
+    "ticker": "7201.T",
+    "total_rows": 8013,
+    "made_files": 4958,
+    "status": "OK"
+  },
+  {
+    "ticker": "7013.T",
+    "total_rows": 8012,
+    "made_files": 4958,
+    "status": "OK"
+  },
+  {
+    "ticker": "7011.T",
+    "total_rows": 8013,
+    "made_files": 4958,
+    "status": "OK"
+  },
+  {
+    "ticker": "4689.T",
+    "total_rows": 6313,
+    "made_files": 3876,
+    "status": "OK"
+  },
+  {
+    "ticker": "5401.T",
+    "total_rows": 6313,
+    "made_files": 3876,
+    "status": "OK"
+  },
+  {
+    "ticker": "4005.T",
+    "total_rows": 6541,
+    "made_files": 4099,
+    "status": "OK"
+  },
+  {
+    "ticker": "6758.T",
+    "total_rows": 7024,
+    "made_files": 4593,
+    "status": "OK"
+  },
+  {
+    "ticker": "7267.T",
+    "total_rows": 7287,
+    "made_files": 4849,
+    "status": "OK"
+  },
+  {
+    "ticker": "4568.T",
+    "total_rows": 7284,
+    "made_files": 4859,
+    "status": "OK"
+  },
+  {
+    "ticker": "3436.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "ERROR:dictionary changed size during iteration"
+  },
+  {
+    "ticker": "6315.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "6526.T",
+    "total_rows": 6418,
+    "made_files": 2643,
+    "status": "OK"
+  },
+  {
+    "ticker": "4755.T",
+    "total_rows": 6435,
+    "made_files": 2661,
+    "status": "OK"
+  },
+  {
+    "ticker": "9984.T",
+    "total_rows": 5036,
+    "made_files": 724,
+    "status": "OK"
+  },
+  {
+    "ticker": "6525.T",
+    "total_rows": 840,
+    "made_files": 131,
+    "status": "OK"
+  },
+  {
+    "ticker": "8316.T",
+    "total_rows": 1272,
+    "made_files": 1041,
+    "status": "OK"
+  },
+  {
+    "ticker": "6723.T",
+    "total_rows": 1864,
+    "made_files": 737,
+    "status": "OK"
+  },
+  {
+    "ticker": "6857.T",
+    "total_rows": 1431,
+    "made_files": 281,
+    "status": "OK"
+  },
+  {
+    "ticker": "6501.T",
+    "total_rows": 1633,
+    "made_files": 485,
+    "status": "OK"
+  },
+  {
+    "ticker": "2181.T",
+    "total_rows": 3420,
+    "made_files": 337,
+    "status": "OK"
+  },
+  {
+    "ticker": "7532.T",
+    "total_rows": 1063,
+    "made_files": 370,
+    "status": "OK"
+  },
+  {
+    "ticker": "8750.T",
+    "total_rows": 5008,
+    "made_files": 2196,
+    "status": "OK"
+  },
+  {
+    "ticker": "7261.T",
+    "total_rows": 1939,
+    "made_files": 313,
+    "status": "OK"
+  },
+  {
+    "ticker": "9433.T",
+    "total_rows": 2293,
+    "made_files": 603,
+    "status": "OK"
+  },
+  {
+    "ticker": "6920.T",
+    "total_rows": 893,
+    "made_files": 161,
+    "status": "OK"
+  },
+  {
+    "ticker": "5020.T",
+    "total_rows": 311,
+    "made_files": 46,
+    "status": "OK"
+  },
+  {
+    "ticker": "8801.T",
+    "total_rows": 3472,
+    "made_files": 2035,
+    "status": "OK"
+  },
+  {
+    "ticker": "8035.T",
+    "total_rows": 2384,
+    "made_files": 2090,
+    "status": "OK"
+  },
+  {
+    "ticker": "4506.T",
+    "total_rows": 4456,
+    "made_files": 2355,
+    "status": "OK"
+  },
+  {
+    "ticker": "6762.T",
+    "total_rows": 2733,
+    "made_files": 2499,
+    "status": "OK"
+  },
+  {
+    "ticker": "8058.T",
+    "total_rows": 3544,
+    "made_files": 2019,
+    "status": "OK"
+  },
+  {
+    "ticker": "2502.T",
+    "total_rows": 4023,
+    "made_files": 1877,
+    "status": "OK"
+  },
+  {
+    "ticker": "3382.T",
+    "total_rows": 1623,
+    "made_files": 920,
+    "status": "OK"
+  },
+  {
+    "ticker": "6981.T",
+    "total_rows": 524,
+    "made_files": 524,
+    "status": "OK"
+  },
+  {
+    "ticker": "7269.T",
+    "total_rows": 1006,
+    "made_files": 772,
+    "status": "OK"
+  },
+  {
+    "ticker": "8604.T",
+    "total_rows": 2677,
+    "made_files": 851,
+    "status": "OK"
+  },
+  {
+    "ticker": "8411.T",
+    "total_rows": 1911,
+    "made_files": 513,
+    "status": "OK"
+  },
+  {
+    "ticker": "8308.T",
+    "total_rows": 1361,
+    "made_files": 634,
+    "status": "OK"
+  },
+  {
+    "ticker": "5803.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "ERROR:dictionary changed size during iteration"
+  },
+  {
+    "ticker": "4503.T",
+    "total_rows": 2826,
+    "made_files": 295,
+    "status": "OK"
+  },
+  {
+    "ticker": "6146.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "ERROR:'7205.T'"
+  },
+  {
+    "ticker": "7205.T",
+    "total_rows": 1751,
+    "made_files": 515,
+    "status": "OK"
+  },
+  {
+    "ticker": "8410.T",
+    "total_rows": 1540,
+    "made_files": 1071,
+    "status": "OK"
+  },
+  {
+    "ticker": "8267.T",
+    "total_rows": 25,
+    "made_files": 1,
+    "status": "ERROR:No objects to concatenate"
+  },
+  {
+    "ticker": "7211.T",
+    "total_rows": 562,
+    "made_files": 91,
+    "status": "ERROR:No objects to concatenate"
+  },
+  {
+    "ticker": "4063.T",
+    "total_rows": 1536,
+    "made_files": 57,
+    "status": "ERROR:No objects to concatenate"
+  },
+  {
+    "ticker": "3656.T",
+    "total_rows": 1415,
+    "made_files": 231,
+    "status": "ERROR:No objects to concatenate"
+  },
+  {
+    "ticker": "6752.T",
+    "total_rows": 1674,
+    "made_files": 249,
+    "status": "ERROR:No objects to concatenate"
+  },
+  {
+    "ticker": "3697.T",
+    "total_rows": 8029,
+    "made_files": 5351,
+    "status": "OK"
+  },
+  {
+    "ticker": "7182.T",
+    "total_rows": 8055,
+    "made_files": 5377,
+    "status": "OK"
+  },
+  {
+    "ticker": "7453.T",
+    "total_rows": 8055,
+    "made_files": 5377,
+    "status": "OK"
+  },
+  {
+    "ticker": "4543.T",
+    "total_rows": 8055,
+    "made_files": 5377,
+    "status": "OK"
+  },
+  {
+    "ticker": "6902.T",
+    "total_rows": 8029,
+    "made_files": 5351,
+    "status": "OK"
+  },
+  {
+    "ticker": "6702.T",
+    "total_rows": 8029,
+    "made_files": 5351,
+    "status": "OK"
+  },
+  {
+    "ticker": "4612.T",
+    "total_rows": 5048,
+    "made_files": 4088,
+    "status": "OK"
+  },
+  {
+    "ticker": "7974.T",
+    "total_rows": 5283,
+    "made_files": 4557,
+    "status": "OK"
+  },
+  {
+    "ticker": "9503.T",
+    "total_rows": 7191,
+    "made_files": 4229,
+    "status": "OK"
+  },
+  {
+    "ticker": "6178.T",
+    "total_rows": 5891,
+    "made_files": 4211,
+    "status": "OK"
+  },
+  {
+    "ticker": "8031.T",
+    "total_rows": 7098,
+    "made_files": 4234,
+    "status": "OK"
+  },
+  {
+    "ticker": "7272.T",
+    "total_rows": 7182,
+    "made_files": 4221,
+    "status": "OK"
+  },
+  {
+    "ticker": "6594.T",
+    "total_rows": 2572,
+    "made_files": 1294,
+    "status": "OK"
+  },
+  {
+    "ticker": "8766.T",
+    "total_rows": 3419,
+    "made_files": 1558,
+    "status": "OK"
+  },
+  {
+    "ticker": "4188.T",
+    "total_rows": 2623,
+    "made_files": 1653,
+    "status": "OK"
+  },
+  {
+    "ticker": "8113.T",
+    "total_rows": 5160,
+    "made_files": 1826,
+    "status": "OK"
+  },
+  {
+    "ticker": "3402.T",
+    "total_rows": 3652,
+    "made_files": 2208,
+    "status": "OK"
+  },
+  {
+    "ticker": "6326.T",
+    "total_rows": 2799,
+    "made_files": 2101,
+    "status": "OK"
+  },
+  {
+    "ticker": "9509.T",
+    "total_rows": 1705,
+    "made_files": 293,
+    "status": "OK"
+  },
+  {
+    "ticker": "5801.T",
+    "total_rows": 1638,
+    "made_files": 457,
+    "status": "OK"
+  },
+  {
+    "ticker": "6971.T",
+    "total_rows": 833,
+    "made_files": 376,
+    "status": "OK"
+  },
+  {
+    "ticker": "6503.T",
+    "total_rows": 1441,
+    "made_files": 866,
+    "status": "OK"
+  },
+  {
+    "ticker": "4519.T",
+    "total_rows": 1682,
+    "made_files": 675,
+    "status": "OK"
+  },
+  {
+    "ticker": "8002.T",
+    "total_rows": 2402,
+    "made_files": 1407,
+    "status": "OK"
+  },
+  {
+    "ticker": "8233.T",
+    "total_rows": 2950,
+    "made_files": 632,
+    "status": "OK"
+  },
+  {
+    "ticker": "2413.T",
+    "total_rows": 1350,
+    "made_files": 402,
+    "status": "OK"
+  },
+  {
+    "ticker": "6361.T",
+    "total_rows": 897,
+    "made_files": 184,
+    "status": "OK"
+  },
+  {
+    "ticker": "7733.T",
+    "total_rows": 2887,
+    "made_files": 984,
+    "status": "OK"
+  },
+  {
+    "ticker": "4502.T",
+    "total_rows": 2222,
+    "made_files": 615,
+    "status": "OK"
+  },
+  {
+    "ticker": "2801.T",
+    "total_rows": 519,
+    "made_files": 285,
+    "status": "OK"
+  },
+  {
+    "ticker": "9504.T",
+    "total_rows": 1364,
+    "made_files": 422,
+    "status": "OK"
+  },
+  {
+    "ticker": "8601.T",
+    "total_rows": 1910,
+    "made_files": 530,
+    "status": "OK"
+  },
+  {
+    "ticker": "1605.T",
+    "total_rows": 574,
+    "made_files": 100,
+    "status": "OK"
+  },
+  {
+    "ticker": "7270.T",
+    "total_rows": 574,
+    "made_files": 301,
+    "status": "OK"
+  },
+  {
+    "ticker": "6701.T",
+    "total_rows": 519,
+    "made_files": 296,
+    "status": "OK"
+  },
+  {
+    "ticker": "6098.T",
+    "total_rows": 1777,
+    "made_files": 731,
+    "status": "OK"
+  },
+  {
+    "ticker": "3231.T",
+    "total_rows": 2424,
+    "made_files": 1016,
+    "status": "OK"
+  },
+  {
+    "ticker": "5713.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "ERROR:dictionary changed size during iteration"
+  },
+  {
+    "ticker": "3315.T",
+    "total_rows": 1424,
+    "made_files": 654,
+    "status": "OK"
+  },
+  {
+    "ticker": "8697.T",
+    "total_rows": 2118,
+    "made_files": 958,
+    "status": "OK"
+  },
+  {
+    "ticker": "6963.T",
+    "total_rows": 2041,
+    "made_files": 104,
+    "status": "OK"
+  },
+  {
+    "ticker": "8802.T",
+    "total_rows": 2116,
+    "made_files": 401,
+    "status": "OK"
+  },
+  {
+    "ticker": "3861.T",
+    "total_rows": 1489,
+    "made_files": 1255,
+    "status": "OK"
+  },
+  {
+    "ticker": "8725.T",
+    "total_rows": 2820,
+    "made_files": 1902,
+    "status": "OK"
+  },
+  {
+    "ticker": "7012.T",
+    "total_rows": 3109,
+    "made_files": 1929,
+    "status": "OK"
+  },
+  {
+    "ticker": "7751.T",
+    "total_rows": 3692,
+    "made_files": 2208,
+    "status": "OK"
+  },
+  {
+    "ticker": "9107.T",
+    "total_rows": 3692,
+    "made_files": 2199,
+    "status": "OK"
+  },
+  {
+    "ticker": "2914.T",
+    "total_rows": 3221,
+    "made_files": 1968,
+    "status": "OK"
+  },
+  {
+    "ticker": "9843.T",
+    "total_rows": 3239,
+    "made_files": 1533,
+    "status": "OK"
+  },
+  {
+    "ticker": "6869.T",
+    "total_rows": 2135,
+    "made_files": 102,
+    "status": "ERROR:No objects to concatenate"
+  },
+  {
+    "ticker": "5076.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "ERROR:dictionary changed size during iteration"
+  },
+  {
+    "ticker": "4661.T",
+    "total_rows": 25,
+    "made_files": 1,
+    "status": "ERROR:dictionary changed size during iteration"
+  },
+  {
+    "ticker": "7936.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "6954.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "8593.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "4901.T",
+    "total_rows": 1877,
+    "made_files": 1150,
+    "status": "OK"
+  },
+  {
+    "ticker": "4446.T",
+    "total_rows": 1656,
+    "made_files": 483,
+    "status": "OK"
+  },
+  {
+    "ticker": "3092.T",
+    "total_rows": 3115,
+    "made_files": 836,
+    "status": "OK"
+  },
+  {
+    "ticker": "9101.T",
+    "total_rows": 2960,
+    "made_files": 1022,
+    "status": "OK"
+  },
+  {
+    "ticker": "8473.T",
+    "total_rows": 1266,
+    "made_files": 1266,
+    "status": "OK"
+  },
+  {
+    "ticker": "3064.T",
+    "total_rows": 2259,
+    "made_files": 1795,
+    "status": "OK"
+  },
+  {
+    "ticker": "3407.T",
+    "total_rows": 2993,
+    "made_files": 1760,
+    "status": "OK"
+  },
+  {
+    "ticker": "8331.T",
+    "total_rows": 2710,
+    "made_files": 1481,
+    "status": "OK"
+  },
+  {
+    "ticker": "4751.T",
+    "total_rows": 3636,
+    "made_files": 1562,
+    "status": "OK"
+  },
+  {
+    "ticker": "4004.T",
+    "total_rows": 3003,
+    "made_files": 936,
+    "status": "OK"
+  },
+  {
+    "ticker": "5802.T",
+    "total_rows": 1811,
+    "made_files": 113,
+    "status": "OK"
+  },
+  {
+    "ticker": "8591.T",
+    "total_rows": 2326,
+    "made_files": 630,
+    "status": "OK"
+  },
+  {
+    "ticker": "5411.T",
+    "total_rows": 1782,
+    "made_files": 702,
+    "status": "OK"
+  },
+  {
+    "ticker": "7762.T",
+    "total_rows": 2400,
+    "made_files": 1001,
+    "status": "OK"
+  },
+  {
+    "ticker": "6323.T",
+    "total_rows": 1599,
+    "made_files": 671,
+    "status": "OK"
+  },
+  {
+    "ticker": "3099.T",
+    "total_rows": 2928,
+    "made_files": 1274,
+    "status": "OK"
+  },
+  {
+    "ticker": "3853.T",
+    "total_rows": 2815,
+    "made_files": 565,
+    "status": "OK"
+  },
+  {
+    "ticker": "7731.T",
+    "total_rows": 1422,
+    "made_files": 686,
+    "status": "OK"
+  },
+  {
+    "ticker": "9506.T",
+    "total_rows": 901,
+    "made_files": 371,
+    "status": "OK"
+  },
+  {
+    "ticker": "7202.T",
+    "total_rows": 1418,
+    "made_files": 435,
+    "status": "OK"
+  },
+  {
+    "ticker": "7186.T",
+    "total_rows": 2015,
+    "made_files": 1050,
+    "status": "OK"
+  },
+  {
+    "ticker": "4507.T",
+    "total_rows": 2338,
+    "made_files": 1609,
+    "status": "OK"
+  },
+  {
+    "ticker": "8524.T",
+    "total_rows": 2169,
+    "made_files": 1175,
+    "status": "OK"
+  },
+  {
+    "ticker": "6472.T",
+    "total_rows": 2383,
+    "made_files": 1409,
+    "status": "OK"
+  },
+  {
+    "ticker": "5019.T",
+    "total_rows": 5202,
+    "made_files": 2481,
+    "status": "OK"
+  },
+  {
+    "ticker": "4385.T",
+    "total_rows": 2377,
+    "made_files": 679,
+    "status": "OK"
+  },
+  {
+    "ticker": "2897.T",
+    "total_rows": 1658,
+    "made_files": 463,
+    "status": "OK"
+  },
+  {
+    "ticker": "8309.T",
+    "total_rows": 2145,
+    "made_files": 966,
+    "status": "OK"
+  },
+  {
+    "ticker": "9020.T",
+    "total_rows": 1328,
+    "made_files": 422,
+    "status": "OK"
+  },
+  {
+    "ticker": "8848.T",
+    "total_rows": 1631,
+    "made_files": 1117,
+    "status": "OK"
+  },
+  {
+    "ticker": "2802.T",
+    "total_rows": 2444,
+    "made_files": 98,
+    "status": "OK"
+  },
+  {
+    "ticker": "6506.T",
+    "total_rows": 1753,
+    "made_files": 565,
+    "status": "OK"
+  },
+  {
+    "ticker": "2503.T",
+    "total_rows": 646,
+    "made_files": 146,
+    "status": "OK"
+  },
+  {
+    "ticker": "5726.T",
+    "total_rows": 80,
+    "made_files": 80,
+    "status": "OK"
+  },
+  {
+    "ticker": "9104.T",
+    "total_rows": 272,
+    "made_files": 49,
+    "status": "OK"
+  },
+  {
+    "ticker": "9022.T",
+    "total_rows": 1317,
+    "made_files": 41,
+    "status": "OK"
+  },
+  {
+    "ticker": "8515.T",
+    "total_rows": 533,
+    "made_files": 308,
+    "status": "OK"
+  },
+  {
+    "ticker": "9831.T",
+    "total_rows": 1949,
+    "made_files": 346,
+    "status": "OK"
+  },
+  {
+    "ticker": "7259.T",
+    "total_rows": 831,
+    "made_files": 146,
+    "status": "OK"
+  },
+  {
+    "ticker": "7003.T",
+    "total_rows": 1377,
+    "made_files": 234,
+    "status": "OK"
+  },
+  {
+    "ticker": "8001.T",
+    "total_rows": 53,
+    "made_files": 9,
+    "status": "OK"
+  },
+  {
+    "ticker": "7832.T",
+    "total_rows": 246,
+    "made_files": 246,
+    "status": "OK"
+  },
+  {
+    "ticker": "1802.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "6871.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "3289.T",
+    "total_rows": 288,
+    "made_files": 288,
+    "status": "OK"
+  },
+  {
+    "ticker": "8630.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "ERROR:Cannot join tz-naive with tz-aware DatetimeIndex"
+  },
+  {
+    "ticker": "8053.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "8015.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "6976.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "2267.T",
+    "total_rows": 821,
+    "made_files": 586,
+    "status": "OK"
+  },
+  {
+    "ticker": "4528.T",
+    "total_rows": 1387,
+    "made_files": 1109,
+    "status": "OK"
+  },
+  {
+    "ticker": "5991.T",
+    "total_rows": 2418,
+    "made_files": 1027,
+    "status": "OK"
+  },
+  {
+    "ticker": "1803.T",
+    "total_rows": 2272,
+    "made_files": 2015,
+    "status": "OK"
+  },
+  {
+    "ticker": "7167.T",
+    "total_rows": 1338,
+    "made_files": 1081,
+    "status": "OK"
+  },
+  {
+    "ticker": "9697.T",
+    "total_rows": 3128,
+    "made_files": 866,
+    "status": "OK"
+  },
+  {
+    "ticker": "9502.T",
+    "total_rows": 3492,
+    "made_files": 581,
+    "status": "OK"
+  },
+  {
+    "ticker": "6965.T",
+    "total_rows": 2412,
+    "made_files": 144,
+    "status": "OK"
+  },
+  {
+    "ticker": "7752.T",
+    "total_rows": 2203,
+    "made_files": 361,
+    "status": "OK"
+  },
+  {
+    "ticker": "3110.T",
+    "total_rows": 1568,
+    "made_files": 471,
+    "status": "OK"
+  },
+  {
+    "ticker": "6988.T",
+    "total_rows": 1194,
+    "made_files": 606,
+    "status": "OK"
+  },
+  {
+    "ticker": "6301.T",
+    "total_rows": 1022,
+    "made_files": 776,
+    "status": "OK"
+  },
+  {
+    "ticker": "9202.T",
+    "total_rows": 2139,
+    "made_files": 489,
+    "status": "OK"
+  },
+  {
+    "ticker": "5706.T",
+    "total_rows": 2294,
+    "made_files": 425,
+    "status": "OK"
+  },
+  {
+    "ticker": "5535.T",
+    "total_rows": 1770,
+    "made_files": 1042,
+    "status": "OK"
+  },
+  {
+    "ticker": "9424.T",
+    "total_rows": 2170,
+    "made_files": 1182,
+    "status": "OK"
+  },
+  {
+    "ticker": "3003.T",
+    "total_rows": 3667,
+    "made_files": 717,
+    "status": "OK"
+  },
+  {
+    "ticker": "4911.T",
+    "total_rows": 2144,
+    "made_files": 761,
+    "status": "OK"
+  },
+  {
+    "ticker": "1911.T",
+    "total_rows": 2585,
+    "made_files": 261,
+    "status": "OK"
+  },
+  {
+    "ticker": "9508.T",
+    "total_rows": 1498,
+    "made_files": 1264,
+    "status": "OK"
+  },
+  {
+    "ticker": "9201.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "4704.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "9023.T",
+    "total_rows": 2021,
+    "made_files": 67,
+    "status": "ERROR:No objects to concatenate"
+  },
+  {
+    "ticker": "4902.T",
+    "total_rows": 2214,
+    "made_files": 147,
+    "status": "ERROR:No objects to concatenate"
+  },
+  {
+    "ticker": "8795.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "ERROR:No objects to concatenate"
+  },
+  {
+    "ticker": "8698.T",
+    "total_rows": 1111,
+    "made_files": 177,
+    "status": "ERROR:No objects to concatenate"
+  },
+  {
+    "ticker": "7735.T",
+    "total_rows": 996,
+    "made_files": 996,
+    "status": "OK"
+  },
+  {
+    "ticker": "1861.T",
+    "total_rows": 6287,
+    "made_files": 3429,
+    "status": "OK"
+  },
+  {
+    "ticker": "9021.T",
+    "total_rows": 7809,
+    "made_files": 5130,
+    "status": "OK"
+  },
+  {
+    "ticker": "4062.T",
+    "total_rows": 7809,
+    "made_files": 5130,
+    "status": "OK"
+  },
+  {
+    "ticker": "2127.T",
+    "total_rows": 7809,
+    "made_files": 5130,
+    "status": "OK"
+  },
+  {
+    "ticker": "9009.T",
+    "total_rows": 7809,
+    "made_files": 5130,
+    "status": "OK"
+  },
+  {
+    "ticker": "4452.T",
+    "total_rows": 7809,
+    "made_files": 5130,
+    "status": "OK"
+  },
+  {
+    "ticker": "5406.T",
+    "total_rows": 5855,
+    "made_files": 1948,
+    "status": "OK"
+  },
+  {
+    "ticker": "3038.T",
+    "total_rows": 6200,
+    "made_files": 4970,
+    "status": "OK"
+  },
+  {
+    "ticker": "7951.T",
+    "total_rows": 6200,
+    "made_files": 4970,
+    "status": "OK"
+  },
+  {
+    "ticker": "5108.T",
+    "total_rows": 6200,
+    "made_files": 4970,
+    "status": "OK"
+  }
+]

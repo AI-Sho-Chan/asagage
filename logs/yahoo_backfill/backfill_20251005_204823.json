@@ -1,0 +1,1184 @@
+[
+  {
+    "ticker": "9501.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "9432.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "9434.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "5016.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "6740.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "8306.T",
+    "total_rows": 1342,
+    "made_files": 415,
+    "status": "OK"
+  },
+  {
+    "ticker": "7201.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "8136.T",
+    "total_rows": 2,
+    "made_files": 2,
+    "status": "OK"
+  },
+  {
+    "ticker": "7013.T",
+    "total_rows": 805,
+    "made_files": 319,
+    "status": "OK"
+  },
+  {
+    "ticker": "7203.T",
+    "total_rows": 1885,
+    "made_files": 297,
+    "status": "OK"
+  },
+  {
+    "ticker": "5401.T",
+    "total_rows": 254,
+    "made_files": 248,
+    "status": "OK"
+  },
+  {
+    "ticker": "7011.T",
+    "total_rows": 805,
+    "made_files": 319,
+    "status": "OK"
+  },
+  {
+    "ticker": "4689.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "7267.T",
+    "total_rows": 273,
+    "made_files": 39,
+    "status": "OK"
+  },
+  {
+    "ticker": "9984.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "3436.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "4568.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "6758.T",
+    "total_rows": 268,
+    "made_files": 40,
+    "status": "OK"
+  },
+  {
+    "ticker": "4755.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "4005.T",
+    "total_rows": 503,
+    "made_files": 503,
+    "status": "OK"
+  },
+  {
+    "ticker": "6526.T",
+    "total_rows": 244,
+    "made_files": 244,
+    "status": "OK"
+  },
+  {
+    "ticker": "6525.T",
+    "total_rows": 1186,
+    "made_files": 25,
+    "status": "OK"
+  },
+  {
+    "ticker": "8316.T",
+    "total_rows": 1335,
+    "made_files": 1059,
+    "status": "OK"
+  },
+  {
+    "ticker": "6723.T",
+    "total_rows": 1929,
+    "made_files": 741,
+    "status": "OK"
+  },
+  {
+    "ticker": "6501.T",
+    "total_rows": 1010,
+    "made_files": 999,
+    "status": "OK"
+  },
+  {
+    "ticker": "6315.T",
+    "total_rows": 3511,
+    "made_files": 1385,
+    "status": "OK"
+  },
+  {
+    "ticker": "8750.T",
+    "total_rows": 1505,
+    "made_files": 1272,
+    "status": "OK"
+  },
+  {
+    "ticker": "6857.T",
+    "total_rows": 617,
+    "made_files": 124,
+    "status": "OK"
+  },
+  {
+    "ticker": "2181.T",
+    "total_rows": 1595,
+    "made_files": 1020,
+    "status": "OK"
+  },
+  {
+    "ticker": "6920.T",
+    "total_rows": 1306,
+    "made_files": 817,
+    "status": "OK"
+  },
+  {
+    "ticker": "4506.T",
+    "total_rows": 798,
+    "made_files": 331,
+    "status": "OK"
+  },
+  {
+    "ticker": "7261.T",
+    "total_rows": 524,
+    "made_files": 495,
+    "status": "OK"
+  },
+  {
+    "ticker": "9433.T",
+    "total_rows": 2076,
+    "made_files": 1142,
+    "status": "OK"
+  },
+  {
+    "ticker": "7532.T",
+    "total_rows": 1502,
+    "made_files": 1265,
+    "status": "OK"
+  },
+  {
+    "ticker": "5020.T",
+    "total_rows": 1108,
+    "made_files": 425,
+    "status": "OK"
+  },
+  {
+    "ticker": "2502.T",
+    "total_rows": 545,
+    "made_files": 317,
+    "status": "OK"
+  },
+  {
+    "ticker": "8801.T",
+    "total_rows": 508,
+    "made_files": 284,
+    "status": "OK"
+  },
+  {
+    "ticker": "8035.T",
+    "total_rows": 2097,
+    "made_files": 494,
+    "status": "OK"
+  },
+  {
+    "ticker": "3382.T",
+    "total_rows": 497,
+    "made_files": 488,
+    "status": "OK"
+  },
+  {
+    "ticker": "6762.T",
+    "total_rows": 2348,
+    "made_files": 745,
+    "status": "OK"
+  },
+  {
+    "ticker": "8058.T",
+    "total_rows": 258,
+    "made_files": 40,
+    "status": "OK"
+  },
+  {
+    "ticker": "8604.T",
+    "total_rows": 589,
+    "made_files": 365,
+    "status": "OK"
+  },
+  {
+    "ticker": "8411.T",
+    "total_rows": 1513,
+    "made_files": 850,
+    "status": "OK"
+  },
+  {
+    "ticker": "4503.T",
+    "total_rows": 1509,
+    "made_files": 1269,
+    "status": "OK"
+  },
+  {
+    "ticker": "6981.T",
+    "total_rows": 1928,
+    "made_files": 1123,
+    "status": "OK"
+  },
+  {
+    "ticker": "7269.T",
+    "total_rows": 1560,
+    "made_files": 874,
+    "status": "OK"
+  },
+  {
+    "ticker": "8308.T",
+    "total_rows": 2131,
+    "made_files": 1791,
+    "status": "OK"
+  },
+  {
+    "ticker": "6752.T",
+    "total_rows": 1626,
+    "made_files": 659,
+    "status": "OK"
+  },
+  {
+    "ticker": "7211.T",
+    "total_rows": 3992,
+    "made_files": 422,
+    "status": "OK"
+  },
+  {
+    "ticker": "4063.T",
+    "total_rows": 797,
+    "made_files": 327,
+    "status": "OK"
+  },
+  {
+    "ticker": "5803.T",
+    "total_rows": 924,
+    "made_files": 552,
+    "status": "OK"
+  },
+  {
+    "ticker": "3697.T",
+    "total_rows": 2,
+    "made_files": 2,
+    "status": "OK"
+  },
+  {
+    "ticker": "8410.T",
+    "total_rows": 792,
+    "made_files": 568,
+    "status": "OK"
+  },
+  {
+    "ticker": "8267.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "6702.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "7453.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "7205.T",
+    "total_rows": 3140,
+    "made_files": 1287,
+    "status": "OK"
+  },
+  {
+    "ticker": "3656.T",
+    "total_rows": 820,
+    "made_files": 123,
+    "status": "OK"
+  },
+  {
+    "ticker": "6146.T",
+    "total_rows": 1888,
+    "made_files": 695,
+    "status": "OK"
+  },
+  {
+    "ticker": "8031.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "7182.T",
+    "total_rows": 260,
+    "made_files": 39,
+    "status": "OK"
+  },
+  {
+    "ticker": "4612.T",
+    "total_rows": 1397,
+    "made_files": 22,
+    "status": "OK"
+  },
+  {
+    "ticker": "4543.T",
+    "total_rows": 1285,
+    "made_files": 4,
+    "status": "OK"
+  },
+  {
+    "ticker": "6902.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "7272.T",
+    "total_rows": 392,
+    "made_files": 6,
+    "status": "OK"
+  },
+  {
+    "ticker": "7974.T",
+    "total_rows": 316,
+    "made_files": 1,
+    "status": "OK"
+  },
+  {
+    "ticker": "6178.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "6594.T",
+    "total_rows": 203,
+    "made_files": 203,
+    "status": "OK"
+  },
+  {
+    "ticker": "8766.T",
+    "total_rows": 2007,
+    "made_files": 277,
+    "status": "OK"
+  },
+  {
+    "ticker": "3402.T",
+    "total_rows": 534,
+    "made_files": 81,
+    "status": "OK"
+  },
+  {
+    "ticker": "9503.T",
+    "total_rows": 3051,
+    "made_files": 89,
+    "status": "OK"
+  },
+  {
+    "ticker": "5801.T",
+    "total_rows": 9,
+    "made_files": 3,
+    "status": "OK"
+  },
+  {
+    "ticker": "6326.T",
+    "total_rows": 813,
+    "made_files": 343,
+    "status": "OK"
+  },
+  {
+    "ticker": "8113.T",
+    "total_rows": 798,
+    "made_files": 119,
+    "status": "OK"
+  },
+  {
+    "ticker": "4188.T",
+    "total_rows": 910,
+    "made_files": 341,
+    "status": "OK"
+  },
+  {
+    "ticker": "9509.T",
+    "total_rows": 496,
+    "made_files": 490,
+    "status": "OK"
+  },
+  {
+    "ticker": "6503.T",
+    "total_rows": 541,
+    "made_files": 83,
+    "status": "OK"
+  },
+  {
+    "ticker": "2413.T",
+    "total_rows": 278,
+    "made_files": 41,
+    "status": "OK"
+  },
+  {
+    "ticker": "6971.T",
+    "total_rows": 1265,
+    "made_files": 811,
+    "status": "OK"
+  },
+  {
+    "ticker": "8601.T",
+    "total_rows": 760,
+    "made_files": 531,
+    "status": "OK"
+  },
+  {
+    "ticker": "8002.T",
+    "total_rows": 1435,
+    "made_files": 287,
+    "status": "OK"
+  },
+  {
+    "ticker": "8233.T",
+    "total_rows": 245,
+    "made_files": 245,
+    "status": "OK"
+  },
+  {
+    "ticker": "4519.T",
+    "total_rows": 48,
+    "made_files": 42,
+    "status": "OK"
+  },
+  {
+    "ticker": "7733.T",
+    "total_rows": 1124,
+    "made_files": 287,
+    "status": "OK"
+  },
+  {
+    "ticker": "9504.T",
+    "total_rows": 14,
+    "made_files": 2,
+    "status": "OK"
+  },
+  {
+    "ticker": "6361.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "4502.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "2801.T",
+    "total_rows": 1408,
+    "made_files": 87,
+    "status": "OK"
+  },
+  {
+    "ticker": "1605.T",
+    "total_rows": 389,
+    "made_files": 42,
+    "status": "OK"
+  },
+  {
+    "ticker": "7270.T",
+    "total_rows": 245,
+    "made_files": 245,
+    "status": "OK"
+  },
+  {
+    "ticker": "6701.T",
+    "total_rows": 2912,
+    "made_files": 1259,
+    "status": "OK"
+  },
+  {
+    "ticker": "6098.T",
+    "total_rows": 2152,
+    "made_files": 800,
+    "status": "OK"
+  },
+  {
+    "ticker": "3231.T",
+    "total_rows": 1238,
+    "made_files": 1016,
+    "status": "OK"
+  },
+  {
+    "ticker": "6963.T",
+    "total_rows": 1300,
+    "made_files": 602,
+    "status": "OK"
+  },
+  {
+    "ticker": "8697.T",
+    "total_rows": 2273,
+    "made_files": 1549,
+    "status": "OK"
+  },
+  {
+    "ticker": "3315.T",
+    "total_rows": 1567,
+    "made_files": 872,
+    "status": "OK"
+  },
+  {
+    "ticker": "3861.T",
+    "total_rows": 775,
+    "made_files": 741,
+    "status": "OK"
+  },
+  {
+    "ticker": "5713.T",
+    "total_rows": 2226,
+    "made_files": 813,
+    "status": "OK"
+  },
+  {
+    "ticker": "8802.T",
+    "total_rows": 2473,
+    "made_files": 125,
+    "status": "OK"
+  },
+  {
+    "ticker": "7012.T",
+    "total_rows": 1354,
+    "made_files": 22,
+    "status": "OK"
+  },
+  {
+    "ticker": "7751.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "6869.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "9107.T",
+    "total_rows": 509,
+    "made_files": 281,
+    "status": "OK"
+  },
+  {
+    "ticker": "3092.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "9101.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "4661.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "8725.T",
+    "total_rows": 1290,
+    "made_files": 609,
+    "status": "OK"
+  },
+  {
+    "ticker": "2914.T",
+    "total_rows": 2354,
+    "made_files": 801,
+    "status": "OK"
+  },
+  {
+    "ticker": "4446.T",
+    "total_rows": 815,
+    "made_files": 127,
+    "status": "OK"
+  },
+  {
+    "ticker": "9843.T",
+    "total_rows": 1647,
+    "made_files": 1647,
+    "status": "OK"
+  },
+  {
+    "ticker": "4901.T",
+    "total_rows": 2098,
+    "made_files": 1584,
+    "status": "OK"
+  },
+  {
+    "ticker": "6954.T",
+    "total_rows": 3746,
+    "made_files": 1243,
+    "status": "OK"
+  },
+  {
+    "ticker": "7936.T",
+    "total_rows": 2817,
+    "made_files": 1139,
+    "status": "OK"
+  },
+  {
+    "ticker": "5076.T",
+    "total_rows": 3027,
+    "made_files": 937,
+    "status": "OK"
+  },
+  {
+    "ticker": "3064.T",
+    "total_rows": 2699,
+    "made_files": 380,
+    "status": "OK"
+  },
+  {
+    "ticker": "8593.T",
+    "total_rows": 3002,
+    "made_files": 693,
+    "status": "OK"
+  },
+  {
+    "ticker": "8473.T",
+    "total_rows": 2096,
+    "made_files": 948,
+    "status": "OK"
+  },
+  {
+    "ticker": "3407.T",
+    "total_rows": 3003,
+    "made_files": 188,
+    "status": "OK"
+  },
+  {
+    "ticker": "8331.T",
+    "total_rows": 345,
+    "made_files": 69,
+    "status": "OK"
+  },
+  {
+    "ticker": "8591.T",
+    "total_rows": 1079,
+    "made_files": 368,
+    "status": "OK"
+  },
+  {
+    "ticker": "4751.T",
+    "total_rows": 814,
+    "made_files": 780,
+    "status": "OK"
+  },
+  {
+    "ticker": "4004.T",
+    "total_rows": 285,
+    "made_files": 249,
+    "status": "OK"
+  },
+  {
+    "ticker": "5802.T",
+    "total_rows": 1301,
+    "made_files": 608,
+    "status": "OK"
+  },
+  {
+    "ticker": "5411.T",
+    "total_rows": 1028,
+    "made_files": 532,
+    "status": "OK"
+  },
+  {
+    "ticker": "6323.T",
+    "total_rows": 716,
+    "made_files": 497,
+    "status": "OK"
+  },
+  {
+    "ticker": "7762.T",
+    "total_rows": 3015,
+    "made_files": 54,
+    "status": "OK"
+  },
+  {
+    "ticker": "3853.T",
+    "total_rows": 518,
+    "made_files": 288,
+    "status": "OK"
+  },
+  {
+    "ticker": "3099.T",
+    "total_rows": 332,
+    "made_files": 53,
+    "status": "OK"
+  },
+  {
+    "ticker": "9506.T",
+    "total_rows": 516,
+    "made_files": 287,
+    "status": "OK"
+  },
+  {
+    "ticker": "7202.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "7731.T",
+    "total_rows": 799,
+    "made_files": 569,
+    "status": "OK"
+  },
+  {
+    "ticker": "7186.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "8309.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "SKIP_NO_INTRADAY"
+  },
+  {
+    "ticker": "6472.T",
+    "total_rows": 1014,
+    "made_files": 777,
+    "status": "OK"
+  },
+  {
+    "ticker": "4507.T",
+    "total_rows": 526,
+    "made_files": 82,
+    "status": "OK"
+  },
+  {
+    "ticker": "5019.T",
+    "total_rows": 245,
+    "made_files": 245,
+    "status": "OK"
+  },
+  {
+    "ticker": "8524.T",
+    "total_rows": 1403,
+    "made_files": 832,
+    "status": "OK"
+  },
+  {
+    "ticker": "4385.T",
+    "total_rows": 257,
+    "made_files": 39,
+    "status": "OK"
+  },
+  {
+    "ticker": "8848.T",
+    "total_rows": 2621,
+    "made_files": 866,
+    "status": "OK"
+  },
+  {
+    "ticker": "2802.T",
+    "total_rows": 1093,
+    "made_files": 371,
+    "status": "OK"
+  },
+  {
+    "ticker": "2897.T",
+    "total_rows": 3820,
+    "made_files": 418,
+    "status": "OK"
+  },
+  {
+    "ticker": "9020.T",
+    "total_rows": 1333,
+    "made_files": 627,
+    "status": "OK"
+  },
+  {
+    "ticker": "7259.T",
+    "total_rows": 804,
+    "made_files": 328,
+    "status": "OK"
+  },
+  {
+    "ticker": "5726.T",
+    "total_rows": 1900,
+    "made_files": 104,
+    "status": "OK"
+  },
+  {
+    "ticker": "6506.T",
+    "total_rows": 1006,
+    "made_files": 776,
+    "status": "OK"
+  },
+  {
+    "ticker": "2503.T",
+    "total_rows": 2231,
+    "made_files": 2231,
+    "status": "OK"
+  },
+  {
+    "ticker": "9104.T",
+    "total_rows": 4768,
+    "made_files": 2559,
+    "status": "OK"
+  },
+  {
+    "ticker": "9022.T",
+    "total_rows": 2049,
+    "made_files": 1563,
+    "status": "OK"
+  },
+  {
+    "ticker": "9831.T",
+    "total_rows": 2562,
+    "made_files": 1524,
+    "status": "OK"
+  },
+  {
+    "ticker": "7003.T",
+    "total_rows": 1486,
+    "made_files": 1486,
+    "status": "OK"
+  },
+  {
+    "ticker": "7832.T",
+    "total_rows": 1109,
+    "made_files": 367,
+    "status": "OK"
+  },
+  {
+    "ticker": "3289.T",
+    "total_rows": 819,
+    "made_files": 327,
+    "status": "OK"
+  },
+  {
+    "ticker": "4528.T",
+    "total_rows": 515,
+    "made_files": 302,
+    "status": "OK"
+  },
+  {
+    "ticker": "8001.T",
+    "total_rows": 1363,
+    "made_files": 573,
+    "status": "OK"
+  },
+  {
+    "ticker": "8515.T",
+    "total_rows": 2164,
+    "made_files": 554,
+    "status": "OK"
+  },
+  {
+    "ticker": "2267.T",
+    "total_rows": 761,
+    "made_files": 497,
+    "status": "OK"
+  },
+  {
+    "ticker": "1802.T",
+    "total_rows": 532,
+    "made_files": 77,
+    "status": "OK"
+  },
+  {
+    "ticker": "1803.T",
+    "total_rows": 1411,
+    "made_files": 7,
+    "status": "OK"
+  },
+  {
+    "ticker": "6871.T",
+    "total_rows": 2668,
+    "made_files": 802,
+    "status": "OK"
+  },
+  {
+    "ticker": "8053.T",
+    "total_rows": 778,
+    "made_files": 532,
+    "status": "OK"
+  },
+  {
+    "ticker": "5991.T",
+    "total_rows": 734,
+    "made_files": 734,
+    "status": "OK"
+  },
+  {
+    "ticker": "7167.T",
+    "total_rows": 1526,
+    "made_files": 1052,
+    "status": "OK"
+  },
+  {
+    "ticker": "8630.T",
+    "total_rows": 1484,
+    "made_files": 741,
+    "status": "OK"
+  },
+  {
+    "ticker": "8015.T",
+    "total_rows": 1617,
+    "made_files": 917,
+    "status": "OK"
+  },
+  {
+    "ticker": "9502.T",
+    "total_rows": 247,
+    "made_files": 247,
+    "status": "OK"
+  },
+  {
+    "ticker": "9697.T",
+    "total_rows": 1399,
+    "made_files": 249,
+    "status": "OK"
+  },
+  {
+    "ticker": "6976.T",
+    "total_rows": 1660,
+    "made_files": 304,
+    "status": "OK"
+  },
+  {
+    "ticker": "6988.T",
+    "total_rows": 1024,
+    "made_files": 795,
+    "status": "OK"
+  },
+  {
+    "ticker": "6965.T",
+    "total_rows": 545,
+    "made_files": 287,
+    "status": "OK"
+  },
+  {
+    "ticker": "7752.T",
+    "total_rows": 1155,
+    "made_files": 5,
+    "status": "OK"
+  },
+  {
+    "ticker": "6301.T",
+    "total_rows": 2651,
+    "made_files": 576,
+    "status": "OK"
+  },
+  {
+    "ticker": "9202.T",
+    "total_rows": 1896,
+    "made_files": 743,
+    "status": "OK"
+  },
+  {
+    "ticker": "3110.T",
+    "total_rows": 926,
+    "made_files": 283,
+    "status": "OK"
+  },
+  {
+    "ticker": "3003.T",
+    "total_rows": 1674,
+    "made_files": 287,
+    "status": "OK"
+  },
+  {
+    "ticker": "5535.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "5706.T",
+    "total_rows": 748,
+    "made_files": 748,
+    "status": "OK"
+  },
+  {
+    "ticker": "9424.T",
+    "total_rows": 2837,
+    "made_files": 1031,
+    "status": "OK"
+  },
+  {
+    "ticker": "7735.T",
+    "total_rows": 1735,
+    "made_files": 981,
+    "status": "OK"
+  },
+  {
+    "ticker": "9508.T",
+    "total_rows": 2213,
+    "made_files": 588,
+    "status": "OK"
+  },
+  {
+    "ticker": "1911.T",
+    "total_rows": 2042,
+    "made_files": 1777,
+    "status": "OK"
+  },
+  {
+    "ticker": "4911.T",
+    "total_rows": 3264,
+    "made_files": 1483,
+    "status": "OK"
+  },
+  {
+    "ticker": "9023.T",
+    "total_rows": 1093,
+    "made_files": 162,
+    "status": "OK"
+  },
+  {
+    "ticker": "8698.T",
+    "total_rows": 1073,
+    "made_files": 364,
+    "status": "OK"
+  },
+  {
+    "ticker": "8795.T",
+    "total_rows": 770,
+    "made_files": 545,
+    "status": "OK"
+  },
+  {
+    "ticker": "4902.T",
+    "total_rows": 777,
+    "made_files": 741,
+    "status": "OK"
+  },
+  {
+    "ticker": "1861.T",
+    "total_rows": 274,
+    "made_files": 250,
+    "status": "OK"
+  },
+  {
+    "ticker": "4704.T",
+    "total_rows": 1548,
+    "made_files": 858,
+    "status": "OK"
+  },
+  {
+    "ticker": "9201.T",
+    "total_rows": 1218,
+    "made_files": 1218,
+    "status": "OK"
+  },
+  {
+    "ticker": "4452.T",
+    "total_rows": 2,
+    "made_files": 2,
+    "status": "OK"
+  },
+  {
+    "ticker": "2127.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "9021.T",
+    "total_rows": 1247,
+    "made_files": 4,
+    "status": "OK"
+  },
+  {
+    "ticker": "5406.T",
+    "total_rows": 1,
+    "made_files": 1,
+    "status": "OK"
+  },
+  {
+    "ticker": "9009.T",
+    "total_rows": 1,
+    "made_files": 1,
+    "status": "OK"
+  },
+  {
+    "ticker": "4062.T",
+    "total_rows": 0,
+    "made_files": 0,
+    "status": "OK"
+  },
+  {
+    "ticker": "3038.T",
+    "total_rows": 43,
+    "made_files": 43,
+    "status": "OK"
+  },
+  {
+    "ticker": "5108.T",
+    "total_rows": 302,
+    "made_files": 44,
+    "status": "OK"
+  },
+  {
+    "ticker": "7951.T",
+    "total_rows": 263,
+    "made_files": 39,
+    "status": "OK"
+  }
+]

@@ -1,0 +1,5 @@
+[CMD] "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Continue'; if(Test-Path 'C:\AI\asagake\scripts\run_full.ps1'){ Unblock-File -Path 'C:\AI\asagake\scripts\run_full.ps1' -ErrorAction SilentlyContinue; & 'C:\AI\asagake\scripts\run_full.ps1'; } else{ Write-Error 'ps1 not found' }"
+---- STDOUT ----
+
+---- STDERR ----
+

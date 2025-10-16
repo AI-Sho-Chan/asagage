@@ -1,0 +1,799 @@
+{
+  "run_dir": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914",
+  "files_total": 198,
+  "accepted": [
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\1605.T.parquet",
+      "rows": 7843
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\1802.T.parquet",
+      "rows": 7815
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\1803.T.parquet",
+      "rows": 7850
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\1861.T.parquet",
+      "rows": 5406
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\1911.T.parquet",
+      "rows": 7827
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\2127.T.parquet",
+      "rows": 7845
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\2181.T.parquet",
+      "rows": 7753
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\2267.T.parquet",
+      "rows": 7758
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\2413.T.parquet",
+      "rows": 7826
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\2502.T.parquet",
+      "rows": 7872
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\2503.T.parquet",
+      "rows": 7790
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\2801.T.parquet",
+      "rows": 7747
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\2802.T.parquet",
+      "rows": 7779
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\2897.T.parquet",
+      "rows": 7797
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\2914.T.parquet",
+      "rows": 7721
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3003.T.parquet",
+      "rows": 7577
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3038.T.parquet",
+      "rows": 7653
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3064.T.parquet",
+      "rows": 7874
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3092.T.parquet",
+      "rows": 7686
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3099.T.parquet",
+      "rows": 7836
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3110.T.parquet",
+      "rows": 7270
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3231.T.parquet",
+      "rows": 7835
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3289.T.parquet",
+      "rows": 7689
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3315.T.parquet",
+      "rows": 3648
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3382.T.parquet",
+      "rows": 7774
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3402.T.parquet",
+      "rows": 7868
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3407.T.parquet",
+      "rows": 7808
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3436.T.parquet",
+      "rows": 7844
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3656.T.parquet",
+      "rows": 6618
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3697.T.parquet",
+      "rows": 7862
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3853.T.parquet",
+      "rows": 7793
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\3861.T.parquet",
+      "rows": 7856
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4004.T.parquet",
+      "rows": 7833
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4005.T.parquet",
+      "rows": 7876
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4062.T.parquet",
+      "rows": 7817
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4063.T.parquet",
+      "rows": 7845
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4188.T.parquet",
+      "rows": 7848
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4385.T.parquet",
+      "rows": 7898
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4446.T.parquet",
+      "rows": 2727
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4452.T.parquet",
+      "rows": 7736
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4502.T.parquet",
+      "rows": 7769
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4503.T.parquet",
+      "rows": 7882
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4506.T.parquet",
+      "rows": 7865
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4507.T.parquet",
+      "rows": 7764
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4519.T.parquet",
+      "rows": 7839
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4528.T.parquet",
+      "rows": 7779
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4543.T.parquet",
+      "rows": 7852
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4568.T.parquet",
+      "rows": 7866
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4612.T.parquet",
+      "rows": 7645
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4661.T.parquet",
+      "rows": 7870
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4689.T.parquet",
+      "rows": 7894
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4704.T.parquet",
+      "rows": 7466
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4751.T.parquet",
+      "rows": 7891
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4755.T.parquet",
+      "rows": 7875
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4901.T.parquet",
+      "rows": 7831
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4902.T.parquet",
+      "rows": 7841
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\4911.T.parquet",
+      "rows": 7826
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\5016.T.parquet",
+      "rows": 7872
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\5019.T.parquet",
+      "rows": 7781
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\5020.T.parquet",
+      "rows": 7813
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\5076.T.parquet",
+      "rows": 7558
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\5108.T.parquet",
+      "rows": 7718
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\5401.T.parquet",
+      "rows": 7861
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\5406.T.parquet",
+      "rows": 7709
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\5411.T.parquet",
+      "rows": 7829
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\5535.T.parquet",
+      "rows": 5823
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\5706.T.parquet",
+      "rows": 7816
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\5713.T.parquet",
+      "rows": 7832
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\5726.T.parquet",
+      "rows": 7764
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\5801.T.parquet",
+      "rows": 7894
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\5802.T.parquet",
+      "rows": 7846
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\5803.T.parquet",
+      "rows": 7866
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\5991.T.parquet",
+      "rows": 7434
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6098.T.parquet",
+      "rows": 7762
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6146.T.parquet",
+      "rows": 7870
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6178.T.parquet",
+      "rows": 7828
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6301.T.parquet",
+      "rows": 7832
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6315.T.parquet",
+      "rows": 7854
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6323.T.parquet",
+      "rows": 7800
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6326.T.parquet",
+      "rows": 7837
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6361.T.parquet",
+      "rows": 7789
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6472.T.parquet",
+      "rows": 7767
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6501.T.parquet",
+      "rows": 7863
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6503.T.parquet",
+      "rows": 7840
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6506.T.parquet",
+      "rows": 7727
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6525.T.parquet",
+      "rows": 7867
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6526.T.parquet",
+      "rows": 7864
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6594.T.parquet",
+      "rows": 7798
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6701.T.parquet",
+      "rows": 7823
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6702.T.parquet",
+      "rows": 7843
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6723.T.parquet",
+      "rows": 7872
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6740.T.parquet",
+      "rows": 5269
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6752.T.parquet",
+      "rows": 7867
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6758.T.parquet",
+      "rows": 7861
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6762.T.parquet",
+      "rows": 7864
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6857.T.parquet",
+      "rows": 7869
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6869.T.parquet",
+      "rows": 7709
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6871.T.parquet",
+      "rows": 7327
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6902.T.parquet",
+      "rows": 7855
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6920.T.parquet",
+      "rows": 7872
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6954.T.parquet",
+      "rows": 7820
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6963.T.parquet",
+      "rows": 7883
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6965.T.parquet",
+      "rows": 7792
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6971.T.parquet",
+      "rows": 7867
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6976.T.parquet",
+      "rows": 7774
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6981.T.parquet",
+      "rows": 7860
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\6988.T.parquet",
+      "rows": 7764
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7003.T.parquet",
+      "rows": 7719
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7011.T.parquet",
+      "rows": 7843
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7012.T.parquet",
+      "rows": 7832
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7013.T.parquet",
+      "rows": 7847
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7167.T.parquet",
+      "rows": 7842
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7182.T.parquet",
+      "rows": 7854
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7186.T.parquet",
+      "rows": 7737
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7201.T.parquet",
+      "rows": 7856
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7202.T.parquet",
+      "rows": 7785
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7203.T.parquet",
+      "rows": 7868
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7205.T.parquet",
+      "rows": 7760
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7211.T.parquet",
+      "rows": 7864
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7259.T.parquet",
+      "rows": 7784
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7261.T.parquet",
+      "rows": 7849
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7267.T.parquet",
+      "rows": 7887
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7269.T.parquet",
+      "rows": 7845
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7270.T.parquet",
+      "rows": 7703
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7272.T.parquet",
+      "rows": 7809
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7453.T.parquet",
+      "rows": 7870
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7532.T.parquet",
+      "rows": 7841
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7731.T.parquet",
+      "rows": 7717
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7733.T.parquet",
+      "rows": 7796
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7735.T.parquet",
+      "rows": 7792
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7751.T.parquet",
+      "rows": 7801
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7752.T.parquet",
+      "rows": 7684
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7762.T.parquet",
+      "rows": 7092
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7832.T.parquet",
+      "rows": 7820
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7936.T.parquet",
+      "rows": 7759
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7951.T.parquet",
+      "rows": 7428
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\7974.T.parquet",
+      "rows": 7855
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8001.T.parquet",
+      "rows": 7876
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8002.T.parquet",
+      "rows": 7739
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8015.T.parquet",
+      "rows": 7783
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8031.T.parquet",
+      "rows": 7853
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8035.T.parquet",
+      "rows": 7866
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8053.T.parquet",
+      "rows": 7812
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8058.T.parquet",
+      "rows": 7885
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8113.T.parquet",
+      "rows": 7872
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8136.T.parquet",
+      "rows": 7864
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8233.T.parquet",
+      "rows": 7778
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8267.T.parquet",
+      "rows": 7893
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8306.T.parquet",
+      "rows": 7821
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8308.T.parquet",
+      "rows": 7862
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8309.T.parquet",
+      "rows": 7802
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8316.T.parquet",
+      "rows": 7890
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8331.T.parquet",
+      "rows": 7830
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8410.T.parquet",
+      "rows": 7767
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8411.T.parquet",
+      "rows": 7870
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8473.T.parquet",
+      "rows": 7961
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8515.T.parquet",
+      "rows": 4641
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8524.T.parquet",
+      "rows": 6317
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8591.T.parquet",
+      "rows": 7882
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8593.T.parquet",
+      "rows": 7810
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8601.T.parquet",
+      "rows": 7758
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8604.T.parquet",
+      "rows": 7843
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8630.T.parquet",
+      "rows": 7802
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8697.T.parquet",
+      "rows": 7771
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8698.T.parquet",
+      "rows": 6632
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8725.T.parquet",
+      "rows": 7839
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8729.T.parquet",
+      "rows": 5015
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8750.T.parquet",
+      "rows": 7870
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8766.T.parquet",
+      "rows": 7870
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8795.T.parquet",
+      "rows": 7723
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8801.T.parquet",
+      "rows": 7838
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8802.T.parquet",
+      "rows": 7796
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\8848.T.parquet",
+      "rows": 6038
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9009.T.parquet",
+      "rows": 7413
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9020.T.parquet",
+      "rows": 7741
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9021.T.parquet",
+      "rows": 7643
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9022.T.parquet",
+      "rows": 7724
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9023.T.parquet",
+      "rows": 7759
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9101.T.parquet",
+      "rows": 7852
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9104.T.parquet",
+      "rows": 7832
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9107.T.parquet",
+      "rows": 7840
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9201.T.parquet",
+      "rows": 7638
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9202.T.parquet",
+      "rows": 7778
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9424.T.parquet",
+      "rows": 4289
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9432.T.parquet",
+      "rows": 7872
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9433.T.parquet",
+      "rows": 7869
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9434.T.parquet",
+      "rows": 7872
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9501.T.parquet",
+      "rows": 7860
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9502.T.parquet",
+      "rows": 7750
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9503.T.parquet",
+      "rows": 7864
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9504.T.parquet",
+      "rows": 7818
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9506.T.parquet",
+      "rows": 7690
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9508.T.parquet",
+      "rows": 7715
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9509.T.parquet",
+      "rows": 7855
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9697.T.parquet",
+      "rows": 7804
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9831.T.parquet",
+      "rows": 7724
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9843.T.parquet",
+      "rows": 7618
+    },
+    {
+      "file": "C:\\AI\\asagake\\data\\proc\\features_1m\\RUN_20251013_1914\\9984.T.parquet",
+      "rows": 7858
+    }
+  ],
+  "rejected": []
+}

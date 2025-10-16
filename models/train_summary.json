@@ -1,0 +1,20 @@
+{
+  "run_dir": "C:\\AI\\asagake\\data\\ml\\RUN_20251005_2130",
+  "rows": 1079230,
+  "tickers": 198,
+  "best_score": 0.9701584440261558,
+  "overall_pr_auc": 0.8856016009457387,
+  "profit_proxy_thr": 0.6,
+  "profit_proxy_val": 1.3007339155689939,
+  "features": [
+    "J",
+    "dJ",
+    "vEMA",
+    "d2J",
+    "ATR5",
+    "IBS",
+    "Z20",
+    "ROC5",
+    "Turnover"
+  ]
+}

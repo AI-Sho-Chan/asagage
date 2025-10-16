@@ -1,0 +1,6 @@
+﻿msg
+no trades generated
+rows_read=0
+signals_total=0
+dir=C:\AI\asagake\data\proc\features_1m\RUN_20251003_1116
+"params: theta_J=0.3, theta_v=0.0, lam=0.8, kATR=2.0, Tmax=60, session=False"

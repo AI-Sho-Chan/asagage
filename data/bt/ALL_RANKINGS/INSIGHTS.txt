@@ -1,0 +1,12 @@
+== RANKING SUMMARY (median, sums) ==
+ ranking  n_codes  WR_BACK_med  WR_FWD_med  PF_BACK_med  PF_FWD_med  TR_BACK_sum  TR_FWD_sum
+    TICK      100     0.322989    0.263801     0.313099    0.225288        20546     15625.0
+ NEAGARI      100     0.310578    0.250000     0.297947    0.215155         9728      8238.0
+NESAGARI      100     0.402703    0.239530     0.399574    0.213006         7001      6655.0
+DEKIDAKA      285     0.355348    0.254237     0.323443    0.212093        28159     22962.0
+    YORI      200     0.352146    0.239565     0.324735    0.199787        15701     13788.0
+
+== NOTES ==
+・実運用は PF_FWD_med と TR_FWD_sum の高いランキングを優先。
+・ALLOW_STRICT が空なら ALLOW_RELAX で暫定運用し、日々再評価。
+・銘柄は trades_FWD が少なすぎる高PFを避け、安定性重視で選定。

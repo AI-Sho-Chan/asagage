@@ -7,3 +7,4 @@ out/
 *.xlsm
 
 src/*.egg-info/
+data/signals/
