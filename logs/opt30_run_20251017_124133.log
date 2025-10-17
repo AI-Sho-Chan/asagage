@@ -1,0 +1,29 @@
+[2025-10-17 12:41:33] Run started
+[2025-10-17 12:41:33] Codes limited via output/bt30/RUN_coarse_AM15_20251017_114040/_TOP_CANDIDATES.csv: 22 tickers
+[2025-10-17 12:41:33] Fetching Yahoo Finance 1m bars for 22 tickers (lookback=60, chunk=5)
+[2025-10-17 12:42:02] Entry window marks set: 4401 rows flagged out of 119289
+[2025-10-17 12:42:02] Liquidity filter q=0.50 kept 19 tickers and 59616 rows
+[2025-10-17 12:42:02] Using 1 rolling slices (train=12, forward=4)
+[2025-10-17 12:42:02] Parameter grid size: 750 (mode=refine, signal=j-only)
+[2025-10-17 12:42:52] [1/19] 1360.T: best train_pf_eff=1.270, forward_pf_eff=999.000, trades=55/7
+[2025-10-17 12:42:58] [2/19] 1579.T: best train_pf_eff=0.000, forward_pf_eff=999.000, trades=0/7
+[2025-10-17 12:44:19] [3/19] 285A.T: best train_pf_eff=1.424, forward_pf_eff=999.000, trades=47/12
+[2025-10-17 12:45:16] [4/19] 4062.T: best train_pf_eff=3.147, forward_pf_eff=1.679, trades=17/8
+[2025-10-17 12:45:53] [5/19] 4519.T: best train_pf_eff=999.000, forward_pf_eff=1.232, trades=1/7
+[2025-10-17 12:47:15] [6/19] 4568.T: best train_pf_eff=1.088, forward_pf_eff=999.000, trades=77/13
+[2025-10-17 12:47:45] [7/19] 4755.T: best train_pf_eff=0.434, forward_pf_eff=999.000, trades=16/6
+[2025-10-17 12:48:21] [8/19] 5706.T: best train_pf_eff=0.587, forward_pf_eff=999.000, trades=40/23
+[2025-10-17 12:48:32] [9/19] 5802.T: best train_pf_eff=999.000, forward_pf_eff=0.000, trades=7/0
+[2025-10-17 12:48:49] [10/19] 6301.T: best train_pf_eff=999.000, forward_pf_eff=0.000, trades=2/0
+[2025-10-17 12:49:28] [11/19] 6752.T: best train_pf_eff=3.065, forward_pf_eff=999.000, trades=20/5
+[2025-10-17 12:50:37] [12/19] 6758.T: best train_pf_eff=1.071, forward_pf_eff=1.552, trades=74/28
+[2025-10-17 12:50:50] [13/19] 6762.T: best train_pf_eff=3.623, forward_pf_eff=0.000, trades=4/0
+[2025-10-17 12:52:10] [14/19] 6861.T: best train_pf_eff=1.100, forward_pf_eff=1.676, trades=41/6
+[2025-10-17 12:52:13] [15/19] 6871.T: best train_pf_eff=999.000, forward_pf_eff=0.000, trades=1/0
+[2025-10-17 12:53:14] [16/19] 7735.T: best train_pf_eff=0.672, forward_pf_eff=3.804, trades=24/7
+[2025-10-17 12:53:25] [17/19] 8308.T: best train_pf_eff=8.132, forward_pf_eff=0.000, trades=6/0
+[2025-10-17 12:54:44] [18/19] 8316.T: best train_pf_eff=0.589, forward_pf_eff=999.000, trades=65/17
+[2025-10-17 12:56:09] [19/19] 8411.T: best train_pf_eff=1.720, forward_pf_eff=999.000, trades=41/8
+[2025-10-17 12:56:09] Refine candidates exported to output\excel\candidates_20251017.csv
+[2025-10-17 12:56:09] Excel summary written to output\bt30\RUN_refine_AM15_jonly_20251017_124132\summary_20251017_125609.xlsx
+[2025-10-17 12:56:09] Run completed in 14.6 minutes

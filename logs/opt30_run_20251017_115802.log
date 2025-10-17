@@ -1,0 +1,16 @@
+[2025-10-17 11:58:02] Run started
+[2025-10-17 11:58:02] Codes limited via output/bt30/RUN_coarse_AM10_20251017_112911/_TOP_CANDIDATES.csv: 6 tickers
+[2025-10-17 11:58:02] Fetching Yahoo Finance 1m bars for 6 tickers (lookback=60, chunk=5)
+[2025-10-17 11:58:31] Entry window marks set: 720 rows flagged out of 32769
+[2025-10-17 11:58:31] Liquidity filter q=0.50 kept 6 tickers and 16406 rows
+[2025-10-17 11:58:31] Using 1 rolling slices (train=12, forward=4)
+[2025-10-17 11:58:31] Parameter grid size: 750 (mode=refine, signal=j-only)
+[2025-10-17 11:58:39] [1/6] 4503.T: best train_pf_eff=999.000, forward_pf_eff=0.000, trades=9/0
+[2025-10-17 11:59:24] [2/6] 5801.T: best train_pf_eff=1.975, forward_pf_eff=2.383, trades=18/6
+[2025-10-17 11:59:57] [3/6] 6594.T: best train_pf_eff=0.747, forward_pf_eff=999.000, trades=35/8
+[2025-10-17 12:00:00] [4/6] 7936.T: best train_pf_eff=999.000, forward_pf_eff=0.000, trades=2/0
+[2025-10-17 12:00:33] [5/6] 8002.T: best train_pf_eff=0.939, forward_pf_eff=2.063, trades=27/10
+[2025-10-17 12:00:37] [6/6] 8267.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/3
+[2025-10-17 12:00:37] Refine candidates exported to output\excel\candidates_20251017.csv
+[2025-10-17 12:00:38] Excel summary written to output\bt30\RUN_refine_AM10_jonly_20251017_115800\summary_20251017_120037.xlsx
+[2025-10-17 12:00:38] Run completed in 2.6 minutes

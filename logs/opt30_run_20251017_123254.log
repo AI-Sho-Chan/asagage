@@ -1,0 +1,26 @@
+[2025-10-17 12:32:54] Run started
+[2025-10-17 12:32:54] Codes limited via output/bt30/jcross_am15_codes.csv: 20 tickers
+[2025-10-17 12:32:54] Fetching Yahoo Finance 1m bars for 20 tickers (lookback=60, chunk=5)
+[2025-10-17 12:33:22] Entry window marks set: 3925 rows flagged out of 106873
+[2025-10-17 12:33:22] Liquidity filter q=0.50 kept 16 tickers and 54473 rows
+[2025-10-17 12:33:23] Using 1 rolling slices (train=12, forward=4)
+[2025-10-17 12:33:23] Parameter grid size: 750 (mode=refine, signal=j-cross)
+[2025-10-17 12:34:09] [1/16] 3350.T: best train_pf_eff=2.254, forward_pf_eff=999.000, trades=9/5
+[2025-10-17 12:34:23] [2/16] 3692.T: best train_pf_eff=0.000, forward_pf_eff=13.181, trades=2/5
+[2025-10-17 12:34:38] [3/16] 3905.T: best train_pf_eff=1.886, forward_pf_eff=0.000, trades=7/0
+[2025-10-17 12:34:51] [4/16] 4004.T: best train_pf_eff=0.264, forward_pf_eff=0.000, trades=3/2
+[2025-10-17 12:35:01] [5/16] 4506.T: best train_pf_eff=999.000, forward_pf_eff=0.000, trades=4/0
+[2025-10-17 12:35:43] [6/16] 4519.T: best train_pf_eff=999.000, forward_pf_eff=1.060, trades=5/2
+[2025-10-17 12:36:03] [7/16] 4755.T: best train_pf_eff=0.000, forward_pf_eff=4.400, trades=3/5
+[2025-10-17 12:36:34] [8/16] 5706.T: best train_pf_eff=0.282, forward_pf_eff=999.000, trades=13/9
+[2025-10-17 12:37:16] [9/16] 6525.T: best train_pf_eff=0.695, forward_pf_eff=999.000, trades=12/6
+[2025-10-17 12:37:53] [10/16] 6526.T: best train_pf_eff=0.495, forward_pf_eff=999.000, trades=23/7
+[2025-10-17 12:38:00] [11/16] 6762.T: best train_pf_eff=4.382, forward_pf_eff=0.000, trades=3/0
+[2025-10-17 12:38:43] [12/16] 7012.T: best train_pf_eff=0.519, forward_pf_eff=999.000, trades=13/8
+[2025-10-17 12:39:30] [13/16] 8306.T: best train_pf_eff=0.483, forward_pf_eff=999.000, trades=18/8
+[2025-10-17 12:39:52] [14/16] 8308.T: best train_pf_eff=1.333, forward_pf_eff=999.000, trades=11/3
+[2025-10-17 12:40:20] [15/16] 8729.T: best train_pf_eff=2.341, forward_pf_eff=4.732, trades=13/6
+[2025-10-17 12:41:17] [16/16] 9983.T: best train_pf_eff=0.611, forward_pf_eff=999.000, trades=12/5
+[2025-10-17 12:41:17] Refine candidates exported to output\excel\candidates_20251017.csv
+[2025-10-17 12:41:17] Excel summary written to output\bt30\RUN_refine_AM15_jcross_20251017_123253\summary_20251017_124117.xlsx
+[2025-10-17 12:41:17] Run completed in 8.4 minutes

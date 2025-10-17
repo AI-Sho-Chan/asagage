@@ -1,0 +1,7 @@
+[2025-10-17 17:08:50] Run started
+[2025-10-17 17:08:50] Codes limited via output\bt30\NIGHTLY_20251017\universe_amt_top_300_2025-10-17.csv: 300 tickers
+[2025-10-17 17:08:50] Fetching Yahoo Finance 1m bars for 300 tickers (lookback=60, chunk=5)
+[2025-10-17 17:10:24] Entry window marks set: 34639 rows flagged out of 1553831
+[2025-10-17 17:10:26] Liquidity filter q=0.50 kept 300 tickers and 811565 rows
+[2025-10-17 17:10:26] Using 1 rolling slices (train=12, forward=4)
+[2025-10-17 17:10:26] Parameter grid size: 72 (mode=coarse, signal=j-only)

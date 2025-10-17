@@ -1,0 +1,3 @@
+﻿code,mode,signal_mode,ATR_n,TPk,SLk,J_th,dJ_th,vEMA_th,TMAX,train_trades,train_winrate,train_pf,train_pf_eff,train_exp_bp,train_slices_pass,train_slices_total
+4568.T,refine,full,1,2.5,0.8,0.3,0.0,0.01,60,20,0.1,0.3676470588235294,0.3467643467643468,-0.4708,0,1
+9432.T,refine,full,3,2.5,1.5,0.3,0.01,0.0,60,17,0.47058823529411764,1.4814814814814814,1.4802179578298984,0.38155294117647076,0,1

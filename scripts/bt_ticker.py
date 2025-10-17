@@ -138,8 +138,8 @@ def grid_eval(df: pd.DataFrame):
                                 if (best is None) or ((m["pf"], m["winrate"])>(best["pf"], best["winrate"])):
                                     best = rec
     grid = pd.DataFrame(outs)
-    best = (grid.sort_values(["code","pf","winrate"], ascending=[True,False,False])
-                 .drop_duplicates("code","first"))
+    best = (grid.sort_values(["code","pf","winrate"], ascending=[True, False, False])
+             .drop_duplicates(subset=["code"], keep="first"))   # ←修正
     return best, grid
 
 # ---------- 5) 出力フォルダ（ユニーク） ----------

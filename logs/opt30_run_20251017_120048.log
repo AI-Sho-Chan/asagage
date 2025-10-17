@@ -1,0 +1,12 @@
+[2025-10-17 12:00:48] Run started
+[2025-10-17 12:00:48] Fetching Yahoo Finance 1m bars for 300 tickers (lookback=60, chunk=5)
+[2025-10-17 12:01:34] Chunk fetch error 2025-08-23 - 2025-08-28: Failed to perform, curl: (28) Operation timed out after 30005 milliseconds with 0 bytes received. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+[2025-10-17 12:03:03] Entry window marks set: 34639 rows flagged out of 1553531
+[2025-10-17 12:03:03] Liquidity filter q=0.50 kept 229 tickers and 811265 rows
+[2025-10-17 12:03:03] Using 1 rolling slices (train=12, forward=4)
+[2025-10-17 12:03:03] Parameter grid size: 72 (mode=coarse, signal=j-cross)
+[2025-10-17 12:03:06] [1/229] 1321.T: best train_pf_eff=0.584, forward_pf_eff=69.952, trades=16/6
+[2025-10-17 12:03:09] [2/229] 1357.T: best train_pf_eff=0.240, forward_pf_eff=3.164, trades=13/5
+[2025-10-17 12:03:12] [3/229] 1360.T: best train_pf_eff=0.413, forward_pf_eff=2.866, trades=11/5
+[2025-10-17 12:03:14] [4/229] 1458.T: best train_pf_eff=1.079, forward_pf_eff=0.457, trades=13/5
+[2025-10-17 12:03:17] [5/229] 1540.T: best train_pf_eff=0.548, forward_pf_eff=0.000, trades=15/5

@@ -1,0 +1,3 @@
+﻿code,mode,signal_mode,ATR_n,TPk,SLk,J_th,dJ_th,vEMA_th,TMAX,train_trades,train_winrate,train_pf,train_pf_eff,train_exp_bp,train_slices_pass,train_slices_total
+4568.T,refine,j-cross,8,2.5,0.8,0.3,0.0,0.0,60,19,0.2631578947368421,1.2019230769230769,1.1145996860282572,0.0676210526315788,0,1
+9432.T,refine,j-cross,3,2.5,0.8,0.3,0.0,0.0,60,19,0.42105263157894735,2.5,2.2697302697302693,0.5886736842105262,0,1

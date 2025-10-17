@@ -1,0 +1,2 @@
+﻿mode,signal_mode,code,ATR_n,TPk,SLk,J_th,dJ_th,vEMA_th,TMAX,train_wins,train_losses,train_flats,train_trades,train_winrate,train_pf,train_pf_eff,train_exp_bp,train_slices_pass,train_slices_total,forward_wins,forward_losses,forward_flats,forward_trades,forward_winrate,forward_pf,forward_pf_eff,forward_exp_bp,forward_slices_pass,forward_slices_total
+refine,j-only,9433.T,8,2.5,0.8,0.4,0.0,0.0,60,14,42,4,60,0.23333333333333334,1.0416666666666665,0.9498327759197326,-0.03079999999999994,0,1,7,11,2,20,0.35,1.9886363636363635,1.6804733727810646,0.35419999999999985,1,1

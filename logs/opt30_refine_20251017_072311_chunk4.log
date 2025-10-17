@@ -1,0 +1,18 @@
+[2025-10-17 07:23:13] Run started
+[2025-10-17 07:23:13] Codes limited via data/bt_temp/refine_codes/chunk_4.csv: 9 tickers
+[2025-10-17 07:23:13] Fetching Yahoo Finance 1m bars for 9 tickers (lookback=60, chunk=5)
+[2025-10-17 07:23:38] Session filter kept 2043 / 55404 rows
+[2025-10-17 07:23:38] Liquidity filter quantile=0.50 kept 9 tickers
+[2025-10-17 07:23:38] Using 2 rolling slices (train=12, forward=4)
+[2025-10-17 07:23:38] Parameter grid size: 4320 (mode=refine)
+[2025-10-17 07:24:28] [1/9] 2413.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=5/3
+[2025-10-17 07:25:42] [2/9] 4004.T: best train_pf_eff=0.749, forward_pf_eff=0.000, trades=11/9
+[2025-10-17 07:27:01] [3/9] 5706.T: best train_pf_eff=1.049, forward_pf_eff=0.899, trades=24/11
+[2025-10-17 07:27:50] [4/9] 6323.T: best train_pf_eff=999.000, forward_pf_eff=0.250, trades=2/5
+[2025-10-17 07:29:06] [5/9] 6981.T: best train_pf_eff=0.499, forward_pf_eff=0.799, trades=15/7
+[2025-10-17 07:29:39] [6/9] 7532.T: best train_pf_eff=999.000, forward_pf_eff=0.000, trades=4/0
+[2025-10-17 07:30:59] [7/9] 8306.T: best train_pf_eff=0.421, forward_pf_eff=0.333, trades=23/7
+[2025-10-17 07:32:07] [8/9] 8729.T: best train_pf_eff=1.249, forward_pf_eff=1.199, trades=13/8
+[2025-10-17 07:33:05] [9/9] 9843.T: best train_pf_eff=0.533, forward_pf_eff=1.065, trades=10/7
+[2025-10-17 07:33:05] Refine candidates exported to output\excel\candidates_20251017.csv
+[2025-10-17 07:33:05] Run completed in 9.9 minutes

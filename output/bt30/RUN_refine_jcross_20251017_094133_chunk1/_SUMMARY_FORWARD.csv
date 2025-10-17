@@ -1,0 +1,4 @@
+﻿code,mode,signal_mode,forward_trades,forward_winrate,forward_pf,forward_pf_eff,forward_exp_bp,forward_slices_pass,forward_slices_total
+1540.T,refine,j-cross,2,0.0,0.0,0.0,-0.8008000000000001,0,1
+7741.T,refine,j-cross,5,0.6,4.6875,4.681318681318681,1.1791999999999998,1,1
+9983.T,refine,j-cross,5,0.6,3.75,3.7458033573141485,1.0992,1,1

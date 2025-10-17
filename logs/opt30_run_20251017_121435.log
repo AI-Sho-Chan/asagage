@@ -1,0 +1,23 @@
+[2025-10-17 12:14:35] Run started
+[2025-10-17 12:14:35] Codes limited via output/bt30/jcross_am10_codes.csv: 15 tickers
+[2025-10-17 12:14:35] Fetching Yahoo Finance 1m bars for 15 tickers (lookback=60, chunk=5)
+[2025-10-17 12:15:04] Entry window marks set: 1759 rows flagged out of 81511
+[2025-10-17 12:15:04] Liquidity filter q=0.50 kept 13 tickers and 43706 rows
+[2025-10-17 12:15:04] Using 1 rolling slices (train=12, forward=4)
+[2025-10-17 12:15:04] Parameter grid size: 750 (mode=refine, signal=j-cross)
+[2025-10-17 12:15:14] [1/13] 1579.T: best train_pf_eff=0.000, forward_pf_eff=1.925, trades=2/5
+[2025-10-17 12:15:26] [2/13] 3905.T: best train_pf_eff=999.000, forward_pf_eff=0.000, trades=3/0
+[2025-10-17 12:16:00] [3/13] 4568.T: best train_pf_eff=0.278, forward_pf_eff=999.000, trades=12/5
+[2025-10-17 12:16:04] [4/13] 4911.T: best train_pf_eff=0.000, forward_pf_eff=0.347, trades=0/2
+[2025-10-17 12:16:27] [5/13] 5706.T: best train_pf_eff=1.418, forward_pf_eff=999.000, trades=9/6
+[2025-10-17 12:16:52] [6/13] 6315.T: best train_pf_eff=3.600, forward_pf_eff=0.000, trades=6/0
+[2025-10-17 12:17:30] [7/13] 6525.T: best train_pf_eff=0.500, forward_pf_eff=999.000, trades=8/5
+[2025-10-17 12:18:07] [8/13] 6920.T: best train_pf_eff=0.802, forward_pf_eff=999.000, trades=17/6
+[2025-10-17 12:18:19] [9/13] 7003.T: best train_pf_eff=2.863, forward_pf_eff=0.000, trades=4/2
+[2025-10-17 12:19:02] [10/13] 7735.T: best train_pf_eff=2.627, forward_pf_eff=999.000, trades=11/6
+[2025-10-17 12:19:40] [11/13] 8306.T: best train_pf_eff=0.653, forward_pf_eff=999.000, trades=14/7
+[2025-10-17 12:19:44] [12/13] 8308.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=1/0
+[2025-10-17 12:20:24] [13/13] 8316.T: best train_pf_eff=0.777, forward_pf_eff=999.000, trades=15/6
+[2025-10-17 12:20:24] Refine candidates exported to output\excel\candidates_20251017.csv
+[2025-10-17 12:20:24] Excel summary written to output\bt30\RUN_refine_AM10_jcross_20251017_121434\summary_20251017_122024.xlsx
+[2025-10-17 12:20:24] Run completed in 5.8 minutes

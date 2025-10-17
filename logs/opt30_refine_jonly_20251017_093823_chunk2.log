@@ -1,0 +1,12 @@
+[2025-10-17 09:38:26] Run started
+[2025-10-17 09:38:26] Codes limited via C:\AI\asagake\data\bt_temp\refine_coarse_v2\chunk_2.csv: 3 tickers
+[2025-10-17 09:38:26] Fetching Yahoo Finance 1m bars for 3 tickers (lookback=60, chunk=5)
+[2025-10-17 09:38:54] Session filter kept 610 / 16380 rows
+[2025-10-17 09:38:54] Liquidity filter quantile=0.50 kept 2 tickers
+[2025-10-17 09:38:54] Using 1 rolling slices (train=12, forward=4)
+[2025-10-17 09:38:54] Parameter grid size: 2250 (mode=refine, signal=j-only)
+[2025-10-17 09:39:35] [1/2] 4568.T: best train_pf_eff=0.499, forward_pf_eff=3.122, trades=54/9
+[2025-10-17 09:40:17] [2/2] 9432.T: best train_pf_eff=1.396, forward_pf_eff=1.560, trades=55/18
+[2025-10-17 09:40:17] Refine candidates exported to output\excel\candidates_20251017.csv
+[2025-10-17 09:40:18] Excel summary written to output\bt30\RUN_refine_jonly_20251017_093823_chunk2\summary_20251017_094017.xlsx
+[2025-10-17 09:40:18] Run completed in 1.9 minutes

@@ -1,0 +1,7 @@
+﻿code,mode,signal_mode,forward_trades,forward_winrate,forward_pf,forward_pf_eff,forward_exp_bp,forward_slices_pass,forward_slices_total
+4503.T,refine,j-only,0,0.0,0.0,0.0,0.0,0,1
+5801.T,refine,j-only,6,0.5,2.3827442659402216,2.3827442659402216,26.43243200956918,1,1
+6594.T,refine,j-only,8,1.0,999.0,999.0,31.273352845357763,1,1
+7936.T,refine,j-only,0,0.0,0.0,0.0,0.0,0,1
+8002.T,refine,j-only,10,0.9,2.0626232458758436,2.062623245875844,5.149895922877545,1,1
+8267.T,refine,j-only,3,0.0,0.0,0.0,-90.579665660526,0,1
