@@ -76,6 +76,18 @@ Private Sub ApplyRealtimeColumns(ByVal ws As Worksheet)
         fillLast = DASH_DATA_START + DASH_FORMULA_ROWS
     End If
 
+    Dim signalStatusCol As Long
+    signalStatusCol = FindColumn(ws, DASH_HEADER_ROW, HEADER_SIGNAL_STATUS_JP)
+    If signalStatusCol > 0 Then
+        SetColumnFormula ws, signalStatusCol, fillLast, "="""""
+    End If
+
+    Dim signalKindCol As Long
+    signalKindCol = FindColumn(ws, DASH_HEADER_ROW, HEADER_SIGNAL_KIND_JP)
+    If signalKindCol > 0 Then
+        SetColumnFormula ws, signalKindCol, fillLast, "="""""
+    End If
+
     Dim nameCol As Long
     nameCol = FindColumn(ws, DASH_HEADER_ROW, HEADER_NAME_JP)
     If nameCol > 0 Then
@@ -185,9 +197,9 @@ Private Function ResolveHeaderAliases(ByVal name As String) As Variant
         Case LCase$(HEADER_NAME_JP)
             ResolveHeaderAliases = Array(HEADER_NAME_JP, "銘柄名称", "Name")
         Case LCase$(HEADER_SIGNAL_STATUS_JP)
-            ResolveHeaderAliases = Array(HEADER_SIGNAL_STATUS_JP, "SignalStatus", "シグナル点灯")
+            ResolveHeaderAliases = Array(HEADER_SIGNAL_STATUS_JP, "SignalStatus", HEADER_SIGNAL_STATUS_JP)
         Case LCase$(HEADER_SIGNAL_KIND_JP)
-            ResolveHeaderAliases = Array(HEADER_SIGNAL_KIND_JP, "SignalKind", "シグナル種別")
+            ResolveHeaderAliases = Array(HEADER_SIGNAL_KIND_JP, "SignalKind", HEADER_SIGNAL_KIND_JP)
         Case LCase$(HEADER_LAST_JP)
             ResolveHeaderAliases = Array(HEADER_LAST_JP, "現在値", "Last")
         Case LCase$(HEADER_VWAP_JP)
@@ -223,6 +235,13 @@ End Sub
 
 Public Sub ButtonStopAuto()
     StopAutoTrading
+End Sub
+
+Public Sub ResetDashboardHeaders()
+    EnsureSetup
+    Dim ws As Worksheet
+    Set ws = EnsureSheet(SHEET_DASHBOARD)
+    EnsureHeaders ws
 End Sub
 
 Public Sub ButtonRefreshNow()
