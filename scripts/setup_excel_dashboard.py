@@ -15,7 +15,7 @@ BUTTONS = [
 
 HEADER_OFFSET_COL = 8
 HEADERS = [
-    "Ticker", "銘柄名", "現在値", "出来高加重平均", "Selected", "SignalMode", "Session", "ATR_n", "TPk", "SLk", "J_th",
+    "Ticker", "銘柄名", "シグナル点灯", "シグナル種別", "現在値", "出来高加重平均", "Selected", "SignalMode", "Session", "ATR_n", "TPk", "SLk", "J_th",
     "ForwardPF", "ForwardTrades", "WinCI_L", "WinCI_H", "ExpBootMean", "ExpBootLow", "ExpBootHigh",
     "ForwardAvgBars", "GapBucket", "GapRule", "GapSummary", "前日終値", "気配値(買)", "気配値(売)", "気配値(中央)",
     "ライブギャップ(bp)", "ライブギャップ帯", "ライブアクション", "DynamicQty"

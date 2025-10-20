@@ -40,6 +40,8 @@ Private Const DASH_FORMULA_ROWS As Long = 400
 Private Const HEADER_NAME_JP As String = "銘柄名"
 Private Const HEADER_LAST_JP As String = "現在値"
 Private Const HEADER_VWAP_JP As String = "出来高加重平均"
+Private Const HEADER_SIGNAL_STATUS_JP As String = "シグナル点灯"
+Private Const HEADER_SIGNAL_KIND_JP As String = "シグナル種別"
 Private Const HEADER_PREV_CLOSE_JP As String = "前日終値"
 Private Const HEADER_PREOPEN_BID_JP As String = "気配値(買)"
 Private Const HEADER_PREOPEN_ASK_JP As String = "気配値(売)"
@@ -181,9 +183,13 @@ Private Function ResolveHeaderAliases(ByVal name As String) As Variant
         Case "ticker"
             ResolveHeaderAliases = Array("Ticker")
         Case LCase$(HEADER_NAME_JP)
-            ResolveHeaderAliases = Array(HEADER_NAME_JP, "銘柄名称")
+            ResolveHeaderAliases = Array(HEADER_NAME_JP, "銘柄名称", "Name")
+        Case LCase$(HEADER_SIGNAL_STATUS_JP)
+            ResolveHeaderAliases = Array(HEADER_SIGNAL_STATUS_JP, "SignalStatus", "シグナル点灯")
+        Case LCase$(HEADER_SIGNAL_KIND_JP)
+            ResolveHeaderAliases = Array(HEADER_SIGNAL_KIND_JP, "SignalKind", "シグナル種別")
         Case LCase$(HEADER_LAST_JP)
-            ResolveHeaderAliases = Array(HEADER_LAST_JP, "現在値")
+            ResolveHeaderAliases = Array(HEADER_LAST_JP, "現在値", "Last")
         Case LCase$(HEADER_VWAP_JP)
             ResolveHeaderAliases = Array(HEADER_VWAP_JP, "出来高加重平均", "VWAP")
         Case "prevclose"
@@ -341,7 +347,7 @@ End Sub
 
 Private Sub EnsureHeaders(ByVal ws As Worksheet)
     Dim headers As Variant
-    headers = Array("Ticker", HEADER_NAME_JP, HEADER_LAST_JP, HEADER_VWAP_JP, "Selected", "SignalMode", "Session", "ATR_n", "TPk", "SLk", "J_th", "ForwardPF", "ForwardTrades", "WinCI_L", "WinCI_H", "ExpBootMean", "ExpBootLow", "ExpBootHigh", "ForwardAvgBars", "GapBucket", "GapRule", "GapSummary", HEADER_PREV_CLOSE_JP, HEADER_PREOPEN_BID_JP, HEADER_PREOPEN_ASK_JP, HEADER_PREOPEN_MID_JP, HEADER_LIVE_GAP_BP_JP, HEADER_LIVE_GAP_BUCKET_JP, HEADER_LIVE_GAP_ACTION_JP, "DynamicQty")
+    headers = Array("Ticker", HEADER_NAME_JP, HEADER_SIGNAL_STATUS_JP, HEADER_SIGNAL_KIND_JP, HEADER_LAST_JP, HEADER_VWAP_JP, "Selected", "SignalMode", "Session", "ATR_n", "TPk", "SLk", "J_th", "ForwardPF", "ForwardTrades", "WinCI_L", "WinCI_H", "ExpBootMean", "ExpBootLow", "ExpBootHigh", "ForwardAvgBars", "GapBucket", "GapRule", "GapSummary", HEADER_PREV_CLOSE_JP, HEADER_PREOPEN_BID_JP, HEADER_PREOPEN_ASK_JP, HEADER_PREOPEN_MID_JP, HEADER_LIVE_GAP_BP_JP, HEADER_LIVE_GAP_BUCKET_JP, HEADER_LIVE_GAP_ACTION_JP, "DynamicQty")
     Dim baseCol As Long: baseCol = 8 ' column H
     Dim i As Long
     For i = LBound(headers) To UBound(headers)
@@ -418,10 +424,12 @@ Private Sub PushCandidatesToDashboard()
     Set wsDash = EnsureSheet(SHEET_DASHBOARD)
     Dim baseCol As Long: baseCol = FindColumn(wsDash, DASH_HEADER_ROW, "Ticker")
     If baseCol = 0 Then baseCol = 8
-    Dim clearWidth As Long: clearWidth = 32
+    Dim clearWidth As Long: clearWidth = 40
     wsDash.Range(wsDash.Cells(DASH_DATA_START, baseCol), wsDash.Cells(wsDash.rows.Count, baseCol + clearWidth)).ClearContents
 
     Dim colSelectedDash As Long: colSelectedDash = FindColumn(wsDash, DASH_HEADER_ROW, "Selected")
+    Dim colSignalStatusDash As Long: colSignalStatusDash = FindColumn(wsDash, DASH_HEADER_ROW, HEADER_SIGNAL_STATUS_JP)
+    Dim colSignalKindDash As Long: colSignalKindDash = FindColumn(wsDash, DASH_HEADER_ROW, HEADER_SIGNAL_KIND_JP)
     Dim colSignalDash As Long: colSignalDash = FindColumn(wsDash, DASH_HEADER_ROW, "SignalMode")
     Dim colSessionDash As Long: colSessionDash = FindColumn(wsDash, DASH_HEADER_ROW, "Session")
     Dim colATRDash As Long: colATRDash = FindColumn(wsDash, DASH_HEADER_ROW, "ATR_n")
@@ -451,6 +459,8 @@ Private Sub PushCandidatesToDashboard()
         If Len(ticker) = 0 Then GoTo NextCandidate
 
         wsDash.Cells(targetRow, colTickerDash).value = ticker
+        If colSignalStatusDash > 0 Then wsDash.Cells(targetRow, colSignalStatusDash).value = ""
+        If colSignalKindDash > 0 Then wsDash.Cells(targetRow, colSignalKindDash).value = ""
         Dim selVal As Variant: selVal = wsCand.Cells(r, colSel).value
         If selVal = "" Then selVal = selDef
         wsDash.Cells(targetRow, colSelectedDash).value = selVal
@@ -572,6 +582,8 @@ Private Sub EvaluateAndQueueOrders()
     Dim jCol As Long: jCol = FindColumn(wsDash, DASH_HEADER_ROW, "J")
     Dim jthCol As Long: jthCol = FindColumn(wsDash, DASH_HEADER_ROW, "J_th")
     Dim qtyCol As Long: qtyCol = FindColumn(wsDash, DASH_HEADER_ROW, "DynamicQty")
+    Dim signalStatusCol As Long: signalStatusCol = FindColumn(wsDash, DASH_HEADER_ROW, HEADER_SIGNAL_STATUS_JP)
+    Dim signalKindCol As Long: signalKindCol = FindColumn(wsDash, DASH_HEADER_ROW, HEADER_SIGNAL_KIND_JP)
     If selCol = 0 Or signalCol = 0 Or tickerCol = 0 Or jCol = 0 Then Exit Sub
 
     Dim defaultQty As Long
@@ -590,9 +602,14 @@ Private Sub EvaluateAndQueueOrders()
         Dim ticker As String: ticker = CStr(wsDash.Cells(r, tickerCol).value)
         If Len(ticker) = 0 Then GoTo UpdatePrev
         If wsDash.Cells(r, selCol).value <> 1 Then
+            If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = ""
+            If signalKindCol > 0 Then wsDash.Cells(r, signalKindCol).value = ""
             SetPrevJ ticker, CDbl(IfZero(wsDash.Cells(r, jCol).value, 0))
             GoTo UpdatePrev
         End If
+
+        If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = ""
+        If signalKindCol > 0 Then wsDash.Cells(r, signalKindCol).value = ""
 
         Dim mode As String: mode = LCase$(CStr(wsDash.Cells(r, signalCol).value))
         Dim threshold As Double: threshold = CDbl(IfZero(wsDash.Cells(r, jthCol).value, 0))
@@ -622,6 +639,8 @@ Private Sub EvaluateAndQueueOrders()
             Dim qty As Long
             qty = ComputeDynamicQty(px, side, maxBudget, lotStep, slipBp, defaultQty)
             If qtyCol > 0 Then wsDash.Cells(r, qtyCol).value = qty
+            If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = "点灯"
+            If signalKindCol > 0 Then wsDash.Cells(r, signalKindCol).value = side & " / " & mode
             PlaceOrder ticker, side, px, qty, mode & ":" & wsDash.Cells(r, sessionCol).value
             PlaceBracketIfAvailable wsDash, r, ticker, side, px, qty
             ScheduleCloseExit wsDash, ticker, side
