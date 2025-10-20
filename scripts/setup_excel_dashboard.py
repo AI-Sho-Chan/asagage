@@ -84,7 +84,10 @@ try:
             return
         col_idx = HEADER_OFFSET_COL + HEADERS.index(header)
         rng = ws.Range(ws.Cells(start_row, col_idx), ws.Cells(end_row, col_idx))
-        rng.FormulaR1C1 = formula
+        try:
+            rng.FormulaR1C1 = formula
+        except Exception:
+            pass
 
     if "銘柄名" in HEADERS:
         idx = HEADERS.index("銘柄名")
