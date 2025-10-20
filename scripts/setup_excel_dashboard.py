@@ -15,10 +15,10 @@ BUTTONS = [
 
 HEADER_OFFSET_COL = 8
 HEADERS = [
-    "Ticker", "銘柄名", "シグナル点灯", "シグナル種別", "現在値", "出来高加重平均", "Selected", "SignalMode", "Session", "ATR_n", "TPk", "SLk", "J_th",
+    "Ticker", "\u9298\u67c4\u540d", "\u73fe\u5728\u306eJ\u5024", "\u95be\u5024\u4e56\u96e2\u7387(%)", "\u30b7\u30b0\u30ca\u30eb\u70b9\u706f", "\u30b7\u30b0\u30ca\u30eb\u7a2e\u5225", "\u73fe\u5728\u5024", "\u51fa\u6765\u9ad8\u52a0\u91cd\u5e73\u5747", "Selected", "SignalMode", "Session", "ATR_n", "TPk", "SLk", "J_th",
     "ForwardPF", "ForwardTrades", "WinCI_L", "WinCI_H", "ExpBootMean", "ExpBootLow", "ExpBootHigh",
-    "ForwardAvgBars", "GapBucket", "GapRule", "GapSummary", "前日終値", "気配値(買)", "気配値(売)", "気配値(中央)",
-    "ライブギャップ(bp)", "ライブギャップ帯", "ライブアクション", "DynamicQty"
+    "ForwardAvgBars", "GapBucket", "GapRule", "GapSummary", "\u524d\u65e5\u7d42\u5024", "\u6c17\u914d\u5024(\u8cb7)", "\u6c17\u914d\u5024(\u58f2)", "\u6c17\u914d\u5024(\u4e2d\u592e)",
+    "\u30e9\u30a4\u30d6\u30ae\u30e3\u30c3\u30d7(bp)", "\u30e9\u30a4\u30d6\u30ae\u30e3\u30c3\u30d7\u5e2f", "\u30e9\u30a4\u30d6\u30a2\u30af\u30b7\u30e7\u30f3", "DynamicQty"
 ]
 
 CONFIG_CELLS = {
@@ -66,7 +66,23 @@ try:
             if cell.Value in (None, ""):
                 cell.Value = value
 
+
     # Header extensions
+    name_header = "銘柄名"
+    current_j_header = "現在のJ値"
+    gap_header = "閾値乖離率(%)"
+    status_header = "シグナル点灯"
+    kind_header = "シグナル種別"
+    last_header = "現在値"
+    vwap_header = "出来高加重平均"
+    prev_header = "前日終値"
+    bid_header = "気配値(買)"
+    ask_header = "気配値(売)"
+    mid_header = "気配値(中央)"
+    gap_bp_header = "ライブギャップ(bp)"
+    gap_bucket_header = "ライブギャップ帯"
+    gap_action_header = "ライブアクション"
+
     for idx, header in enumerate(HEADERS):
         ws.Cells(5, HEADER_OFFSET_COL + idx).Value = header
 
@@ -89,63 +105,103 @@ try:
         except Exception:
             pass
 
-    if "銘柄名" in HEADERS:
-        idx = HEADERS.index("銘柄名")
+    if name_header in HEADERS:
+        idx = HEADERS.index(name_header)
         ref = r1c(ticker_pos, idx)
-        set_formula("銘柄名", f'=IF({ref}="","",IFERROR(RssMarket({ref},"銘柄名称"),""))')
+        set_formula(name_header, f'=IF({ref}="","",IFERROR(@RssMarket({ref},"銘柄名"),""))')
 
-    if "現在値" in HEADERS:
-        idx = HEADERS.index("現在値")
+    if current_j_header in HEADERS:
+        idx = HEADERS.index(current_j_header)
+        last_idx = HEADERS.index(last_header) if last_header in HEADERS else None
+        vwap_idx = HEADERS.index(vwap_header) if vwap_header in HEADERS else None
+        atr_idx = HEADERS.index("ATR_n") if "ATR_n" in HEADERS else None
+        if last_idx is not None and vwap_idx is not None and atr_idx is not None:
+            last_ref = r1c(last_idx, idx)
+            vwap_ref = r1c(vwap_idx, idx)
+            atr_ref = r1c(atr_idx, idx)
+            set_formula(current_j_header, f'=IF(OR({last_ref}="",{vwap_ref}="",{atr_ref}=0),"",({last_ref}-{vwap_ref})/{atr_ref})')
+        else:
+            set_formula(current_j_header, '=""')
+
+    if gap_header in HEADERS:
+        idx = HEADERS.index(gap_header)
+        current_idx = HEADERS.index(current_j_header) if current_j_header in HEADERS else None
+        jth_idx = HEADERS.index("J_th") if "J_th" in HEADERS else None
+        if current_idx is not None and jth_idx is not None:
+            current_ref = r1c(current_idx, idx)
+            jth_ref = r1c(jth_idx, idx)
+            set_formula(gap_header, f'=IF(OR({jth_ref}="",{current_ref}="",{jth_ref}=0),"",MAX(0,(ABS({jth_ref})-ABS({current_ref}))/ABS({jth_ref})*100))')
+            rng_gap = ws.Range(ws.Cells(start_row, HEADER_OFFSET_COL + idx), ws.Cells(end_row, HEADER_OFFSET_COL + idx))
+            try:
+                rng_gap.FormatConditions.Delete()
+                cf = rng_gap.FormatConditions.AddColorScale(3)
+                cf.ColorScaleCriteria(1).Type = 0
+                cf.ColorScaleCriteria(1).Value = 50
+                cf.ColorScaleCriteria(1).FormatColor.Color = 0xC0504D
+                cf.ColorScaleCriteria(2).Type = 0
+                cf.ColorScaleCriteria(2).Value = 25
+                cf.ColorScaleCriteria(2).FormatColor.Color = 0x92D050
+                cf.ColorScaleCriteria(3).Type = 0
+                cf.ColorScaleCriteria(3).Value = 0
+                cf.ColorScaleCriteria(3).FormatColor.Color = 0x548235
+            except Exception:
+                pass
+        else:
+            set_formula(gap_header, '=""')
+
+    if status_header in HEADERS:
+        set_formula(status_header, '=""')
+    if kind_header in HEADERS:
+        set_formula(kind_header, '=""')
+
+    if last_header in HEADERS:
+        idx = HEADERS.index(last_header)
         ref = r1c(ticker_pos, idx)
-        set_formula("現在値", f'=IF({ref}="","",IFERROR(RssMarket({ref},"現在値"),""))')
+        set_formula(last_header, f'=IF({ref}="","",IFERROR(@RssMarket({ref},"現在値"),""))')
 
-    if "出来高加重平均" in HEADERS:
-        idx = HEADERS.index("出来高加重平均")
+    if vwap_header in HEADERS:
+        idx = HEADERS.index(vwap_header)
         ref = r1c(ticker_pos, idx)
-        set_formula("出来高加重平均", f'=IF({ref}="","",IFERROR(RssMarket({ref},"出来高加重平均"),""))')
+        set_formula(vwap_header, f'=IF({ref}="","",IFERROR(@RssMarket({ref},"出来高加重平均"),""))')
 
-    if "前日終値" in HEADERS:
-        idx = HEADERS.index("前日終値")
-        ref = r1c(ticker_pos, idx)
-        set_formula("前日終値", f'=IF({ref}="","",IFERROR(RssMarket({ref},15),""))')
+    formula_map = [
+        (prev_header, 15),
+        (bid_header, 56),
+        (ask_header, 55),
+    ]
+    for header, code in formula_map:
+        if header in HEADERS:
+            idx = HEADERS.index(header)
+            ref = r1c(ticker_pos, idx)
+            set_formula(header, f'=IF({ref}="","",IFERROR(@RssMarket({ref},{code}),""))')
 
-    if "気配値(買)" in HEADERS:
-        idx = HEADERS.index("気配値(買)")
-        ref = r1c(ticker_pos, idx)
-        set_formula("気配値(買)", f'=IF({ref}="","",IFERROR(RssMarket({ref},56),""))')
-
-    if "気配値(売)" in HEADERS:
-        idx = HEADERS.index("気配値(売)")
-        ref = r1c(ticker_pos, idx)
-        set_formula("気配値(売)", f'=IF({ref}="","",IFERROR(RssMarket({ref},55),""))')
-
-    if all(h in HEADERS for h in ("気配値(中央)", "気配値(買)", "気配値(売)")):
-        mid_idx = HEADERS.index("気配値(中央)")
-        bid_idx = HEADERS.index("気配値(買)")
-        ask_idx = HEADERS.index("気配値(売)")
+    if mid_header in HEADERS and bid_header in HEADERS and ask_header in HEADERS:
+        mid_idx = HEADERS.index(mid_header)
+        bid_idx = HEADERS.index(bid_header)
+        ask_idx = HEADERS.index(ask_header)
         bid_ref = r1c(bid_idx, mid_idx)
         ask_ref = r1c(ask_idx, mid_idx)
-        set_formula("気配値(中央)", f'=IF(OR({bid_ref}="",{ask_ref}=""),"",({bid_ref}+{ask_ref})/2)')
+        set_formula(mid_header, f'=IF(OR({bid_ref}="",{ask_ref}=""),"",({bid_ref}+{ask_ref})/2)')
 
-    if all(h in HEADERS for h in ("ライブギャップ(bp)", "気配値(中央)", "前日終値")):
-        gap_idx = HEADERS.index("ライブギャップ(bp)")
-        mid_idx = HEADERS.index("気配値(中央)")
-        prev_idx = HEADERS.index("前日終値")
+    if gap_bp_header in HEADERS and mid_header in HEADERS and prev_header in HEADERS:
+        gap_idx = HEADERS.index(gap_bp_header)
+        mid_idx = HEADERS.index(mid_header)
+        prev_idx = HEADERS.index(prev_header)
         mid_ref = r1c(mid_idx, gap_idx)
         prev_ref = r1c(prev_idx, gap_idx)
-        set_formula("ライブギャップ(bp)", f'=IF(OR({mid_ref}="",{prev_ref}=""),"",({mid_ref}-{prev_ref})/{prev_ref}*10000)')
+        set_formula(gap_bp_header, f'=IF(OR({mid_ref}="",{prev_ref}=""),"",({mid_ref}-{prev_ref})/{prev_ref}*10000)')
 
-    if all(h in HEADERS for h in ("ライブギャップ帯", "ライブギャップ(bp)")):
-        bucket_idx = HEADERS.index("ライブギャップ帯")
-        gap_idx = HEADERS.index("ライブギャップ(bp)")
+    if gap_bucket_header in HEADERS and gap_bp_header in HEADERS:
+        bucket_idx = HEADERS.index(gap_bucket_header)
+        gap_idx = HEADERS.index(gap_bp_header)
         gap_ref = r1c(gap_idx, bucket_idx)
-        set_formula("ライブギャップ帯", f'=IF({gap_ref}="","",IF(ABS({gap_ref})>=120,">=120bp",IF(ABS({gap_ref})>=80,"80-120bp",IF(ABS({gap_ref})>=50,"50-80bp","<50bp"))))')
+        set_formula(gap_bucket_header, f'=IF({gap_ref}="","",IF(ABS({gap_ref})>=120,">=120bp",IF(ABS({gap_ref})>=80,"80-120bp",IF(ABS({gap_ref})>=50,"50-80bp","<50bp"))))')
 
-    if all(h in HEADERS for h in ("ライブアクション", "ライブギャップ帯")):
-        action_idx = HEADERS.index("ライブアクション")
-        bucket_idx = HEADERS.index("ライブギャップ帯")
+    if gap_action_header in HEADERS and gap_bucket_header in HEADERS:
+        action_idx = HEADERS.index(gap_action_header)
+        bucket_idx = HEADERS.index(gap_bucket_header)
         bucket_ref = r1c(bucket_idx, action_idx)
-        set_formula("ライブアクション", f'=IF({bucket_ref}="","",IF({bucket_ref}=">=120bp","j-cross only; TP-0.2; SL+0.2",IF({bucket_ref}="80-120bp","Skip opposite; J_th+0.2",IF({bucket_ref}="50-80bp","J_th+0.1","Baseline")))))')
+        set_formula(gap_action_header, f'=IF({bucket_ref}="","",IF({bucket_ref}=">=120bp","j-cross only; TP-0.2; SL+0.2",IF({bucket_ref}="80-120bp","Skip opposite; J_th+0.2",IF({bucket_ref}="50-80bp","J_th+0.1","Baseline")))))')
 
     # 設定セルのラベルと初期値
     labels = [
