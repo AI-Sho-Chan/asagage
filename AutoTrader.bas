@@ -1,4 +1,4 @@
-﻿Attribute VB_Name = "AutoTrader"
+Attribute VB_Name = "AutoTrader"
 Option Explicit
 
 Private Const SHEET_DASHBOARD As String = "NewDashboard"
@@ -35,6 +35,18 @@ Private Const DEFAULT_ORDER_QTY As Long = 100
 Private Const DEFAULT_MAX_BUDGET As Double = 10000000#
 Private Const DEFAULT_LOT_STEP As Long = 100
 Private Const DEFAULT_SLIP_BP As Double = 30#
+Private Const DASH_FORMULA_ROWS As Long = 400
+
+Private Const HEADER_NAME_JP As String = "銘柄名"
+Private Const HEADER_LAST_JP As String = "現在値"
+Private Const HEADER_VWAP_JP As String = "出来高加重平均"
+Private Const HEADER_PREV_CLOSE_JP As String = "前日終値"
+Private Const HEADER_PREOPEN_BID_JP As String = "気配値(買)"
+Private Const HEADER_PREOPEN_ASK_JP As String = "気配値(売)"
+Private Const HEADER_PREOPEN_MID_JP As String = "気配値(中央)"
+Private Const HEADER_LIVE_GAP_BP_JP As String = "ライブギャップ(bp)"
+Private Const HEADER_LIVE_GAP_BUCKET_JP As String = "ライブギャップ帯"
+Private Const HEADER_LIVE_GAP_ACTION_JP As String = "ライブアクション"
 
 Private prevJ As Object
 Private AutoTimer As Date
@@ -46,6 +58,152 @@ Public Sub ButtonLoadCandidates()
     EnsureSetup
     LoadCandidates
 End Sub
+
+Private Sub ApplyRealtimeColumns(ByVal ws As Worksheet)
+    Dim tickerCol As Long
+    tickerCol = FindColumn(ws, DASH_HEADER_ROW, "Ticker")
+    If tickerCol = 0 Then Exit Sub
+
+    Dim lastDataRow As Long
+    lastDataRow = ws.Cells(ws.rows.Count, tickerCol).End(xlUp).row
+    If lastDataRow < DASH_DATA_START Then lastDataRow = DASH_DATA_START
+
+    Dim fillLast As Long
+    fillLast = lastDataRow
+    If fillLast < DASH_DATA_START + DASH_FORMULA_ROWS Then
+        fillLast = DASH_DATA_START + DASH_FORMULA_ROWS
+    End If
+
+    Dim nameCol As Long
+    nameCol = FindColumn(ws, DASH_HEADER_ROW, HEADER_NAME_JP)
+    If nameCol > 0 Then
+        Dim nameRef As String
+        nameRef = BuildR1C1Ref(tickerCol, nameCol)
+        SetColumnFormula ws, nameCol, fillLast, "=IF(" & nameRef & "="""","""",IFERROR(RssMarket(" & nameRef & ",""銘柄名称""),""""))"
+    End If
+
+    Dim lastCol As Long
+    lastCol = FindColumn(ws, DASH_HEADER_ROW, HEADER_LAST_JP)
+    If lastCol > 0 Then
+        Dim lastRef As String
+        lastRef = BuildR1C1Ref(tickerCol, lastCol)
+        SetColumnFormula ws, lastCol, fillLast, "=IF(" & lastRef & "="""","""",IFERROR(RssMarket(" & lastRef & ",""現在値""),""""))"
+    End If
+
+    Dim vwapCol As Long
+    vwapCol = FindColumn(ws, DASH_HEADER_ROW, HEADER_VWAP_JP)
+    If vwapCol > 0 Then
+        Dim vwapRef As String
+        vwapRef = BuildR1C1Ref(tickerCol, vwapCol)
+        SetColumnFormula ws, vwapCol, fillLast, "=IF(" & vwapRef & "="""","""",IFERROR(RssMarket(" & vwapRef & ",""出来高加重平均""),""""))"
+    End If
+
+    Dim prevCloseCol As Long
+    prevCloseCol = FindColumn(ws, DASH_HEADER_ROW, HEADER_PREV_CLOSE_JP)
+    If prevCloseCol > 0 Then
+        Dim prevRef As String
+        prevRef = BuildR1C1Ref(tickerCol, prevCloseCol)
+        SetColumnFormula ws, prevCloseCol, fillLast, "=IF(" & prevRef & "="""","""",IFERROR(RssMarket(" & prevRef & ",15),""""))"
+    End If
+
+    Dim bidCol As Long
+    bidCol = FindColumn(ws, DASH_HEADER_ROW, HEADER_PREOPEN_BID_JP)
+    If bidCol > 0 Then
+        Dim bidRef As String
+        bidRef = BuildR1C1Ref(tickerCol, bidCol)
+        SetColumnFormula ws, bidCol, fillLast, "=IF(" & bidRef & "="""","""",IFERROR(RssMarket(" & bidRef & ",56),""""))"
+    End If
+
+    Dim askCol As Long
+    askCol = FindColumn(ws, DASH_HEADER_ROW, HEADER_PREOPEN_ASK_JP)
+    If askCol > 0 Then
+        Dim askRef As String
+        askRef = BuildR1C1Ref(tickerCol, askCol)
+        SetColumnFormula ws, askCol, fillLast, "=IF(" & askRef & "="""","""",IFERROR(RssMarket(" & askRef & ",55),""""))"
+    End If
+
+    Dim midCol As Long
+    midCol = FindColumn(ws, DASH_HEADER_ROW, HEADER_PREOPEN_MID_JP)
+    If midCol > 0 And bidCol > 0 And askCol > 0 Then
+        Dim bidRefForMid As String
+        Dim askRefForMid As String
+        bidRefForMid = BuildR1C1Ref(bidCol, midCol)
+        askRefForMid = BuildR1C1Ref(askCol, midCol)
+        SetColumnFormula ws, midCol, fillLast, "=IF(OR(" & bidRefForMid & "=""""," & askRefForMid & "=""""),"""",(" & bidRefForMid & "+" & askRefForMid & ")/2)"
+    End If
+
+    Dim gapBpCol As Long
+    gapBpCol = FindColumn(ws, DASH_HEADER_ROW, HEADER_LIVE_GAP_BP_JP)
+    If gapBpCol > 0 And midCol > 0 And prevCloseCol > 0 Then
+        Dim midRefForGap As String
+        Dim prevRefForGap As String
+        midRefForGap = BuildR1C1Ref(midCol, gapBpCol)
+        prevRefForGap = BuildR1C1Ref(prevCloseCol, gapBpCol)
+        SetColumnFormula ws, gapBpCol, fillLast, "=IF(OR(" & midRefForGap & "=""""," & prevRefForGap & "=""""),"""",(" & midRefForGap & "-" & prevRefForGap & ")/" & prevRefForGap & "*10000)"
+    End If
+
+    Dim gapBucketCol As Long
+    gapBucketCol = FindColumn(ws, DASH_HEADER_ROW, HEADER_LIVE_GAP_BUCKET_JP)
+    If gapBucketCol > 0 And gapBpCol > 0 Then
+        Dim gapRef As String
+        gapRef = BuildR1C1Ref(gapBpCol, gapBucketCol)
+        SetColumnFormula ws, gapBucketCol, fillLast, "=IF(" & gapRef & "="""","""",IF(ABS(" & gapRef & ")>=120,"">=120bp"",IF(ABS(" & gapRef & ")>=80,""80-120bp"",IF(ABS(" & gapRef & ")>=50,""50-80bp"",""<50bp""))))"
+    End If
+
+    Dim actionCol As Long
+    actionCol = FindColumn(ws, DASH_HEADER_ROW, HEADER_LIVE_GAP_ACTION_JP)
+    If actionCol > 0 And gapBucketCol > 0 Then
+        Dim bucketRef As String
+        bucketRef = BuildR1C1Ref(gapBucketCol, actionCol)
+        SetColumnFormula ws, actionCol, fillLast, "=IF(" & bucketRef & "="""","""",IF(" & bucketRef & "="">=120bp"",""j-cross only; TP-0.2; SL+0.2"",IF(" & bucketRef & "=""80-120bp"",""Skip opposite; J_th+0.2"",IF(" & bucketRef & "=""50-80bp"",""J_th+0.1"",""Baseline""))))"
+    End If
+End Sub
+
+Private Sub SetColumnFormula(ByVal ws As Worksheet, ByVal col As Long, ByVal fillLast As Long, ByVal formulaR1C1 As String)
+    If col <= 0 Then Exit Sub
+    ws.Range(ws.Cells(DASH_DATA_START, col), ws.Cells(fillLast, col)).FormulaR1C1 = formulaR1C1
+End Sub
+
+Private Function BuildR1C1Ref(ByVal sourceCol As Long, ByVal targetCol As Long) As String
+    Dim offset As Long
+    offset = sourceCol - targetCol
+    If offset = 0 Then
+        BuildR1C1Ref = "RC"
+    Else
+        BuildR1C1Ref = "RC[" & CStr(offset) & "]"
+    End If
+End Function
+
+Private Function ResolveHeaderAliases(ByVal name As String) As Variant
+    Dim key As String
+    key = LCase$(name)
+    Select Case key
+        Case "ticker"
+            ResolveHeaderAliases = Array("Ticker")
+        Case LCase$(HEADER_NAME_JP)
+            ResolveHeaderAliases = Array(HEADER_NAME_JP, "銘柄名称")
+        Case LCase$(HEADER_LAST_JP)
+            ResolveHeaderAliases = Array(HEADER_LAST_JP, "現在値")
+        Case LCase$(HEADER_VWAP_JP)
+            ResolveHeaderAliases = Array(HEADER_VWAP_JP, "出来高加重平均", "VWAP")
+        Case "prevclose"
+            ResolveHeaderAliases = Array("PrevClose", HEADER_PREV_CLOSE_JP)
+        Case "preopenbid"
+            ResolveHeaderAliases = Array("PreOpenBid", HEADER_PREOPEN_BID_JP)
+        Case "preopenask"
+            ResolveHeaderAliases = Array("PreOpenAsk", HEADER_PREOPEN_ASK_JP)
+        Case "preopenmid"
+            ResolveHeaderAliases = Array("PreOpenMid", HEADER_PREOPEN_MID_JP)
+        Case "livegapbp"
+            ResolveHeaderAliases = Array("LiveGapBp", HEADER_LIVE_GAP_BP_JP)
+        Case "livegapbucket"
+            ResolveHeaderAliases = Array("LiveGapBucket", HEADER_LIVE_GAP_BUCKET_JP)
+        Case "livegapaction"
+            ResolveHeaderAliases = Array("LiveGapAction", HEADER_LIVE_GAP_ACTION_JP)
+        Case Else
+            ResolveHeaderAliases = Array(name)
+    End Select
+End Function
 
 Public Sub ButtonPushCandidates()
     EnsureSetup
@@ -183,12 +341,13 @@ End Sub
 
 Private Sub EnsureHeaders(ByVal ws As Worksheet)
     Dim headers As Variant
-    headers = Array("Ticker", "Selected", "SignalMode", "Session", "ATR_n", "TPk", "SLk", "J_th", "ForwardPF", "ForwardTrades", "WinCI_L", "WinCI_H", "ExpBootMean", "ExpBootLow", "ExpBootHigh", "ForwardAvgBars", "GapBucket", "GapRule", "GapSummary", "PrevClose", "PreOpenBid", "PreOpenAsk", "PreOpenMid", "LiveGapBp", "LiveGapBucket", "LiveGapAction", "DynamicQty")
+    headers = Array("Ticker", HEADER_NAME_JP, HEADER_LAST_JP, HEADER_VWAP_JP, "Selected", "SignalMode", "Session", "ATR_n", "TPk", "SLk", "J_th", "ForwardPF", "ForwardTrades", "WinCI_L", "WinCI_H", "ExpBootMean", "ExpBootLow", "ExpBootHigh", "ForwardAvgBars", "GapBucket", "GapRule", "GapSummary", HEADER_PREV_CLOSE_JP, HEADER_PREOPEN_BID_JP, HEADER_PREOPEN_ASK_JP, HEADER_PREOPEN_MID_JP, HEADER_LIVE_GAP_BP_JP, HEADER_LIVE_GAP_BUCKET_JP, HEADER_LIVE_GAP_ACTION_JP, "DynamicQty")
     Dim baseCol As Long: baseCol = 8 ' column H
     Dim i As Long
     For i = LBound(headers) To UBound(headers)
         ws.Cells(DASH_HEADER_ROW, baseCol + i).value = headers(i)
     Next i
+    ApplyRealtimeColumns ws
 End Sub
 
 Private Sub LoadCandidates()
@@ -633,15 +792,35 @@ End Function
 Private Function FindColumn(ByVal ws As Worksheet, ByVal headerRow As Long, ByVal name As String) As Long
     Dim lastCol As Long
     lastCol = ws.Cells(headerRow, ws.Columns.Count).End(xlToLeft).Column
+    Dim aliases As Variant
+    aliases = ResolveHeaderAliases(name)
     Dim c As Long
+    Dim text As String
+    Dim aliasValue As Variant
     For c = 1 To lastCol
-        Dim text As String
         text = CStr(ws.Cells(headerRow, c).value)
         If Len(text) > 0 Then
-            If InStr(1, text, name, vbTextCompare) > 0 Then
-                FindColumn = c
-                Exit Function
-            End If
+            For Each aliasValue In aliases
+                If StrComp(text, CStr(aliasValue), vbTextCompare) = 0 Then
+                    FindColumn = c
+                    Exit Function
+                End If
+            Next aliasValue
+        End If
+    Next c
+    For c = 1 To lastCol
+        text = CStr(ws.Cells(headerRow, c).value)
+        If Len(text) > 0 Then
+            For Each aliasValue In aliases
+                Dim aliasText As String
+                aliasText = CStr(aliasValue)
+                If Len(aliasText) > 0 Then
+                    If InStr(1, text, aliasText, vbTextCompare) > 0 Then
+                        FindColumn = c
+                        Exit Function
+                    End If
+                End If
+            Next aliasValue
         End If
     Next c
     FindColumn = 0
