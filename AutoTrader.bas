@@ -1,4 +1,4 @@
-Attribute VB_Name = "AutoTrader"
+﻿Attribute VB_Name = "AutoTrader"
 Option Explicit
 
 Private Const SHEET_DASHBOARD As String = "NewDashboard"

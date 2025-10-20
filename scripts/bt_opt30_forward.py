@@ -80,8 +80,50 @@ class StatusTracker:
 
 
 def load_tickers_from_excel(path: Path) -> List[str]:
-    df = pd.read_excel(path, sheet_name="Ticker", usecols="A", header=0)
-    return df["Code"].dropna().astype(str).tolist()
+    """Return list of tickers from Excel, accepting multiple sheet/column conventions."""
+    if not path.exists():
+        raise FileNotFoundError(f"Excel workbook not found: {path}")
+
+    fallbacks: List[Tuple[str, Tuple[str, ...]]] = [
+        ("Ticker", ("Code", "Ticker")),
+        ("Candidates", ("Ticker", "Code")),
+        ("NewDashboard", ("Ticker",)),
+    ]
+
+    for sheet_name, candidates in fallbacks:
+        try:
+            df = pd.read_excel(path, sheet_name=sheet_name)
+        except Exception:
+            continue
+
+        for col in candidates:
+            if col in df.columns:
+                series = (
+                    df[col]
+                    .dropna()
+                    .astype(str)
+                    .map(lambda x: x.strip())
+                )
+                series = series[series != ""]
+                if not series.empty:
+                    return series.tolist()
+
+        # as a last resort, try first column if it looks like tickers
+        if df.shape[1] > 0:
+            series = (
+                df.iloc[:, 0]
+                .dropna()
+                .astype(str)
+                .map(lambda x: x.strip())
+            )
+            if not series.empty:
+                return series.tolist()
+
+    raise ValueError(
+        "Ticker list could not be located. "
+        "Ensure the workbook has either a 'Ticker' sheet with a 'Code' column, "
+        "or a sheet containing a 'Ticker' column."
+    )
 
 
 def fetch_1m_chunks(
@@ -266,6 +308,224 @@ def build_signal_mask(
 
 BP_EPS = 1e-6
 
+GAP_BUCKETS: List[Tuple[str, float, float]] = [
+    ("<50bp", 0.0, 50.0),
+    ("50-80bp", 50.0, 80.0),
+    ("80-120bp", 80.0, 120.0),
+    (">=120bp", 120.0, float("inf")),
+]
+
+GAP_RULE_TABLE = [
+    {
+        "label": "<50bp",
+        "abs_min": 0.0,
+        "abs_max": 50.0,
+        "settings": {
+            "j-only": {
+                "enabled": True,
+                "j_th_add": 0.0,
+                "tp_add": 0.0,
+                "sl_add": 0.0,
+                "skip_opposite": False,
+                "description": "Baseline: allow both signals",
+            },
+            "j-cross": {
+                "enabled": True,
+                "j_th_add": 0.0,
+                "tp_add": 0.0,
+                "sl_add": 0.0,
+                "skip_opposite": False,
+                "description": "Baseline: allow both signals",
+            },
+        },
+    },
+    {
+        "label": "50-80bp",
+        "abs_min": 50.0,
+        "abs_max": 80.0,
+        "settings": {
+            "j-only": {
+                "enabled": True,
+                "j_th_add": 0.1,
+                "tp_add": 0.0,
+                "sl_add": 0.0,
+                "skip_opposite": False,
+                "description": "Raise J_th by 0.1 to reduce noise",
+            },
+            "j-cross": {
+                "enabled": True,
+                "j_th_add": 0.1,
+                "tp_add": 0.0,
+                "sl_add": 0.0,
+                "skip_opposite": False,
+                "description": "Allow cross; J_th +0.1",
+            },
+        },
+    },
+    {
+        "label": "80-120bp",
+        "abs_min": 80.0,
+        "abs_max": 120.0,
+        "settings": {
+            "j-only": {
+                "enabled": True,
+                "j_th_add": 0.2,
+                "tp_add": 0.0,
+                "sl_add": 0.1,
+                "skip_opposite": True,
+                "description": "Skip opposite direction; J_th +0.2; SL +0.1",
+            },
+            "j-cross": {
+                "enabled": True,
+                "j_th_add": 0.2,
+                "tp_add": 0.0,
+                "sl_add": 0.1,
+                "skip_opposite": True,
+                "description": "Skip opposite direction; J_th +0.2; SL +0.1",
+            },
+        },
+    },
+    {
+        "label": ">=120bp",
+        "abs_min": 120.0,
+        "abs_max": float("inf"),
+        "settings": {
+            "j-only": {
+                "enabled": False,
+                "j_th_add": 0.3,
+                "tp_add": -0.2,
+                "sl_add": 0.2,
+                "skip_opposite": True,
+                "description": "Disable j-only; J_th +0.3; TP -0.2; SL +0.2",
+            },
+            "j-cross": {
+                "enabled": True,
+                "j_th_add": 0.3,
+                "tp_add": -0.2,
+                "sl_add": 0.2,
+                "skip_opposite": True,
+                "description": "Cross only; J_th +0.3; TP -0.2; SL +0.2",
+            },
+        },
+    },
+]
+
+GAP_RULE_INDEX = {entry["label"]: entry for entry in GAP_RULE_TABLE}
+
+
+def bucket_for_gap(gap_bp: float) -> str:
+    gap_abs = abs(gap_bp)
+    for label, gmin, gmax in GAP_BUCKETS:
+        if gmin <= gap_abs < gmax:
+            return label
+    return GAP_BUCKETS[-1][0]
+
+
+def resolve_gap_settings(gap_bp: float, signal_mode: str) -> Dict[str, float]:
+    gap_abs = abs(gap_bp)
+    for entry in GAP_RULE_TABLE:
+        if entry["abs_min"] <= gap_abs < entry["abs_max"]:
+            settings = entry["settings"].get(signal_mode, {})
+            return {
+                "bucket": entry["label"],
+                "enabled": settings.get("enabled", True),
+                "j_th_add": float(settings.get("j_th_add", 0.0)),
+                "tp_add": float(settings.get("tp_add", 0.0)),
+                "sl_add": float(settings.get("sl_add", 0.0)),
+                "skip_opposite": bool(settings.get("skip_opposite", False)),
+                "description": settings.get("description", entry["label"]),
+            }
+    # fallback to default bucket
+    default = GAP_RULE_TABLE[0]["settings"][signal_mode]
+    return {
+        "bucket": GAP_RULE_TABLE[0]["label"],
+        "enabled": default.get("enabled", True),
+        "j_th_add": float(default.get("j_th_add", 0.0)),
+        "tp_add": float(default.get("tp_add", 0.0)),
+        "sl_add": float(default.get("sl_add", 0.0)),
+        "skip_opposite": bool(default.get("skip_opposite", False)),
+        "description": default.get("description", GAP_RULE_TABLE[0]["label"]),
+    }
+
+
+def summarize_gap(gaps: Sequence[float], pnl_list: Sequence[float], bars_list: Sequence[int]) -> List[Dict[str, float]]:
+    stats = {}
+    for label, _, _ in GAP_BUCKETS:
+        stats[label] = {
+            "bucket": label,
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "pnl_vals": [],
+            "bars_vals": [],
+            "pnl_sum": 0.0,
+            "bars_sum": 0.0,
+        }
+    for idx, gap in enumerate(gaps):
+        label = bucket_for_gap(float(gap))
+        entry = stats[label]
+        pnl = float(pnl_list[idx]) if idx < len(pnl_list) else 0.0
+        bars = float(bars_list[idx]) if idx < len(bars_list) else 0.0
+        entry["trades"] += 1
+        if pnl > BP_EPS:
+            entry["wins"] += 1
+        elif pnl < -BP_EPS:
+            entry["losses"] += 1
+        entry["pnl_vals"].append(pnl)
+        entry["bars_vals"].append(bars)
+        entry["pnl_sum"] += pnl
+        entry["bars_sum"] += bars
+    summary = []
+    for label, data in stats.items():
+        trades = data["trades"]
+        if trades > 0:
+            mean_pnl = data["pnl_sum"] / trades
+            mean_bars = data["bars_sum"] / trades
+            median_pnl = float(np.median(data["pnl_vals"])) if data["pnl_vals"] else 0.0
+        else:
+            mean_pnl = 0.0
+            mean_bars = 0.0
+            median_pnl = 0.0
+        summary.append(
+            {
+                "bucket": label,
+                "trades": trades,
+                "wins": data["wins"],
+                "losses": data["losses"],
+                "winrate": (data["wins"] / trades) if trades else 0.0,
+                "mean_pnl_bp": mean_pnl,
+                "median_pnl_bp": median_pnl,
+                "mean_bars": mean_bars,
+                "pnl_sum": data["pnl_sum"],
+                "bars_sum": data["bars_sum"],
+            }
+        )
+    return summary
+
+
+def select_best_gap_bucket(summary: Sequence[Dict[str, float]]) -> str:
+    best_bucket = ""
+    best_trades = -1
+    best_mean = -float("inf")
+    for item in summary:
+        trades = int(item.get("trades", 0))
+        if trades <= 0:
+            continue
+        mean_pnl = float(item.get("mean_pnl_bp", 0.0))
+        if trades > best_trades or (trades == best_trades and mean_pnl > best_mean):
+            best_bucket = item.get("bucket", "")
+            best_trades = trades
+            best_mean = mean_pnl
+    return best_bucket or "none"
+
+
+def describe_gap_rule(bucket_label: str, signal_mode: str) -> str:
+    entry = GAP_RULE_INDEX.get(bucket_label)
+    if not entry:
+        return ""
+    settings = entry["settings"].get(signal_mode, {})
+    return settings.get("description", bucket_label)
+
 
 def eval_one(
     df: pd.DataFrame,
@@ -292,6 +552,9 @@ def eval_one(
     max_bars = int(params.get("TMAX", 0) or 0)
     use_cap = max_bars > 0
     trade_bp: List[float] = []
+    trade_bars: List[int] = []
+    trade_gap: List[float] = []
+    trade_gap_bucket: List[str] = []
     grouped_indices = {date: sorted(idxs) for date, idxs in df.groupby("date").indices.items()}
 
     for date in sorted(grouped_indices.keys()):
@@ -312,13 +575,36 @@ def eval_one(
             side = "BUY" if J.iloc[idx] < 0 else "SELL"
             # Gap guard: absolute or directional skip using df['gap_bp'] (per day constant)
             g = float(df.loc[idx, "gap_bp"]) if "gap_bp" in df.columns else 0.0
+            gap_rule = resolve_gap_settings(g, signal_mode)
+            if not gap_rule["enabled"]:
+                continue
             if abs_guard_bp and abs(g) >= abs_guard_bp:
                 continue
             if dir_guard_bp and abs(g) >= dir_guard_bp:
                 if (g > 0 and side == "SELL") or (g < 0 and side == "BUY"):
                     continue
-            tp = px + float(params["TPk"]) * a if side == "BUY" else px - float(params["TPk"]) * a
-            sl = px - float(params["SLk"]) * a if side == "BUY" else px + float(params["SLk"]) * a
+            if gap_rule["skip_opposite"]:
+                if (g > 0 and side == "SELL") or (g < 0 and side == "BUY"):
+                    continue
+
+            base_j_th = float(params.get("J_th", 0.0))
+            eff_j_th = base_j_th + float(gap_rule.get("j_th_add", 0.0))
+            if signal_mode == "j-only":
+                if abs(J.iloc[idx]) < eff_j_th:
+                    continue
+            elif signal_mode == "j-cross":
+                if abs(J.iloc[idx]) < eff_j_th:
+                    continue
+                prev_val = abs(J.iloc[idx - 1]) if idx > 0 else float("inf")
+                if prev_val < eff_j_th:
+                    pass
+                else:
+                    continue
+
+            eff_tp = max(0.2, float(params["TPk"]) + float(gap_rule.get("tp_add", 0.0)))
+            eff_sl = max(0.2, float(params["SLk"]) + float(gap_rule.get("sl_add", 0.0)))
+            tp = px + eff_tp * a if side == "BUY" else px - eff_tp * a
+            sl = px - eff_sl * a if side == "BUY" else px + eff_sl * a
 
             future_positions = day_positions[offset + 1 :]
             if not future_positions:
@@ -357,8 +643,12 @@ def eval_one(
             pnl_bp = (pnl_price / px) * 10000.0
             pnl_bp -= cost_bp
             trade_bp.append(float(pnl_bp))
+            bar_len = future_positions.index(fut_idx) + 1 if exit_price is not None else len(future_positions)
+            trade_bars.append(int(bar_len))
+            trade_gap.append(g)
+            trade_gap_bucket.append(gap_rule["bucket"])
 
-    return {"pnl_bp": trade_bp}
+    return {"pnl_bp": trade_bp, "bars": trade_bars, "gap_bp": trade_gap, "gap_bucket": trade_gap_bucket}
 
 
 def metrics_from_bp(bp_list: Sequence[float]) -> Dict[str, float]:
@@ -420,7 +710,10 @@ def aggregate_segments(
     slice_pf_effs: List[float] = []
     slice_pass = 0
     all_bp: List[float] = []
+    all_bars: List[int] = []
     slice_exp_bp: List[float] = []
+    all_gap: List[float] = []
+    all_gap_bucket: List[str] = []
 
     for seg in segments:
         seg_bp = seg.get("pnl_bp", [])
@@ -428,16 +721,25 @@ def aggregate_segments(
         seg_metrics = metrics_from_bp(seg_bp)
         slice_pf_effs.append(seg_metrics["pf_eff"])
         slice_exp_bp.append(seg_metrics["exp_bp"])
+        seg_bars = seg.get("bars", [])
+        all_bars.extend(seg_bars)
+        seg_gap = seg.get("gap_bp", [])
+        all_gap.extend(seg_gap)
+        all_gap_bucket.extend(seg.get("gap_bucket", []))
         if seg_metrics["trades"] >= min_slice_trades and seg_metrics["pf_eff"] > 1.0:
             slice_pass += 1
 
     metrics = metrics_from_bp(all_bp)
+    avg_bars = (sum(all_bars) / len(all_bars)) if all_bars else 0.0
+    gap_summary = summarize_gap(all_gap, all_bp, all_bars)
     metrics.update(
         {
             "slices_total": len(segments),
             "slices_pass": slice_pass,
             "slice_pf_eff": slice_pf_effs,
             "slice_exp_bp": slice_exp_bp,
+            "avg_bars": avg_bars,
+            "gap_summary": gap_summary,
         }
     )
     return metrics
@@ -567,6 +869,68 @@ def write_csv(path: Path, df: pd.DataFrame) -> None:
     tmp.replace(path)
 
 
+def parse_gap_summary_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    records = []
+    for _, row in df.iterrows():
+        raw = row.get(column)
+        if raw is None or (isinstance(raw, float) and math.isnan(raw)):
+            continue
+        if isinstance(raw, str):
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                summary = json.loads(raw)
+            except Exception:
+                continue
+        else:
+            summary = raw
+        if not isinstance(summary, list):
+            continue
+        for item in summary:
+            if not isinstance(item, dict):
+                continue
+            rec = dict(item)
+            rec["code"] = row.get("code")
+            records.append(rec)
+    if not records:
+        return pd.DataFrame()
+    return pd.DataFrame(records)
+
+
+def aggregate_gap_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return pd.DataFrame()
+    agg = (
+        df.groupby("bucket", as_index=False)
+        .agg(
+            trades=("trades", "sum"),
+            wins=("wins", "sum"),
+            losses=("losses", "sum"),
+            pnl_sum=("pnl_sum", "sum"),
+            bars_sum=("bars_sum", "sum"),
+        )
+    )
+    agg["winrate"] = agg.apply(lambda r: (r["wins"] / r["trades"]) if r["trades"] else 0.0, axis=1)
+    agg["mean_pnl_bp"] = agg.apply(lambda r: (r["pnl_sum"] / r["trades"]) if r["trades"] else 0.0, axis=1)
+    agg["mean_bars"] = agg.apply(lambda r: (r["bars_sum"] / r["trades"]) if r["trades"] else 0.0, axis=1)
+    agg = agg[["bucket", "trades", "winrate", "mean_pnl_bp", "mean_bars"]].sort_values("bucket")
+    return agg
+
+
+def write_gap_summaries(summary_df: pd.DataFrame, outdir: Path) -> None:
+    train_df = parse_gap_summary_column(summary_df, "train_gap_summary")
+    if not train_df.empty:
+        agg_train = aggregate_gap_dataframe(train_df)
+        if not agg_train.empty:
+            write_csv(outdir / "_GAP_SUMMARY_TRAIN.csv", agg_train)
+    forward_df = parse_gap_summary_column(summary_df, "forward_gap_summary")
+    if not forward_df.empty:
+        agg_forward = aggregate_gap_dataframe(forward_df)
+        if not agg_forward.empty:
+            write_csv(outdir / "_GAP_SUMMARY_FORWARD.csv", agg_forward)
+
+
 def _eval_code_task(payload) -> Tuple[str, pd.DataFrame, Dict[str, float]]:
     (
         code,
@@ -640,16 +1004,61 @@ def _eval_code_task(payload) -> Tuple[str, pd.DataFrame, Dict[str, float]]:
             "forward_exp_boot_mean": bmean,
             "forward_exp_boot_low": blo,
             "forward_exp_boot_high": bhi,
+            "train_avg_bars": train_metrics.get("avg_bars", 0.0),
+            "forward_avg_bars": forward_metrics.get("avg_bars", 0.0),
         }
+        record["train_gap_summary"] = json.dumps(train_metrics.get("gap_summary", []), ensure_ascii=False)
+        forward_gap_summary = forward_metrics.get("gap_summary", [])
+        record["forward_gap_summary"] = json.dumps(forward_gap_summary, ensure_ascii=False)
+        best_bucket = select_best_gap_bucket(forward_gap_summary)
+        record["forward_gap_best_bucket"] = best_bucket
+        record["forward_gap_rule"] = describe_gap_rule(best_bucket, signal_mode) if best_bucket != "none" else ""
         code_records.append(record)
     df_code = pd.DataFrame(code_records)
     if df_code.empty:
         best_record: Dict[str, float] = {
+            "mode": mode,
+            "signal_mode": signal_mode,
+            "session": session_label,
             "code": code,
-            "train_pf_eff": 0.0,
-            "forward_pf_eff": 0.0,
+            "ATR_n": param["ATR_n"],
+            "TPk": param["TPk"],
+            "SLk": param["SLk"],
+            "J_th": param["J_th"],
+            "dJ_th": param["dJ_th"],
+            "vEMA_th": param["vEMA_th"],
+            "TMAX": param["TMAX"],
+            "train_wins": 0,
+            "train_losses": 0,
+            "train_flats": 0,
             "train_trades": 0,
+            "train_winrate": 0.0,
+            "train_pf": 0.0,
+            "train_pf_eff": 0.0,
+            "train_exp_bp": 0.0,
+            "train_slices_pass": 0,
+            "train_slices_total": 0,
+            "forward_wins": 0,
+            "forward_losses": 0,
+            "forward_flats": 0,
             "forward_trades": 0,
+            "forward_winrate": 0.0,
+            "forward_pf": 0.0,
+            "forward_pf_eff": 0.0,
+            "forward_exp_bp": 0.0,
+            "forward_slices_pass": 0,
+            "forward_slices_total": 0,
+            "forward_win_ci_low": 0.0,
+            "forward_win_ci_high": 0.0,
+            "forward_exp_boot_mean": 0.0,
+            "forward_exp_boot_low": 0.0,
+            "forward_exp_boot_high": 0.0,
+            "train_avg_bars": 0.0,
+            "forward_avg_bars": 0.0,
+            "train_gap_summary": json.dumps([], ensure_ascii=False),
+            "forward_gap_summary": json.dumps([], ensure_ascii=False),
+            "forward_gap_best_bucket": "none",
+            "forward_gap_rule": "",
         }
     else:
         best_record = max(
@@ -912,6 +1321,8 @@ def main() -> None:
         "train_exp_bp",
         "train_slices_pass",
         "train_slices_total",
+        "train_avg_bars",
+        "train_gap_summary",
     ]
     forward_cols = [
         "code",
@@ -924,10 +1335,15 @@ def main() -> None:
         "forward_exp_bp",
         "forward_slices_pass",
         "forward_slices_total",
+        "forward_avg_bars",
+        "forward_gap_summary",
+        "forward_gap_best_bucket",
+        "forward_gap_rule",
     ]
     write_csv(outdir / "_SUMMARY_TRAIN.csv", summary_df[summary_cols])
     write_csv(outdir / "_SUMMARY_FORWARD.csv", summary_df[forward_cols])
     write_csv(outdir / "_COMPARE.csv", summary_df)
+    write_gap_summaries(summary_df, outdir)
 
     top_df = summary_df[
         (summary_df["train_pf_eff"] >= args.train_pf_min)
@@ -962,6 +1378,7 @@ def main() -> None:
         candidate_path = candidate_dir / f"candidates_{dt.datetime.now():%Y%m%d}.csv"
         export_cols = [
             "code",
+            "signal_mode",
             "ATR_n",
             "TPk",
             "SLk",
@@ -983,8 +1400,21 @@ def main() -> None:
             "forward_exp_boot_mean",
             "forward_exp_boot_low",
             "forward_exp_boot_high",
+            "train_avg_bars",
+            "forward_avg_bars",
+            "forward_gap_best_bucket",
+            "forward_gap_rule",
+            "forward_gap_summary",
         ]
-        final_out = final_candidates[export_cols].rename(columns={"code": "Ticker"})
+        rename_map = {
+            "code": "Ticker",
+            "signal_mode": "SignalMode",
+            "forward_avg_bars": "ForwardAvgBars",
+            "forward_gap_best_bucket": "GapBucket",
+            "forward_gap_rule": "GapRule",
+            "forward_gap_summary": "GapSummary",
+        }
+        final_out = final_candidates[export_cols].rename(columns=rename_map)
         final_out.insert(0, "Selected", 1)
         write_csv(candidate_path, final_out)
         logger.log(f"Refine candidates exported to {candidate_path}")
@@ -1006,6 +1436,12 @@ def main() -> None:
                 top_forward.to_excel(writer, sheet_name="TopForward", index=False)
                 top_train.to_excel(writer, sheet_name="TopTrain", index=False)
                 compare_sample.to_excel(writer, sheet_name="Compare", index=False)
+                gap_train_df = aggregate_gap_dataframe(parse_gap_summary_column(summary_df, "train_gap_summary"))
+                if not gap_train_df.empty:
+                    gap_train_df.to_excel(writer, sheet_name="GapTrain", index=False)
+                gap_forward_df = aggregate_gap_dataframe(parse_gap_summary_column(summary_df, "forward_gap_summary"))
+                if not gap_forward_df.empty:
+                    gap_forward_df.to_excel(writer, sheet_name="GapForward", index=False)
 
                 if outdir.joinpath("_GRID_FULL.csv").exists():
                     grid_df = pd.read_csv(outdir / "_GRID_FULL.csv")
