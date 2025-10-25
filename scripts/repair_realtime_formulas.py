@@ -61,7 +61,7 @@ def main() -> None:
         ws.Range(ws.Cells(START_ROW, 13), ws.Cells(START_ROW + ROWS, 13)).Value = ""
 
         ws.Cells.Locked = False
-        ws.Range(ws.Cells(START_ROW, 8), ws.Cells(START_ROW + ROWS, 14)).Locked = True
+        ws.Range(ws.Cells(START_ROW, 8), ws.Cells(START_ROW + ROWS, 20)).Locked = True
         ws.Protect(
             Password="",
             UserInterfaceOnly=True,

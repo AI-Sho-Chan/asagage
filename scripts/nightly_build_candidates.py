@@ -11,6 +11,9 @@ from yahooquery import Ticker
 
 STATUS_PATH = Path("logs/nightly_status.txt")
 STATUS_DATA: Dict[str, str] = {}
+WORKBOOK_PATH = Path("C:/AI/asagake/SHINSOKU.xlsm")
+START_ROW = 6
+FORMULA_COLS = (8, 9, 10, 11, 14, 15, 16, 17, 18, 19, 20)
 
 
 def write_status(**updates: object) -> None:
@@ -79,6 +82,11 @@ def aggregate_candidates(frames: List[pd.DataFrame], out_path: Path) -> Dict[str
         return summary
 
     combined = pd.concat(frames, ignore_index=True)
+    # Ensure optional columns exist for downstream Excel (MaxDD used for DD penalty)
+    if "MaxDD" not in combined.columns and "max_dd" in combined.columns:
+        combined = combined.rename(columns={"max_dd": "MaxDD"})
+    if "MaxDD" not in combined.columns:
+        combined["MaxDD"] = ""
 
     sort_cols: List[str] = []
     ascending: List[bool] = []
@@ -91,8 +99,8 @@ def aggregate_candidates(frames: List[pd.DataFrame], out_path: Path) -> Dict[str
     if sort_cols:
         combined = combined.sort_values(sort_cols, ascending=ascending)
 
-    if "Ticker" in combined.columns:
-        combined = combined.drop_duplicates(subset=["Ticker"], keep="first")
+    if {"Ticker", "signal_mode", "session"}.issubset(combined.columns):
+        combined = combined.drop_duplicates(subset=["Ticker", "signal_mode", "session"], keep="first")
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     combined.to_csv(out_path, index=False, encoding="utf-8-sig")
@@ -109,6 +117,75 @@ def aggregate_candidates(frames: List[pd.DataFrame], out_path: Path) -> Dict[str
     summary["avg_forward_trades"] = ensure_numeric_mean(combined, "forward_trades", decimals=2)
 
     return summary
+
+
+def ensure_dashboard_formulas(repo_root: Path) -> None:
+    """Run repair script and verify RSS columns remain intact."""
+    try:
+        run([sys.executable, "scripts/repair_realtime_formulas.py"], cwd=repo_root)
+    except SystemExit:
+        write_status(
+            state="running",
+            step="repair_formulas",
+            message="repair_realtime_formulas.py failed",
+        )
+        return
+
+    try:
+        import win32com.client  # type: ignore
+    except Exception as exc:  # pragma: no cover
+        write_status(
+            state="running",
+            step="repair_formulas",
+            message=f"Skipped formula verification (COM unavailable: {exc})",
+        )
+        return
+
+    excel = win32com.client.DispatchEx("Excel.Application")
+    excel.Visible = False
+    excel.DisplayAlerts = False
+    try:
+        wb = excel.Workbooks.Open(str(WORKBOOK_PATH))
+        try:
+            ws = wb.Worksheets("NewDashboard")
+        except Exception:
+            write_status(
+                state="running",
+                step="repair_formulas",
+                message="NewDashboard sheet not found",
+            )
+            return
+
+        missing: List[str] = []
+        col_names = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        for col in FORMULA_COLS:
+            try:
+                cell = ws.Cells(START_ROW, col)
+                has_formula = bool(cell.HasFormula)
+            except Exception:
+                has_formula = False
+            if not has_formula:
+                label = col_names[col - 1] if col <= len(col_names) else f"col{col}"
+                missing.append(label)
+
+        if missing:
+            write_status(
+                state="running",
+                step="repair_formulas",
+                message="Formulas missing in " + ",".join(missing),
+            )
+        else:
+            write_status(
+                state="running",
+                step="repair_formulas",
+                message="Dashboard formulas verified (H6-T6)",
+            )
+    finally:
+        try:
+            wb.Close(SaveChanges=True)
+        except Exception:
+            pass
+        excel.Quit()
 
 
 def format_plan_counts(plan_counts: Dict[str, int]) -> str:
@@ -161,17 +238,19 @@ def _main_impl() -> None:
     ap.add_argument("--chunk-days", type=int, default=5)
     ap.add_argument("--train-days", type=int, default=12)
     ap.add_argument("--forward-days", type=int, default=4)
-    ap.add_argument("--min-forward-trades", type=int, default=10)
+    ap.add_argument("--min-train-trades", type=int, default=15)
+    ap.add_argument("--min-forward-trades", type=int, default=3)
     ap.add_argument("--forward-pf-min", type=float, default=1.3)
     ap.add_argument("--gap-guard-abs-bp", type=float, default=80.0)
     ap.add_argument("--gap-guard-dir-bp", type=float, default=40.0)
     ap.add_argument("--slipbp", type=float, default=4.0)
     ap.add_argument("--feebp", type=float, default=4.0)
     ap.add_argument("--liquidity-quantile", type=float, default=0.5)
+    ap.add_argument("--jobs", type=int, default=0, help="Worker processes for bt_opt30_forward (0=auto)")
     ap.add_argument("--excel-summary", action="store_true")
-    ap.add_argument("--universe-mode", choices=["excel", "yahoo-top"], default="excel")
+    ap.add_argument("--universe-mode", choices=["excel", "yahoo-top"], default="yahoo-top")
     ap.add_argument("--universe-size", type=int, default=300)
-    ap.add_argument("--universe-source", default="data/universe_tse_prime.csv")
+    ap.add_argument("--universe-source", default="data/universe/topvol_*.csv")
     ap.add_argument("--excel-ticker-sheet", default="Ticker")
     ap.add_argument("--universe-metric", choices=["amt", "vol"], default="amt")
     args = ap.parse_args()
@@ -182,10 +261,16 @@ def _main_impl() -> None:
     night_root.mkdir(parents=True, exist_ok=True)
 
     plans: List[Tuple[str, str, str]] = [
-        ("AM10", "09:10", "j-only"),
-        ("AM10", "09:10", "j-cross"),
-        ("AM15", "09:15", "j-only"),
-        ("AM15", "09:15", "j-cross"),
+        ("AM0930", "09:30", "j-only"),
+        ("AM0930", "09:30", "j-cross"),
+        ("AM0945", "09:45", "j-only"),
+        ("AM0945", "09:45", "j-cross"),
+        ("AM1000", "10:00", "j-only"),
+        ("AM1000", "10:00", "j-cross"),
+        ("AM1015", "10:15", "j-only"),
+        ("AM1015", "10:15", "j-cross"),
+        ("AM1030", "10:30", "j-only"),
+        ("AM1030", "10:30", "j-cross"),
     ]
     total_plans = len(plans)
     plan_counts: Dict[str, int] = {f"{label}_{sig}": 0 for label, _, sig in plans}
@@ -212,6 +297,15 @@ def _main_impl() -> None:
 
         base_codes: List[str] = []
         src_path = Path(args.universe_source)
+        if "*" in src_path.name or "?" in src_path.name:
+            parent = src_path.parent if src_path.parent != Path("") else Path(".")
+            matches = sorted(parent.glob(src_path.name))
+            if matches:
+                src_path = matches[-1]
+        elif src_path.is_dir():
+            matches = sorted(src_path.glob("topvol_*.csv"))
+            if matches:
+                src_path = matches[-1]
         if src_path.exists():
             try:
                 dfu = pd.read_csv(src_path)
@@ -324,6 +418,8 @@ def _main_impl() -> None:
                 str(args.train_days),
                 "--forward-days",
                 str(args.forward_days),
+                "--min-train-trades",
+                str(args.min_train_trades),
                 "--min-forward-trades",
                 str(args.min_forward_trades),
                 "--forward-pf-min",
@@ -338,6 +434,8 @@ def _main_impl() -> None:
                 str(args.feebp),
                 "--liquidity-quantile",
                 str(args.liquidity_quantile),
+                "--jobs",
+                str(args.jobs),
             ]
             + (["--codes-file", str(codes_file_for_runs)] if codes_file_for_runs else [])
             + (["--excel-summary"] if args.excel_summary else []),
@@ -419,6 +517,8 @@ def _main_impl() -> None:
                 str(args.train_days),
                 "--forward-days",
                 str(args.forward_days),
+                "--min-train-trades",
+                str(args.min_train_trades),
                 "--min-forward-trades",
                 str(args.min_forward_trades),
                 "--forward-pf-min",
@@ -433,6 +533,8 @@ def _main_impl() -> None:
                 str(args.feebp),
                 "--liquidity-quantile",
                 str(args.liquidity_quantile),
+                "--jobs",
+                str(args.jobs),
                 "--codes-file",
                 str(codes_file),
                 "--candidate-dir",
@@ -490,6 +592,8 @@ def _main_impl() -> None:
             "candidates_path": str(out_all.resolve()),
         }
     )
+
+    ensure_dashboard_formulas(repo_root)
 
     write_status(
         state="success",

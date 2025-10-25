@@ -2133,7 +2133,7 @@ End Function
 Private Sub ProtectRealtimeColumns(ByVal ws As Worksheet)
     On Error Resume Next
     Dim firstCol As Long: firstCol = 8  ' H
-    Dim lastCol As Long: lastCol = 14   ' N
+    Dim lastCol As Long: lastCol = 20   ' T
     Dim firstRow As Long: firstRow = DASH_DATA_START
     Dim lastRow As Long: lastRow = DASH_DATA_START + DASH_FORMULA_ROWS
     ' Lock only realtime block; other cells remain editable
