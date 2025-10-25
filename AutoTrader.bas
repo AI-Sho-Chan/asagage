@@ -1,4 +1,4 @@
-Attribute VB_Name = "AutoTrader"
+﻿Attribute VB_Name = "AutoTrader"
 Option Explicit
 
 Private Const SHEET_DASHBOARD As String = "NewDashboard"
@@ -445,7 +445,7 @@ Private Sub ApplyRealtimeColumns(ByVal ws As Worksheet, Optional ByVal fillLastO
             currentRefGap = BuildR1C1Ref(currentJCol, gapPctCol)
             jthRef = BuildR1C1Ref(jthCol, gapPctCol)
 
-            ' 荵夜屬邇・ｮ夂ｾｩ: |J - J_th| / |J_th| * 100
+            ' 闕ｵ螟懷ｱｬ驍・・・ｮ螟ゑｽｾ・ｩ: |J - J_th| / |J_th| * 100
             SetColumnFormula ws, gapPctCol, fillLast, "=IF(OR(" & jthRef & "=""," & currentRefGap & "=""," & jthRef & "=0),"",ABS(" & currentRefGap & "-" & jthRef & ")/ABS(" & jthRef & ")*100)"
 
             Dim rngGap As Range
@@ -455,7 +455,7 @@ Private Sub ApplyRealtimeColumns(ByVal ws As Worksheet, Optional ByVal fillLastO
             rngGap.FormatConditions.Delete
             On Error GoTo 0
 
-            ' 譚｡莉ｶ莉倥″譖ｸ蠑・ 0% 縺ｯ豼・＞邱代・0%莉･荳九・阮・＞邱・
+            ' 隴夲ｽ｡闔会ｽｶ闔牙･窶ｳ隴厄ｽｸ陟代・ 0% 邵ｺ・ｯ雎ｼ繝ｻ・樣こ莉｣ﾂ繝ｻ0%闔会ｽ･闕ｳ荵昴・髦ｮ繝ｻ・樣こ繝ｻ
             Dim fc0 As FormatCondition
             Set fc0 = rngGap.FormatConditions.Add(Type:=xlCellValue, Operator:=xlEqual, Formula1:="0")
             fc0.Interior.Color = RGB(0, 176, 80)
@@ -553,6 +553,19 @@ Private Sub SetColumnFormula(ByVal ws As Worksheet, ByVal col As Long, ByVal fil
     Dim firstCell As Range
     Set firstCell = rngTarget.Cells(1, 1)
 
+    Dim hasExisting As Boolean
+    Dim existingFormula As String
+    On Error Resume Next
+    hasExisting = firstCell.HasFormula
+    If hasExisting Then existingFormula = firstCell.FormulaR1C1
+    On Error GoTo 0
+
+    If hasExisting Then
+        If StrComp(existingFormula, formulaR1C1, vbBinaryCompare) = 0 Then
+            Exit Sub
+        End If
+    End If
+
     On Error GoTo ApplyFailed
 
     firstCell.FormulaR1C1 = formulaR1C1
@@ -570,10 +583,9 @@ Private Sub SetColumnFormula(ByVal ws As Worksheet, ByVal col As Long, ByVal fil
 
 ApplyFailed:
     LogDebug "SetColumnFormula error col=" & col & " err=" & Err.Number & " desc=" & Err.Description & " formulaR1C1=" & formulaR1C1
-    On Error Resume Next
-    firstCell.ClearContents
-    On Error GoTo 0
     Err.Clear
+    On Error GoTo 0
+End Sub
 End Sub
 
 
@@ -798,7 +810,7 @@ Public Sub AttachFormulasFromDashboardTemplate()
     End If
     Set wsDst = EnsureSheet(SHEET_DASHBOARD)
     Dim headers As Variant
-    headers = Array("迴ｾ蝨ｨ蛟､", "VWAP", "ATR")
+    headers = Array("霑ｴ・ｾ陜ｨ・ｨ陋滂ｽ､", "VWAP", "ATR")
     Dim i As Long
     For i = LBound(headers) To UBound(headers)
         Dim h As String: h = CStr(headers(i))
@@ -1038,11 +1050,11 @@ Private Sub UpdateRiskUsageFromExecutions()
         If Len(key) > 0 Then hdrMap(key) = c
     Next c
 
-    Dim colDate As Long: If hdrMap.Exists("邏・ｮ壽律") Then colDate = hdrMap("邏・ｮ壽律") Else GoTo fallback
-    Dim colTicker As Long: If hdrMap.Exists("驫俶氛繧ｳ繝ｼ繝・) Then colTicker = hdrMap("驫俶氛繧ｳ繝ｼ繝・) Else GoTo fallback
-    Dim colSide As Long: If hdrMap.Exists("螢ｲ雋ｷ") Then colSide = hdrMap("螢ｲ雋ｷ") Else GoTo fallback
-    Dim colQty As Long: If hdrMap.Exists("邏・ｮ壽焚驥・) Then colQty = hdrMap("邏・ｮ壽焚驥・) Else GoTo fallback
-    Dim colPrice As Long: If hdrMap.Exists("邏・ｮ壻ｾ｡譬ｼ") Then colPrice = hdrMap("邏・ｮ壻ｾ｡譬ｼ") Else GoTo fallback
+    Dim colDate As Long: If hdrMap.Exists("驍上・・ｮ螢ｽ蠕・) Then colDate = hdrMap("驍上・・ｮ螢ｽ蠕・) Else GoTo fallback
+    Dim colTicker As Long: If hdrMap.Exists("鬩ｫ菫ｶ豌帷ｹｧ・ｳ郢晢ｽｼ郢昴・) Then colTicker = hdrMap("鬩ｫ菫ｶ豌帷ｹｧ・ｳ郢晢ｽｼ郢昴・) Else GoTo fallback
+    Dim colSide As Long: If hdrMap.Exists("陞｢・ｲ髮具ｽｷ") Then colSide = hdrMap("陞｢・ｲ髮具ｽｷ") Else GoTo fallback
+    Dim colQty As Long: If hdrMap.Exists("驍上・・ｮ螢ｽ辟夐ｩ･繝ｻ) Then colQty = hdrMap("驍上・・ｮ螢ｽ辟夐ｩ･繝ｻ) Else GoTo fallback
+    Dim colPrice As Long: If hdrMap.Exists("驍上・・ｮ螢ｻ・ｾ・｡隴ｬ・ｼ") Then colPrice = hdrMap("驍上・・ｮ螢ｻ・ｾ・｡隴ｬ・ｼ") Else GoTo fallback
 
     Dim sessionCol As Long: sessionCol = FindColumn(wsDash, DASH_HEADER_ROW, "Session")
     Dim modeCol As Long: modeCol = FindColumn(wsDash, DASH_HEADER_ROW, "SignalMode")
@@ -2016,9 +2028,9 @@ Private Function ExecSideSign(ByVal text As String) As Long
         ExecSideSign = 0
         Exit Function
     End If
-    If InStr(s, "雋ｷ") > 0 Or Left$(s, 1) = "B" Then
+    If InStr(s, "髮具ｽｷ") > 0 Or Left$(s, 1) = "B" Then
         ExecSideSign = 1
-    ElseIf InStr(s, "螢ｲ") > 0 Or Left$(s, 1) = "S" Or Left$(s, 1) = "F" Then
+    ElseIf InStr(s, "陞｢・ｲ") > 0 Or Left$(s, 1) = "S" Or Left$(s, 1) = "F" Then
         ExecSideSign = -1
     Else
         ExecSideSign = 0
