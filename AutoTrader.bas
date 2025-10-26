@@ -43,6 +43,7 @@ Private Const SESSION_MODE_JCROSS_RATIO As Double = 0.4
 Private Const ROW_SCORE_TRADE_TARGET As Double = 40#
 Private Const ROW_SCORE_EXP_TARGET As Double = 15#
 Private Const ROW_SCORE_DD_K As Double = 2#
+Private Const ROW_SCORE_PF_CAP_GROWTH As Double = 2#
 
 Private prevJ As Object
 Private AutoTimer As Date
@@ -1963,8 +1964,12 @@ Private Function ComputeRowScore(ByVal winRate As Double, ByVal pfEff As Double,
         expFactor = expMean / ROW_SCORE_EXP_TARGET
         If expFactor > 1 Then expFactor = 1
     End If
+    Dim pfCap As Double
+    pfCap = 1# + (tradesVal / ROW_SCORE_TRADE_TARGET) * ROW_SCORE_PF_CAP_GROWTH
+    If pfCap < 1.5 Then pfCap = 1.5
     Dim pfFactor As Double
     pfFactor = pfEff
+    If pfFactor > pfCap Then pfFactor = pfCap
     If pfFactor < 1 Then pfFactor = 0
     Dim ddNorm As Double
     ddNorm = maxDD
