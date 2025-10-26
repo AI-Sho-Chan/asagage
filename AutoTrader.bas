@@ -567,10 +567,17 @@ Private Sub SetColumnFormula(ByVal ws As Worksheet, ByVal col As Long, ByVal fil
         End If
     End If
 
-    On Error GoTo ApplyFailed
+    On Error GoTo UseLocal
 
     firstCell.FormulaR1C1 = formulaR1C1
+    GoTo AfterApply
 
+UseLocal:
+    Err.Clear
+    On Error GoTo ApplyFailed
+    firstCell.FormulaR1C1Local = formulaR1C1
+
+AfterApply:
     If rngTarget.Rows.Count > 1 Then
         firstCell.AutoFill Destination:=rngTarget
     End If
