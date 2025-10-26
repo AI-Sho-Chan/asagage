@@ -436,6 +436,7 @@ def _main_impl() -> None:
                 str(args.liquidity_quantile),
                 "--jobs",
                 str(args.jobs),
+                "--use-local-raw",
             ]
             + (["--codes-file", str(codes_file_for_runs)] if codes_file_for_runs else [])
             + (["--excel-summary"] if args.excel_summary else []),
@@ -539,6 +540,7 @@ def _main_impl() -> None:
                 str(codes_file),
                 "--candidate-dir",
                 str(cand_dir),
+                "--use-local-raw",
             ]
             + (["--excel-summary"] if args.excel_summary else []),
             cwd=repo_root,

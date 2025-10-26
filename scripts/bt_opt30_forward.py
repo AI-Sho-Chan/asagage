@@ -176,6 +176,59 @@ def fetch_1m_chunks(
     return merged[["ts", "code", "open", "high", "low", "close", "volume", "vwap", "date", "amt"]]
 
 
+def load_local_1m_chunks(
+    tickers: Sequence[str],
+    *,
+    lookback_days: int,
+    raw_root: Path,
+    logger: RunLogger,
+) -> pd.DataFrame:
+    """Load locally saved 1m bars from data/raw/yahoo_1m if available.
+
+    Expected layout: data/raw/yahoo_1m/<ticker>/YYYY-MM-DD.parquet
+    Returns same columns as fetch_1m_chunks.
+    """
+    frames: List[pd.DataFrame] = []
+    cutoff_date = (dt.datetime.now().date() - dt.timedelta(days=lookback_days))
+    for code in tickers:
+        ddir = raw_root / code
+        if not ddir.exists() or not ddir.is_dir():
+            continue
+        files = sorted([p for p in ddir.glob("*.parquet") if p.stem >= str(cutoff_date)])
+        if not files:
+            continue
+        for p in files:
+            try:
+                df = pd.read_parquet(p)
+            except Exception:
+                continue
+            # flatten columns
+            if isinstance(df.columns, pd.MultiIndex):
+                level0 = [c.lower() for c in df.columns.get_level_values(0)]
+                df.columns = level0
+            else:
+                df.columns = [c.lower() for c in df.columns]
+            # required columns
+            need = {"open", "high", "low", "close", "volume"}
+            if not need.issubset(set(df.columns)):
+                continue
+            df = df[["open", "high", "low", "close", "volume"]].copy()
+            df.index = pd.to_datetime(df.index)
+            df["code"] = code
+            df["ts"] = df.index
+            df["date"] = df["ts"].dt.date
+            df["amt"] = (df["close"] * df["volume"]).astype(float)
+            df["cumAmt"] = df.groupby(["code", "date"])['amt'].cumsum()
+            df["cumVol"] = df.groupby(["code", "date"])['volume'].cumsum().replace(0, np.nan)
+            df["vwap"] = df["cumAmt"] / df["cumVol"]
+            frames.append(df.reset_index(drop=True))
+    if not frames:
+        return pd.DataFrame(columns=["ts","code","open","high","low","close","volume","vwap","date","amt"])
+    merged = pd.concat(frames, ignore_index=True)
+    merged = merged.drop_duplicates(subset=["ts", "code"]) 
+    return merged[["ts", "code", "open", "high", "low", "close", "volume", "vwap", "date", "amt"]]
+
+
 def apply_liquidity_and_mark_entry(
     df: pd.DataFrame,
     *,
@@ -1139,6 +1192,7 @@ def main() -> None:
     ap.add_argument("--grid-sample-size", type=int, default=200, help="Rows to include when sampling grid into Excel summary")
     ap.add_argument("--bootstrap-n", type=int, default=300, help="Bootstrap resamples for CI")
     ap.add_argument("--jobs", type=int, default=0, help="Parallel workers across codes (0=auto)")
+    ap.add_argument("--use-local-raw", action="store_true", help="Use saved data/raw/yahoo_1m if available (fallback to Yahoo)")
     args = ap.parse_args()
 
     outdir = Path(args.outdir)
@@ -1153,20 +1207,56 @@ def main() -> None:
     logger.log("Run started")
 
     tickers = load_tickers_from_excel(Path(args.excel))
+    original_count = len(tickers)
     if args.codes_file:
         code_df = pd.read_csv(args.codes_file)
-        allow = set(code_df["code"].astype(str).tolist())
-        tickers = [t for t in tickers if t in allow]
-        logger.log(f"Codes limited via {args.codes_file}: {len(tickers)} tickers")
+        allow = [code.strip() for code in code_df["code"].astype(str).tolist() if code]
+        tickers = allow
+        logger.log(
+            f"Codes limited via {args.codes_file}: {len(tickers)} tickers "
+            f"(was {original_count})"
+        )
     if not tickers:
         raise RuntimeError("No tickers available for evaluation")
 
-    data = fetch_1m_chunks(
-        tickers,
-        lookback_days=args.lookback,
-        chunk_days=args.chunk_days,
-        logger=logger,
-    )
+    # Data source: local raw parquet (if enabled) + optional Yahoo top-up
+    if args.use_local_raw:
+        local = load_local_1m_chunks(
+            tickers,
+            lookback_days=args.lookback,
+            raw_root=Path("data/raw/yahoo_1m"),
+            logger=logger,
+        )
+        unique_days = sorted(pd.to_datetime(local["date"]).unique()) if not local.empty else []
+        need_topup = True
+        if unique_days:
+            min_needed = dt.datetime.now().date() - dt.timedelta(days=args.lookback)
+            have_span = (pd.to_datetime(unique_days[0]).date() <= min_needed)
+            have_counts = len(unique_days) >= int(args.lookback * 0.6)  # rough check
+            need_topup = not (have_span and have_counts)
+        if need_topup:
+            try:
+                remote = fetch_1m_chunks(
+                    tickers,
+                    lookback_days=args.lookback,
+                    chunk_days=args.chunk_days,
+                    logger=logger,
+                )
+            except Exception:
+                remote = pd.DataFrame()
+            data = pd.concat([local, remote], ignore_index=True) if not local.empty else remote
+            if data.empty:
+                raise RuntimeError("No 1m data available from local or remote sources")
+            data = data.drop_duplicates(subset=["ts", "code"]).reset_index(drop=True)
+        else:
+            data = local
+    else:
+        data = fetch_1m_chunks(
+            tickers,
+            lookback_days=args.lookback,
+            chunk_days=args.chunk_days,
+            logger=logger,
+        )
 
     days = sorted(data["date"].unique())
     if len(days) < args.train_days + args.forward_days:
