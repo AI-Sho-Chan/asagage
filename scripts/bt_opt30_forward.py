@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 import datetime as dt
 import itertools
 import json
@@ -844,7 +844,7 @@ def build_param_grid(mode: str, signal_mode: str) -> Dict[str, List[float]]:
             "ATR_n": [1, 3, 5],
             "TPk": [1.2, 1.5],
             "SLk": [1.0, 1.5, 2.0],
-            "J_th": [0.4, 0.6, 0.8, 1.0],
+            "J_th": [0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6],
             "dJ_th": [0.01, 0.03, 0.05],
             "vEMA_th": [0.01, 0.03, 0.05],
             "TMAX": [0],
@@ -854,7 +854,7 @@ def build_param_grid(mode: str, signal_mode: str) -> Dict[str, List[float]]:
             "ATR_n": [1, 2, 3, 5, 8],
             "TPk": [1.0, 1.2, 1.5, 2.0, 2.5],
             "SLk": [0.8, 1.0, 1.2, 1.5, 2.0],
-            "J_th": [0.3, 0.4, 0.6, 0.8, 1.0, 1.2],
+            "J_th": [0.3, 0.4, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 2.0, 2.2],
             "dJ_th": [0.0, 0.01, 0.03, 0.05],
             "vEMA_th": [0.0, 0.01, 0.03, 0.05],
             "TMAX": [0],
@@ -1578,3 +1578,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
