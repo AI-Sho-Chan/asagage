@@ -204,15 +204,31 @@ def load_local_1m_chunks(
                 continue
             # flatten columns
             if isinstance(df.columns, pd.MultiIndex):
-                level0 = [c.lower() for c in df.columns.get_level_values(0)]
-                df.columns = level0
+                # Yahoo parquet files may contain duplicated price columns
+                # (Adj Close / Close etc.). Prefer actual OHLCV quotes.
+                selected: Dict[str, pd.Series] = {}
+                for tup in df.columns:
+                    name = str(tup[0]).strip().lower()
+                    if name == "adj close":
+                        continue
+                    if name in {"open", "high", "low", "close", "volume"} and name not in selected:
+                        selected[name] = df[tup]
+                df = pd.DataFrame(selected)
             else:
-                df.columns = [c.lower() for c in df.columns]
-            # required columns
-            need = {"open", "high", "low", "close", "volume"}
-            if not need.issubset(set(df.columns)):
+                cols = [str(c).strip().lower() for c in df.columns]
+                df.columns = cols
+                cleaned: Dict[str, pd.Series] = {}
+                for name, series in zip(cols, (df[col] for col in df.columns)):
+                    if name == "adj close":
+                        continue
+                    if name in {"open", "high", "low", "close", "volume"} and name not in cleaned:
+                        cleaned[name] = series
+                df = pd.DataFrame(cleaned)
+
+            needed_order = ["open", "high", "low", "close", "volume"]
+            if not set(needed_order).issubset(set(df.columns)):
                 continue
-            df = df[["open", "high", "low", "close", "volume"]].copy()
+            df = df[needed_order].copy()
             df.index = pd.to_datetime(df.index)
             df["code"] = code
             df["ts"] = df.index
