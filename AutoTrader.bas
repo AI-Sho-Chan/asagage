@@ -128,6 +128,14 @@ Private Function HeaderPreopenMidJP() As String
     HeaderPreopenMidJP = ChrW(&H6C17) & ChrW(&H914D) & ChrW(&H5024) & ChrW(&HFF08) & ChrW(&H4E2D) & ChrW(&H592E) & ChrW(&HFF09)
 End Function
 
+Private Function RssFieldPreopenBidCode() As String
+    RssFieldPreopenBidCode = "56"
+End Function
+
+Private Function RssFieldPreopenAskCode() As String
+    RssFieldPreopenAskCode = "55"
+End Function
+
 Private Function HeaderLiveGapBpJP() As String
     HeaderLiveGapBpJP = ChrW(&H30E9) & ChrW(&H30A4) & ChrW(&H30D6) & ChrW(&H30AE) & ChrW(&H30E3) & ChrW(&H30C3) & ChrW(&H30D7) & "(bp)"
 End Function
@@ -368,7 +376,7 @@ Private Sub ApplyRealtimeColumns(ByVal ws As Worksheet, Optional ByVal fillLastO
 
         bidRef = BuildR1C1Ref(tickerCol, bidCol)
 
-        SetColumnFormula ws, bidCol, fillLast, "=IF(" & bidRef & "="","",IFERROR(RssMarket(" & bidRef & "," & QuoteForFormula(HeaderPreopenBidJP()) & "),""))"
+        SetColumnFormula ws, bidCol, fillLast, "=IF(" & bidRef & "="","",IFERROR(RssMarket(" & bidRef & "," & QuoteForFormula(RssFieldPreopenBidCode()) & "),""))"
 
     End If
 
@@ -385,7 +393,7 @@ Private Sub ApplyRealtimeColumns(ByVal ws As Worksheet, Optional ByVal fillLastO
 
         askRef = BuildR1C1Ref(tickerCol, askCol)
 
-        SetColumnFormula ws, askCol, fillLast, "=IF(" & askRef & "="","",IFERROR(RssMarket(" & askRef & "," & QuoteForFormula(HeaderPreopenAskJP()) & "),""))"
+        SetColumnFormula ws, askCol, fillLast, "=IF(" & askRef & "="","",IFERROR(RssMarket(" & askRef & "," & QuoteForFormula(RssFieldPreopenAskCode()) & "),""))"
 
     End If
 
