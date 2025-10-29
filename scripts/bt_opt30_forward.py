@@ -1,6 +1,7 @@
 ﻿import argparse
 import datetime as dt
 import itertools
+import hashlib
 import json
 import math
 import os
@@ -8,16 +9,74 @@ import concurrent.futures as cf
 import subprocess
 import time
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence, Tuple, Optional
+from collections import deque
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import numpy as np
 import pandas as pd
+from pandas.util import hash_pandas_object
 from yahooquery import Ticker
 
 
 # ---------------------------------------------------------------------------
 # Utility helpers
 # ---------------------------------------------------------------------------
+
+OPTUNA_PRIOR_TRIALS: List[Dict[str, float]] = [
+    {"ATR_n": 5, "TPk": 1.5, "SLk": 2.0, "J_th": 1.7, "TMAX": 0.0, "dJ_th": 0.0, "vEMA_th": 0.0},
+    {"ATR_n": 5, "TPk": 2.5, "SLk": 2.0, "J_th": 2.0, "TMAX": 0.0, "dJ_th": 0.0, "vEMA_th": 0.0},
+    {"ATR_n": 8, "TPk": 1.5, "SLk": 2.0, "J_th": 1.8, "TMAX": 0.0, "dJ_th": 0.0, "vEMA_th": 0.0},
+    {"ATR_n": 8, "TPk": 2.5, "SLk": 2.0, "J_th": 2.2, "TMAX": 0.0, "dJ_th": 0.0, "vEMA_th": 0.0},
+    {"ATR_n": 3, "TPk": 2.5, "SLk": 2.0, "J_th": 2.2, "TMAX": 0.0, "dJ_th": 0.0, "vEMA_th": 0.0},
+    {"ATR_n": 5, "TPk": 1.5, "SLk": 2.0, "J_th": 1.8, "TMAX": 0.0, "dJ_th": 0.0, "vEMA_th": 0.0},
+]
+
+
+def _load_optuna_priors() -> Dict[str, Any]:
+    """Load dynamic weekend/weekday priors from state/optuna_priors.json if present."""
+    path = Path("state/optuna_priors.json")
+    try:
+        if path.exists():
+            with path.open("r", encoding="utf-8") as fh:
+                data = json.load(fh)
+                if isinstance(data, dict):
+                    return data
+    except Exception:
+        pass
+    return {"version": 1, "epoch": "", "ttl_days": 7, "priors": []}
+
+
+def _filter_priors_for_unique(unique_values: Dict[str, List[float]], priors: List[Dict[str, Any]]) -> List[Dict[str, float]]:
+    """Keep only priors with keys present in unique_values and within min/max bounds."""
+    out: List[Dict[str, float]] = []
+    for combo in priors:
+        params: Dict[str, float] = {}
+        valid = True
+        for key, value in combo.items():
+            if key not in unique_values:
+                continue
+            vals = unique_values[key]
+            if not vals:
+                continue
+            mn = float(min(vals)); mx = float(max(vals))
+            val = float(value)
+            if key == "ATR_n":
+                val = float(int(round(val)))
+            if val < mn - 1e-9 or val > mx + 1e-9:
+                valid = False
+                break
+            params[key] = val
+        if not valid:
+            continue
+        # Ensure required basics present
+        if not {"ATR_n", "TPk", "SLk", "J_th"}.issubset(params.keys()):
+            continue
+        # Fill optional keys
+        for opt_key in ("dJ_th", "vEMA_th", "TMAX"):
+            if opt_key in unique_values and opt_key not in params:
+                params[opt_key] = float(unique_values[opt_key][0])
+        out.append(params)
+    return out
 
 
 def parse_hhmm(value: str) -> dt.time:
@@ -72,6 +131,327 @@ class StatusTracker:
     def flush(self) -> None:
         if self._latest:
             self.update(force=True, **self._latest)
+
+
+# ---------------------------------------------------------------------------
+# Caching + low-priority helpers
+# ---------------------------------------------------------------------------
+
+CACHE_SCHEMA_VERSION = 1
+
+
+def normalize_record(record: Dict[str, Any]) -> Dict[str, Any]:
+    normalized: Dict[str, Any] = {}
+    for key, value in record.items():
+        if isinstance(value, (np.floating,)):
+            normalized[key] = float(value)
+        elif isinstance(value, (np.integer,)):
+            normalized[key] = int(value)
+        else:
+            normalized[key] = value
+    return normalized
+
+
+def make_param_hash(params: Dict[str, float]) -> str:
+    payload = json.dumps({k: params[k] for k in sorted(params)}, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
+def build_plan_key(args: argparse.Namespace, session_label: str) -> str:
+    plan_meta = {
+        "mode": args.mode,
+        "signal_mode": args.signal_mode,
+        "session": session_label,
+        "train_days": args.train_days,
+        "forward_days": args.forward_days,
+        "forward_slices": args.forward_slices,
+        "lookback": args.lookback,
+        "liquidity_q": args.liquidity_quantile,
+        "slipbp": args.slipbp,
+        "feebp": args.feebp,
+        "gap_abs": float(getattr(args, "gap_guard_abs_bp", 0.0) or 0.0),
+        "gap_dir": float(getattr(args, "gap_guard_dir_bp", 0.0) or 0.0),
+    }
+    digest = hashlib.sha1(json.dumps(plan_meta, sort_keys=True).encode("utf-8")).hexdigest()[:10]
+    return f"{args.mode}-{args.signal_mode}-{session_label}-{digest}"
+
+
+def compute_data_hash(df: pd.DataFrame) -> str:
+    if df.empty:
+        return "empty"
+    cols = [col for col in ["ts", "open", "high", "low", "close", "volume", "vwap", "gap_bp", "is_entry"] if col in df.columns]
+    subset = df[cols].copy()
+    hashed = hash_pandas_object(subset, index=False).values
+    digest = hashlib.sha1(hashed.tobytes())
+    digest.update(str(len(df)).encode("utf-8"))
+    unique_days = ",".join(sorted({str(x) for x in df["date"].astype(str).unique()}))
+    digest.update(unique_days.encode("utf-8"))
+    return digest.hexdigest()
+
+
+def _cache_record_path(root: Path, code: str, plan_key: str, param_hash: str, data_hash: str) -> Path:
+    return root / code / plan_key / param_hash / data_hash / "result.json"
+
+
+def load_cache_record(root: Path, code: str, plan_key: str, param_hash: str, data_hash: str) -> Optional[Dict[str, Any]]:
+    path = _cache_record_path(root, code, plan_key, param_hash, data_hash)
+    if not path.exists():
+        return None
+    try:
+        with path.open("r", encoding="utf-8") as fp:
+            payload = json.load(fp)
+    except Exception:
+        return None
+    if payload.get("version") != CACHE_SCHEMA_VERSION:
+        return None
+    record = payload.get("record")
+    if isinstance(record, dict):
+        return record
+    return None
+
+
+def store_cache_record(
+    root: Path,
+    code: str,
+    plan_key: str,
+    param_hash: str,
+    data_hash: str,
+    record: Dict[str, Any],
+) -> None:
+    path = _cache_record_path(root, code, plan_key, param_hash, data_hash)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": CACHE_SCHEMA_VERSION,
+        "saved_at": dt.datetime.now().isoformat(),
+        "record": normalize_record(record),
+    }
+    tmp = path.with_suffix(".tmp")
+    with tmp.open("w", encoding="utf-8") as fp:
+        json.dump(payload, fp, ensure_ascii=False)
+    tmp.replace(path)
+
+
+def auto_worker_count(limit: int = 8) -> int:
+    logical = os.cpu_count() or 1
+    base = logical
+    try:
+        import psutil  # type: ignore
+
+        physical = psutil.cpu_count(logical=False)
+        if physical:
+            base = physical
+    except Exception:
+        # Fall back to heuristic using logical cores
+        base = max(1, logical // 2) if logical > 2 else logical
+    base = max(1, base)
+    return max(1, min(base, limit))
+
+
+class LowPriorityManager:
+    def __init__(
+        self,
+        path: Path,
+        *,
+        window: int,
+        trades_threshold: int,
+        pf_threshold: float,
+        win_threshold: float,
+        consecutive_limit: int,
+    ):
+        self.path = path
+        self.window = max(1, int(window))
+        self.trades_threshold = max(1, int(trades_threshold))
+        self.pf_threshold = float(pf_threshold)
+        self.win_threshold = float(win_threshold)
+        self.consecutive_limit = max(1, int(consecutive_limit))
+        self.data: Dict[str, Any] = {"version": 1, "tickers": {}}
+        self._touched = False
+        self._skipped: List[str] = []
+        self._load()
+
+    def _load(self) -> None:
+        if not self.path.exists():
+            return
+        try:
+            with self.path.open("r", encoding="utf-8") as fp:
+                payload = json.load(fp)
+            if isinstance(payload, dict) and "tickers" in payload:
+                self.data = payload
+        except Exception:
+            self.data = {"version": 1, "tickers": {}}
+
+    def register_skip(self, codes: Iterable[str]) -> None:
+        for code in codes:
+            if code not in self._skipped:
+                self._skipped.append(code)
+
+    def get_low_priority(self) -> List[str]:
+        tickers = self.data.get("tickers", {})
+        return [code for code, meta in tickers.items() if meta.get("low_priority")]
+
+    def update(
+        self,
+        summary_df: pd.DataFrame,
+        selected_map: Dict[str, bool],
+        *,
+        timestamp: dt.datetime,
+    ) -> None:
+        tickers = self.data.setdefault("tickers", {})
+        for _, row in summary_df.iterrows():
+            code = str(row["code"])
+            entry = tickers.setdefault(
+                code,
+                {
+                    "history": [],
+                    "consecutive_miss": 0,
+                    "low_priority": False,
+                },
+            )
+            history = deque(entry.get("history", []), maxlen=self.window)
+            record = {
+                "ts": timestamp.isoformat(),
+                "forward_pf_eff": float(row.get("forward_pf_eff", 0.0) or 0.0),
+                "forward_winrate": float(row.get("forward_winrate", 0.0) or 0.0),
+                "forward_trades": float(row.get("forward_trades", 0.0) or 0.0),
+                "train_pf_eff": float(row.get("train_pf_eff", 0.0) or 0.0),
+                "train_trades": float(row.get("train_trades", 0.0) or 0.0),
+                "selected": bool(selected_map.get(code, False)),
+            }
+            history.append(record)
+            entry["history"] = list(history)
+            if record["selected"]:
+                entry["consecutive_miss"] = 0
+            else:
+                entry["consecutive_miss"] = int(entry.get("consecutive_miss", 0)) + 1
+            entry["last_update"] = timestamp.isoformat()
+            entry["low_priority"] = self._is_low_priority(entry)
+        self._touched = True
+
+    def _is_low_priority(self, entry: Dict[str, Any]) -> bool:
+        history: List[Dict[str, Any]] = entry.get("history", [])
+        if not history:
+            return False
+        window = history[-self.window :]
+        pf_values = [float(item.get("forward_pf_eff", 0.0) or 0.0) for item in window]
+        win_values = [float(item.get("forward_winrate", 0.0) or 0.0) for item in window]
+        trade_values = [float(item.get("forward_trades", 0.0) or 0.0) for item in window]
+        pf_mean = sum(pf_values) / len(pf_values)
+        win_mean = sum(win_values) / len(win_values)
+        trade_mean = sum(trade_values) / len(trade_values)
+        low_pf = (pf_mean < self.pf_threshold) and (win_mean < self.win_threshold)
+        low_trades = trade_mean < float(self.trades_threshold)
+        consec = int(entry.get("consecutive_miss", 0)) >= self.consecutive_limit
+        return low_pf or low_trades or consec
+
+    def save(self) -> None:
+        if not self._touched:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(".tmp")
+        with tmp.open("w", encoding="utf-8") as fp:
+            json.dump(self.data, fp, ensure_ascii=False, indent=2)
+        tmp.replace(self.path)
+
+    def write_report(self, outdir: Path, run_type: str, evaluated: Iterable[str]) -> None:
+        report = {
+            "generated_at": dt.datetime.now().isoformat(),
+            "run_type": run_type,
+            "low_priority": self.get_low_priority(),
+            "skipped_this_run": self._skipped,
+            "evaluated": list(evaluated),
+        }
+        path = outdir / "low_priority_report.json"
+        with path.open("w", encoding="utf-8") as fp:
+            json.dump(report, fp, ensure_ascii=False, indent=2)
+
+
+class IneffectiveBandTracker:
+    def __init__(self, path: Path):
+        self.path = path
+        self.data: Dict[str, Any] = {"version": 1, "plans": {}}
+        self._touched = False
+        self._load()
+
+    def _load(self) -> None:
+        if not self.path.exists():
+            return
+        try:
+            with self.path.open("r", encoding="utf-8") as fp:
+                payload = json.load(fp)
+            if isinstance(payload, dict) and "plans" in payload:
+                self.data = payload
+        except Exception:
+            self.data = {"version": 1, "plans": {}}
+
+    def get_masked_values(self, plan_key: str) -> Set[float]:
+        plans = self.data.get("plans", {})
+        entry = plans.get(plan_key, {}).get("J_th", {})
+        masked: Set[float] = set()
+        for key, meta in entry.items():
+            if meta.get("masked"):
+                try:
+                    masked.add(float(key))
+                except Exception:
+                    continue
+        return masked
+
+    def update(
+        self,
+        plan_key: str,
+        summary_df: pd.DataFrame,
+        *,
+        window: int,
+        threshold: float,
+        timestamp: dt.datetime,
+    ) -> None:
+        if summary_df.empty:
+            return
+        plans = self.data.setdefault("plans", {})
+        plan_entry = plans.setdefault(plan_key, {"J_th": {}})
+        bucket_size = max(1, int(window))
+        min_history = max(3, min(bucket_size, 5))
+        for _, row in summary_df.iterrows():
+            j_val = row.get("J_th")
+            if j_val is None:
+                continue
+            try:
+                j_float = float(j_val)
+            except Exception:
+                continue
+            key = f"{j_float:.4f}"
+            bucket = plan_entry["J_th"].setdefault(key, {"history": []})
+            history = deque(bucket.get("history", []), maxlen=bucket_size)
+            history.append(
+                {
+                    "ts": timestamp.isoformat(),
+                    "forward_pf_eff": float(row.get("forward_pf_eff", 0.0) or 0.0),
+                }
+            )
+            bucket["history"] = list(history)
+            pf_values = [float(item.get("forward_pf_eff", 0.0) or 0.0) for item in history]
+            avg_pf = sum(pf_values) / len(pf_values) if pf_values else 0.0
+            bucket["avg_pf"] = avg_pf
+            bucket["masked"] = len(history) >= min_history and avg_pf < float(threshold)
+        self._touched = True
+
+    def save(self) -> None:
+        if not self._touched:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(".tmp")
+        with tmp.open("w", encoding="utf-8") as fp:
+            json.dump(self.data, fp, ensure_ascii=False, indent=2)
+        tmp.replace(self.path)
+
+    def write_report(self, outdir: Path, plan_key: str) -> None:
+        report = {
+            "generated_at": dt.datetime.now().isoformat(),
+            "plan_key": plan_key,
+            "masked_j_th": sorted(self.get_masked_values(plan_key)),
+        }
+        path = outdir / "ineffective_bands_report.json"
+        with path.open("w", encoding="utf-8") as fp:
+            json.dump(report, fp, ensure_ascii=False, indent=2)
 
 
 # ---------------------------------------------------------------------------
@@ -838,31 +1218,107 @@ def evaluate_params_for_code(
     return train_metrics, forward_metrics
 
 
+def assemble_record(
+    *,
+    code: str,
+    param: Dict[str, float],
+    mode: str,
+    signal_mode: str,
+    session_label: str,
+    train_metrics: Dict[str, Any],
+    forward_metrics: Dict[str, Any],
+    bootstrap_n: int,
+) -> Dict[str, Any]:
+    fw_wins = int(forward_metrics.get("wins", 0))
+    fw_trades = int(forward_metrics.get("trades", 0))
+    wlo, whi = wilson_ci(fw_wins, fw_trades)
+    bmean, blo, bhi = bootstrap_mean_ci(
+        forward_metrics.get("slice_exp_bp", []), n_boot=int(bootstrap_n)
+    )
+    record = {
+        "mode": mode,
+        "signal_mode": signal_mode,
+        "session": session_label,
+        "code": code,
+        "ATR_n": param["ATR_n"],
+        "TPk": param["TPk"],
+        "SLk": param["SLk"],
+        "J_th": param["J_th"],
+        "dJ_th": param["dJ_th"],
+        "vEMA_th": param["vEMA_th"],
+        "TMAX": param["TMAX"],
+        "train_wins": train_metrics.get("wins", 0),
+        "train_losses": train_metrics.get("losses", 0),
+        "train_flats": train_metrics.get("flats", 0),
+        "train_trades": train_metrics.get("trades", 0),
+        "train_winrate": train_metrics.get("winrate", 0.0),
+        "train_pf": train_metrics.get("pf", 0.0),
+        "train_pf_eff": train_metrics.get("pf_eff", 0.0),
+        "train_exp_bp": train_metrics.get("exp_bp", 0.0),
+        "train_slices_pass": train_metrics.get("slices_pass", 0),
+        "train_slices_total": train_metrics.get("slices_total", 0),
+        "forward_wins": forward_metrics.get("wins", 0),
+        "forward_losses": forward_metrics.get("losses", 0),
+        "forward_flats": forward_metrics.get("flats", 0),
+        "forward_trades": forward_metrics.get("trades", 0),
+        "forward_winrate": forward_metrics.get("winrate", 0.0),
+        "forward_pf": forward_metrics.get("pf", 0.0),
+        "forward_pf_eff": forward_metrics.get("pf_eff", 0.0),
+        "forward_exp_bp": forward_metrics.get("exp_bp", 0.0),
+        "forward_slices_pass": forward_metrics.get("slices_pass", 0),
+        "forward_slices_total": forward_metrics.get("slices_total", 0),
+        "forward_win_ci_low": wlo,
+        "forward_win_ci_high": whi,
+        "forward_exp_boot_mean": bmean,
+        "forward_exp_boot_low": blo,
+        "forward_exp_boot_high": bhi,
+        "train_avg_bars": train_metrics.get("avg_bars", 0.0),
+        "forward_avg_bars": forward_metrics.get("avg_bars", 0.0),
+    }
+    record["train_gap_summary"] = json.dumps(train_metrics.get("gap_summary", []), ensure_ascii=False)
+    forward_gap_summary = forward_metrics.get("gap_summary", [])
+    record["forward_gap_summary"] = json.dumps(forward_gap_summary, ensure_ascii=False)
+    best_bucket = select_best_gap_bucket(forward_gap_summary)
+    record["forward_gap_best_bucket"] = best_bucket
+    record["forward_gap_rule"] = describe_gap_rule(best_bucket, signal_mode) if best_bucket != "none" else ""
+    return normalize_record(record)
+
+
 def build_param_grid(mode: str, signal_mode: str) -> Dict[str, List[float]]:
+    # Coarse: ASHAで枝刈りする前提の軽量グリッド（ユーザー合意版）
     if mode == "coarse":
         grid = {
-            "ATR_n": [1, 3, 5],
-            "TPk": [1.2, 1.5],
-            "SLk": [1.0, 1.5, 2.0],
-            "J_th": [0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6],
-            "dJ_th": [0.01, 0.03, 0.05],
-            "vEMA_th": [0.01, 0.03, 0.05],
+            "ATR_n": [1, 3, 5, 10],
+            "TPk": [1.2, 1.5, 2.0],
+            "SLk": [1.0, 1.5, 2.0, 3.0],
+            "J_th": [0.6, 0.8, 1.0, 1.5, 2.0, 2.5],
             "TMAX": [0],
         }
+    # Refine: ベイズ探索ON時は連続値で近傍探索（アンカーは統計レポート用に保持）
     else:
         grid = {
-            "ATR_n": [1, 2, 3, 5, 8],
-            "TPk": [1.0, 1.2, 1.5, 2.0, 2.5],
-            "SLk": [0.8, 1.0, 1.2, 1.5, 2.0],
-            "J_th": [0.3, 0.4, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 2.0, 2.2],
-            "dJ_th": [0.0, 0.01, 0.03, 0.05],
-            "vEMA_th": [0.0, 0.01, 0.03, 0.05],
+            "ATR_n": [1, 2, 3, 5, 8, 10, 20],
+            "TPk": [1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0],
+            "SLk": [0.8, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0],
+            "J_th": [
+                0.6, 0.7, 0.8, 0.9,
+                1.0, 1.1, 1.2, 1.3, 1.4, 1.5,
+                1.6, 1.7, 1.8, 2.0, 2.25, 2.5, 2.75, 3.0,
+            ],
             "TMAX": [0],
         }
 
-    if signal_mode != "full":
-        grid["dJ_th"] = [0.0]
-        grid["vEMA_th"] = [0.0]
+    # dJ_th / vEMA_th は現行ロジックで未使用のため、非 full モードでは探索から除外（固定0.0）。
+    # 下流互換のため full 以外でもキーが必要なコードパスがある場合は 0.0 固定で残す。
+    if signal_mode == "full":
+        grid.setdefault("dJ_th", [0.0])
+        grid.setdefault("vEMA_th", [0.0])
+    else:
+        # 非 full では完全に探索対象から外す（必要なら fallback 側で 0.0 を使用）
+        if "dJ_th" in grid:
+            del grid["dJ_th"]
+        if "vEMA_th" in grid:
+            del grid["vEMA_th"]
 
     return grid
 
@@ -1000,7 +1456,7 @@ def write_gap_summaries(summary_df: pd.DataFrame, outdir: Path) -> None:
             write_csv(outdir / "_GAP_SUMMARY_FORWARD.csv", agg_forward)
 
 
-def _eval_code_task(payload) -> Tuple[str, pd.DataFrame, Dict[str, float]]:
+def _eval_code_task(payload) -> Tuple[str, pd.DataFrame, Dict[str, float], Dict[str, int]]:
     (
         code,
         code_df,
@@ -1016,87 +1472,254 @@ def _eval_code_task(payload) -> Tuple[str, pd.DataFrame, Dict[str, float]]:
         session_label,
         bootstrap_n,
         forward_pf_min,
+        cache_cfg,
+        optim_cfg,
     ) = payload
-    code_records: List[Dict[str, float]] = []
+    optim_cfg = optim_cfg or {}
+    asha_cfg = optim_cfg.get("asha", {}) if isinstance(optim_cfg, dict) else {}
+    asha_enabled = bool(asha_cfg.get("enabled") and mode == "coarse")
+    bayes_cfg = optim_cfg.get("bayes", {}) if isinstance(optim_cfg, dict) else {}
+    bayes_enabled = bool(bayes_cfg.get("enabled") and mode == "refine")
+
+    cache_enabled = bool(cache_cfg and cache_cfg.get("enabled"))
+    cache_root: Optional[Path] = cache_cfg.get("root") if cache_enabled else None  # type: ignore[assignment]
+    plan_key = cache_cfg.get("plan_key") if cache_enabled else ""
+    data_hash = cache_cfg.get("data_hash") if cache_enabled else ""
+    cache_refresh = bool(cache_cfg.get("refresh")) if cache_enabled else False
+
+    stage1_records: Dict[str, Dict[str, Any]] = {}
+    selected_param_hashes: set = set()
+    asha_pruned = 0
+    if asha_enabled and len(param_grid) > 1 and len(slices) > 1:
+        eta = max(2, int(asha_cfg.get("eta", 3)))
+        min_stage = max(1, int(asha_cfg.get("min_slices", 1)))
+        total_slices = len(slices)
+        stage_size = min(total_slices, max(min_stage, total_slices // eta))
+        if stage_size >= total_slices:
+            asha_enabled = False
+        else:
+            subset_slices = list(slices[:stage_size])
+            stage_scores: List[Tuple[float, str]] = []
+            for param in param_grid:
+                train_metrics, forward_metrics = evaluate_params_for_code(
+                    code_df,
+                    subset_slices,
+                    param,
+                    cost_bp,
+                    abs_guard_bp,
+                    dir_guard_bp,
+                    min_train_trades,
+                    min_forward_trades,
+                    signal_mode,
+                )
+                record = assemble_record(
+                    code=code,
+                    param=param,
+                    mode=mode,
+                    signal_mode=signal_mode,
+                    session_label=session_label,
+                    train_metrics=train_metrics,
+                    forward_metrics=forward_metrics,
+                    bootstrap_n=int(bootstrap_n),
+                )
+                p_hash = make_param_hash(param)
+                stage1_records[p_hash] = record
+                score_val = score_record(record, min_forward_trades, forward_pf_min)
+                stage_scores.append((score_val, p_hash))
+            keep = max(1, int(math.ceil(len(param_grid) / eta)))
+            stage_scores.sort(key=lambda item: item[0], reverse=True)
+            selected_param_hashes = {ph for _, ph in stage_scores[:keep]}
+            asha_pruned = len(param_grid) - len(selected_param_hashes)
+
+    evaluated_hashes = set(stage1_records.keys())
+
+    code_records: List[Dict[str, Any]] = []
+    cache_hits = 0
+    cache_misses = 0
+    bayes_trials_done = 0
+    fallback_param: Optional[Dict[str, float]] = None
     for param in param_grid:
-        train_metrics, forward_metrics = evaluate_params_for_code(
-            code_df,
-            slices,
-            param,
-            cost_bp,
-            abs_guard_bp,
-            dir_guard_bp,
-            min_train_trades,
-            min_forward_trades,
-            signal_mode,
-        )
-        fw_wins = int(forward_metrics["wins"])
-        fw_trades = int(forward_metrics["trades"])
-        wlo, whi = wilson_ci(fw_wins, fw_trades)
-        bmean, blo, bhi = bootstrap_mean_ci(
-            forward_metrics.get("slice_exp_bp", []), n_boot=int(bootstrap_n)
-        )
-        record = {
-            "mode": mode,
-            "signal_mode": signal_mode,
-            "session": session_label,
-            "code": code,
-            "ATR_n": param["ATR_n"],
-            "TPk": param["TPk"],
-            "SLk": param["SLk"],
-            "J_th": param["J_th"],
-            "dJ_th": param["dJ_th"],
-            "vEMA_th": param["vEMA_th"],
-            "TMAX": param["TMAX"],
-            "train_wins": train_metrics["wins"],
-            "train_losses": train_metrics["losses"],
-            "train_flats": train_metrics["flats"],
-            "train_trades": train_metrics["trades"],
-            "train_winrate": train_metrics["winrate"],
-            "train_pf": train_metrics["pf"],
-            "train_pf_eff": train_metrics["pf_eff"],
-            "train_exp_bp": train_metrics["exp_bp"],
-            "train_slices_pass": train_metrics["slices_pass"],
-            "train_slices_total": train_metrics["slices_total"],
-            "forward_wins": forward_metrics["wins"],
-            "forward_losses": forward_metrics["losses"],
-            "forward_flats": forward_metrics["flats"],
-            "forward_trades": forward_metrics["trades"],
-            "forward_winrate": forward_metrics["winrate"],
-            "forward_pf": forward_metrics["pf"],
-            "forward_pf_eff": forward_metrics["pf_eff"],
-            "forward_exp_bp": forward_metrics["exp_bp"],
-            "forward_slices_pass": forward_metrics["slices_pass"],
-            "forward_slices_total": forward_metrics["slices_total"],
-            "forward_win_ci_low": wlo,
-            "forward_win_ci_high": whi,
-            "forward_exp_boot_mean": bmean,
-            "forward_exp_boot_low": blo,
-            "forward_exp_boot_high": bhi,
-            "train_avg_bars": train_metrics.get("avg_bars", 0.0),
-            "forward_avg_bars": forward_metrics.get("avg_bars", 0.0),
-        }
-        record["train_gap_summary"] = json.dumps(train_metrics.get("gap_summary", []), ensure_ascii=False)
-        forward_gap_summary = forward_metrics.get("gap_summary", [])
-        record["forward_gap_summary"] = json.dumps(forward_gap_summary, ensure_ascii=False)
-        best_bucket = select_best_gap_bucket(forward_gap_summary)
-        record["forward_gap_best_bucket"] = best_bucket
-        record["forward_gap_rule"] = describe_gap_rule(best_bucket, signal_mode) if best_bucket != "none" else ""
+        if fallback_param is None:
+            fallback_param = param
+        record: Optional[Dict[str, Any]] = None
+        param_hash = make_param_hash(param)
+        if asha_enabled and param_hash in stage1_records and param_hash not in selected_param_hashes:
+            code_records.append(stage1_records[param_hash])
+            evaluated_hashes.add(param_hash)
+            continue
+        if cache_enabled and cache_root and data_hash and not cache_refresh:
+            record = load_cache_record(cache_root, code, plan_key, param_hash, data_hash)
+            if record:
+                cache_hits += 1
+        if record is None:
+            train_metrics, forward_metrics = evaluate_params_for_code(
+                code_df,
+                slices,
+                param,
+                cost_bp,
+                abs_guard_bp,
+                dir_guard_bp,
+                min_train_trades,
+                min_forward_trades,
+                signal_mode,
+            )
+            record = assemble_record(
+                code=code,
+                param=param,
+                mode=mode,
+                signal_mode=signal_mode,
+                session_label=session_label,
+                train_metrics=train_metrics,
+                forward_metrics=forward_metrics,
+                bootstrap_n=int(bootstrap_n),
+            )
+            if cache_enabled and cache_root and data_hash:
+                store_cache_record(cache_root, code, plan_key, param_hash, data_hash, record)
+            cache_misses += 1
         code_records.append(record)
+        evaluated_hashes.add(param_hash)
+    if bayes_enabled and param_grid:
+        bayes_records: List[Dict[str, Any]] = []
+        try:
+            import optuna  # type: ignore
+        except Exception:
+            bayes_enabled = False
+        else:
+            unique_values = {k: sorted({combo[k] for combo in param_grid}) for k in param_grid[0].keys()}
+            trials_target = max(0, int(bayes_cfg.get("trials", 0)))
+            timeout_seconds = int(bayes_cfg.get("timeout", 0) or 0)
+            if trials_target > 0:
+                sampler = optuna.samplers.TPESampler(seed=bayes_cfg.get("seed"))
+                bayes_cache_hits_local = 0
+                bayes_cache_misses_local = 0
+
+                def objective(trial: "optuna.trial.Trial") -> float:
+                    nonlocal bayes_cache_hits_local, bayes_cache_misses_local, bayes_trials_done
+                    atr_candidates = unique_values.get("ATR_n", [1])
+                    atr_value = int(trial.suggest_categorical("ATR_n", atr_candidates)) if len(atr_candidates) > 1 else int(atr_candidates[0])
+
+                    def sample_float(name: str, values: List[float], step: float) -> float:
+                        low = float(min(values))
+                        high = float(max(values))
+                        if math.isclose(low, high):
+                            return low
+                        return float(trial.suggest_float(name, low, high, step=step))
+                    # ベイズ探索の刻み幅: TP/SL は 0.1、J は 0.05
+                    tp_value = sample_float("TPk", unique_values.get("TPk", [1.0]), 0.1)
+                    sl_value = sample_float("SLk", unique_values.get("SLk", [1.0]), 0.1)
+                    # 連続探索範囲の既定: [0.6, 3.0]
+                    j_values = unique_values.get("J_th", [0.6, 3.0])
+                    j_value = sample_float("J_th", j_values, 0.05)
+                    # dJ/vEMA は full モード以外では固定 0.0（unique_values に無ければ [0.0]）
+                    dj_value = sample_float("dJ_th", unique_values.get("dJ_th", [0.0]), 0.01)
+                    vema_value = sample_float("vEMA_th", unique_values.get("vEMA_th", [0.0]), 0.01)
+                    tmax_value = float(unique_values.get("TMAX", [0])[0])
+
+                    param = {
+                        "ATR_n": atr_value,
+                        "TPk": tp_value,
+                        "SLk": sl_value,
+                        "J_th": j_value,
+                        "dJ_th": dj_value,
+                        "vEMA_th": vema_value,
+                        "TMAX": tmax_value,
+                    }
+                    param_hash = make_param_hash(param)
+                    if param_hash in evaluated_hashes:
+                        raise optuna.TrialPruned()
+                    record = None
+                    if cache_enabled and cache_root and data_hash and not cache_refresh:
+                        record = load_cache_record(cache_root, code, plan_key, param_hash, data_hash)
+                        if record:
+                            bayes_cache_hits_local += 1
+                    if record is None:
+                        train_metrics, forward_metrics = evaluate_params_for_code(
+                            code_df,
+                            slices,
+                            param,
+                            cost_bp,
+                            abs_guard_bp,
+                            dir_guard_bp,
+                            min_train_trades,
+                            min_forward_trades,
+                            signal_mode,
+                        )
+                        record = assemble_record(
+                            code=code,
+                            param=param,
+                            mode=mode,
+                            signal_mode=signal_mode,
+                            session_label=session_label,
+                            train_metrics=train_metrics,
+                            forward_metrics=forward_metrics,
+                            bootstrap_n=int(bootstrap_n),
+                        )
+                        if cache_enabled and cache_root and data_hash:
+                            store_cache_record(cache_root, code, plan_key, param_hash, data_hash, record)
+                        bayes_cache_misses_local += 1
+                    bayes_records.append(record)
+                    evaluated_hashes.add(param_hash)
+                    bayes_trials_done += 1
+                    return float(record.get("forward_pf_eff", 0.0))
+
+                study = optuna.create_study(direction="maximize", sampler=sampler)
+                # 優先探索: 週末priors → 平日補助priors → 固定シード
+                try:
+                    prior_state = _load_optuna_priors()
+                    prior_list = prior_state.get("priors", []) if isinstance(prior_state, dict) else []
+                    weekend = [p for p in prior_list if isinstance(p, dict) and p.get("source") == "weekend"]
+                    weekday = [p for p in prior_list if isinstance(p, dict) and p.get("source") == "weekday"]
+                    pri_weekend = _filter_priors_for_unique(unique_values, weekend)
+                    pri_weekday = _filter_priors_for_unique(unique_values, weekday)
+                except Exception:
+                    pri_weekend = []
+                    pri_weekday = []
+
+                def _enqueue_many(candidates: List[Dict[str, float]]) -> None:
+                    for params in candidates:
+                        try:
+                            study.enqueue_trial(params)
+                        except Exception:
+                            pass
+
+                _enqueue_many(pri_weekend)
+                _enqueue_many(pri_weekday)
+
+                seeded_params: List[Dict[str, float]] = _filter_priors_for_unique(unique_values, OPTUNA_PRIOR_TRIALS)
+                _enqueue_many(seeded_params)
+                study.optimize(
+                    objective,
+                    n_trials=trials_target,
+                    timeout=timeout_seconds if timeout_seconds > 0 else None,
+                )
+                cache_hits += bayes_cache_hits_local
+                cache_misses += bayes_cache_misses_local
+        if bayes_records:
+            code_records.extend(bayes_records)
+
     df_code = pd.DataFrame(code_records)
     if df_code.empty:
+        base_param = fallback_param or {
+            "ATR_n": 0.0,
+            "TPk": 0.0,
+            "SLk": 0.0,
+            "J_th": 0.0,
+            "dJ_th": 0.0,
+            "vEMA_th": 0.0,
+            "TMAX": 0.0,
+        }
         best_record: Dict[str, float] = {
             "mode": mode,
             "signal_mode": signal_mode,
             "session": session_label,
             "code": code,
-            "ATR_n": param["ATR_n"],
-            "TPk": param["TPk"],
-            "SLk": param["SLk"],
-            "J_th": param["J_th"],
-            "dJ_th": param["dJ_th"],
-            "vEMA_th": param["vEMA_th"],
-            "TMAX": param["TMAX"],
+            "ATR_n": base_param["ATR_n"],
+            "TPk": base_param["TPk"],
+            "SLk": base_param["SLk"],
+            "J_th": base_param["J_th"],
+            "dJ_th": base_param["dJ_th"],
+            "vEMA_th": base_param["vEMA_th"],
+            "TMAX": base_param["TMAX"],
             "train_wins": 0,
             "train_losses": 0,
             "train_flats": 0,
@@ -1134,7 +1757,12 @@ def _eval_code_task(payload) -> Tuple[str, pd.DataFrame, Dict[str, float]]:
             df_code.to_dict("records"),
             key=lambda rec: score_record(rec, min_forward_trades, forward_pf_min),
         )
-    return code, df_code, best_record
+    stats = {"cache_hits": cache_hits, "cache_misses": cache_misses}
+    if asha_pruned > 0:
+        stats["asha_pruned"] = asha_pruned
+    if bayes_trials_done > 0:
+        stats["bayes_trials"] = bayes_trials_done
+    return code, df_code, best_record, stats
 
 
 # ---------------------------------------------------------------------------
@@ -1209,7 +1837,39 @@ def main() -> None:
     ap.add_argument("--bootstrap-n", type=int, default=300, help="Bootstrap resamples for CI")
     ap.add_argument("--jobs", type=int, default=0, help="Parallel workers across codes (0=auto)")
     ap.add_argument("--use-local-raw", action="store_true", help="Use saved data/raw/yahoo_1m if available (fallback to Yahoo)")
+    ap.add_argument("--cache-root", default="cache/opt30", help="Root directory for cached evaluation results")
+    ap.add_argument("--cache", dest="cache_enabled", action="store_true", help="Enable caching (default)")
+    ap.add_argument("--no-cache", dest="cache_enabled", action="store_false", help="Disable caching")
+    ap.add_argument("--cache-refresh", action="store_true", help="Ignore cached results for this run")
+    ap.add_argument("--run-type", choices=["auto", "weekday", "weekend"], default="auto", help="Controls low-priority gating")
+    ap.add_argument("--low-priority-config", default="state/opt30_low_priority.json", help="Path for persisting low-priority state")
+    ap.add_argument("--low-priority-window", type=int, default=20, help="History (runs) window when computing low-priority metrics")
+    ap.add_argument("--low-priority-trade-threshold", type=int, default=4, help="Average forward trades below this flags low-priority")
+    ap.add_argument("--low-priority-forward-pf", type=float, default=1.1, help="Forward pf_eff threshold for low priority")
+    ap.add_argument("--low-priority-forward-win", type=float, default=0.52, help="Forward winrate threshold for low priority")
+    ap.add_argument("--low-priority-consecutive", type=int, default=5, help="Consecutive misses before forcing low priority")
+    ap.add_argument("--low-priority", dest="low_priority_enabled", action="store_true", help="Enable low-priority gating (default)")
+    ap.add_argument("--no-low-priority", dest="low_priority_enabled", action="store_false", help="Disable low-priority gating")
+    ap.add_argument("--partial-write-every", type=int, default=1, help="Update partial CSV outputs every N tickers (default 1)")
+    ap.add_argument("--optimize-io", action="store_true", help="Reduce partial write frequency and extra I/O")
+    ap.add_argument("--enable-asha", action="store_true", help="Enable ASHA pruning during coarse mode")
+    ap.add_argument("--asha-eta", type=int, default=3, help="Reduction factor (eta) for ASHA pruning (>=2)")
+    ap.add_argument("--asha-min-slices", type=int, default=1, help="Minimum slice count for ASHA warm-up stage")
+    ap.add_argument("--enable-bayes", action="store_true", help="Enable Optuna-based Bayesian search during refine mode")
+    ap.add_argument("--bayes-trials", type=int, default=40, help="Optuna trials when Bayesian search is enabled")
+    ap.add_argument("--bayes-timeout", type=int, default=0, help="Optional Optuna timeout in seconds (0=disabled)")
+    ap.add_argument("--mask-ineffective", action="store_true", help="Skip parameter bands that repeatedly underperform")
+    ap.add_argument("--mask-window", type=int, default=20, help="History window (runs) for ineffective band detection")
+    ap.add_argument("--mask-threshold", type=float, default=1.05, help="Minimum forward_pf_eff to keep a band active")
+    ap.set_defaults(cache_enabled=True, low_priority_enabled=True)
     args = ap.parse_args()
+
+    if args.optimize_io and args.partial_write_every < 5:
+        args.partial_write_every = 5
+
+    run_type = args.run_type
+    if run_type == "auto":
+        run_type = "weekend" if dt.datetime.now().weekday() >= 5 else "weekday"
 
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -1221,6 +1881,30 @@ def main() -> None:
     tracker = StatusTracker(status_path)
     start_ts = time.time()
     logger.log("Run started")
+    logger.log(f"Run type resolved to {run_type}")
+    if getattr(args, "enable_bayes", False) and args.mode == "refine":
+        try:
+            import optuna  # type: ignore
+        except Exception:
+            logger.log("Optuna is not available on this environment; Bayesian refine search disabled")
+            args.enable_bayes = False
+
+    cache_root = Path(args.cache_root)
+    if args.cache_enabled:
+        cache_root.mkdir(parents=True, exist_ok=True)
+    lp_manager: Optional[LowPriorityManager] = None
+    if args.low_priority_enabled:
+        lp_manager = LowPriorityManager(
+            Path(args.low_priority_config),
+            window=args.low_priority_window,
+            trades_threshold=args.low_priority_trade_threshold,
+            pf_threshold=args.low_priority_forward_pf,
+            win_threshold=args.low_priority_forward_win,
+            consecutive_limit=args.low_priority_consecutive,
+        )
+    mask_tracker: Optional[IneffectiveBandTracker] = None
+    if getattr(args, "mask_ineffective", False):
+        mask_tracker = IneffectiveBandTracker(Path("state/ineffective_bands.json"))
 
     tickers = load_tickers_from_excel(Path(args.excel))
     original_count = len(tickers)
@@ -1232,6 +1916,18 @@ def main() -> None:
             f"Codes limited via {args.codes_file}: {len(tickers)} tickers "
             f"(was {original_count})"
         )
+    excluded_codes: List[str] = []
+    if lp_manager and run_type == "weekday":
+        low_priority_codes = set(lp_manager.get_low_priority())
+        if low_priority_codes:
+            excluded_codes = [code for code in tickers if code in low_priority_codes]
+            if excluded_codes:
+                tickers = [code for code in tickers if code not in low_priority_codes]
+                lp_manager.register_skip(excluded_codes)
+                logger.log(
+                    f"Low-priority gating removed {len(excluded_codes)} tickers "
+                    f"(remaining {len(tickers)})"
+                )
     if not tickers:
         raise RuntimeError("No tickers available for evaluation")
 
@@ -1282,6 +1978,8 @@ def main() -> None:
 
     session_start = parse_hhmm(args.session_start)
     session_end = parse_hhmm(args.session_end)
+    session_label = "AM10" if session_end <= parse_hhmm("09:10") else "AM15"
+    plan_key = build_plan_key(args, session_label)
     filtered = apply_liquidity_and_mark_entry(
         data,
         session_start=session_start,
@@ -1305,6 +2003,17 @@ def main() -> None:
     param_spec = build_param_grid(args.mode, args.signal_mode)
     param_grid = list(iter_param_dicts(param_spec))
     logger.log(f"Parameter grid size: {len(param_grid)} (mode={args.mode}, signal={args.signal_mode})")
+    masked_j_values: Set[float] = set()
+    if mask_tracker and run_type != "weekend":
+        masked_j_values = mask_tracker.get_masked_values(plan_key)
+        if masked_j_values:
+            filtered_grid = [combo for combo in param_grid if float(combo.get("J_th", 0.0)) not in masked_j_values]
+            removed = len(param_grid) - len(filtered_grid)
+            if filtered_grid and removed > 0:
+                param_grid = filtered_grid
+                logger.log(f"Ineffective-band mask removed {removed} combos for J_th values {sorted(masked_j_values)}")
+            else:
+                logger.log("Ineffective-band mask skipped (would remove all parameter combinations)")
 
     cost_bp = float(args.slipbp + args.feebp)
     summary_records: List[Dict[str, float]] = []
@@ -1324,14 +2033,42 @@ def main() -> None:
     codes = list(grouped.groups.keys())
     total_tasks = len(codes) * len(param_grid)
     combo_done = 0
-    session_label = "AM10" if session_end <= parse_hhmm("09:10") else "AM15"
+    if args.jobs and args.jobs > 0:
+        max_workers = args.jobs
+    else:
+        max_workers = auto_worker_count()
+    optim_cfg = {
+        "asha": {
+            "enabled": bool(getattr(args, "enable_asha", False) and args.mode == "coarse"),
+            "eta": max(2, int(getattr(args, "asha_eta", 3))),
+            "min_slices": max(1, int(getattr(args, "asha_min_slices", 1))),
+        },
+    }
+    if getattr(args, "enable_bayes", False) and args.mode == "refine":
+        optim_cfg["bayes"] = {
+            "enabled": True,
+            "trials": int(getattr(args, "bayes_trials", 40)),
+            "timeout": int(getattr(args, "bayes_timeout", 0)),
+            "seed": None,
+        }
 
-    max_workers = args.jobs if args.jobs and args.jobs > 0 else max(1, (os.cpu_count() or 2) - 1)
     payloads = []
+    cache_flag = bool(args.cache_enabled)
     for code in codes:
+        code_df = grouped.get_group(code)
+        cache_cfg = None
+        if cache_flag:
+            data_hash = compute_data_hash(code_df)
+            cache_cfg = {
+                "enabled": True,
+                "root": cache_root,
+                "plan_key": plan_key,
+                "data_hash": data_hash,
+                "refresh": args.cache_refresh,
+            }
         payloads.append((
             code,
-            grouped.get_group(code),
+            code_df,
             slices,
             param_grid,
             cost_bp,
@@ -1344,15 +2081,27 @@ def main() -> None:
             session_label,
             int(getattr(args, "bootstrap_n", 300)),
             args.forward_pf_min,
+            cache_cfg,
+            optim_cfg,
         ))
 
     idx = 0
+    processed_since_flush = 0
+    flush_interval = max(1, int(args.partial_write_every))
+    cache_hit_total = 0
+    cache_miss_total = 0
+    asha_pruned_total = 0
+    bayes_trials_total = 0
     with cf.ThreadPoolExecutor(max_workers=max_workers) as ex:
         futures = [ex.submit(_eval_code_task, p) for p in payloads]
         for fut in cf.as_completed(futures):
-            code, df_code, best_record = fut.result()
+            code, df_code, best_record, task_stats = fut.result()
             idx += 1
             combo_done += len(param_grid)
+            cache_hit_total += int(task_stats.get("cache_hits", 0))
+            cache_miss_total += int(task_stats.get("cache_misses", 0))
+            asha_pruned_total += int(task_stats.get("asha_pruned", 0))
+            bayes_trials_total += int(task_stats.get("bayes_trials", 0))
             if not df_code.empty:
                 write_mode = "w" if not grid_path.exists() else "a"
                 df_code.to_csv(
@@ -1363,20 +2112,23 @@ def main() -> None:
                     encoding="utf-8-sig",
                 )
             summary_records.append(best_record)
-            summary_df = pd.DataFrame(summary_records)
-            write_csv(summary_partial_path, summary_df)
-            top_df = summary_df[
-                (summary_df["train_pf_eff"] >= args.train_pf_min)
-                & (summary_df["train_trades"] >= args.min_train_trades)
-                & (summary_df["forward_pf_eff"] >= args.forward_pf_min)
-                & (summary_df["forward_trades"] >= args.min_forward_trades)
-                & (summary_df["train_exp_bp"] >= args.train_exp_min)
-                & (summary_df["forward_exp_bp"] >= args.forward_exp_min)
-            ].sort_values(
-                ["forward_pf_eff", "forward_trades", "train_pf_eff"],
-                ascending=[False, False, False],
-            )
-            write_csv(top_partial_path, top_df)
+            processed_since_flush += 1
+            if processed_since_flush >= flush_interval or idx == len(codes):
+                summary_snapshot = pd.DataFrame(summary_records)
+                write_csv(summary_partial_path, summary_snapshot)
+                top_df = summary_snapshot[
+                    (summary_snapshot["train_pf_eff"] >= args.train_pf_min)
+                    & (summary_snapshot["train_trades"] >= args.min_train_trades)
+                    & (summary_snapshot["forward_pf_eff"] >= args.forward_pf_min)
+                    & (summary_snapshot["forward_trades"] >= args.min_forward_trades)
+                    & (summary_snapshot["train_exp_bp"] >= args.train_exp_min)
+                    & (summary_snapshot["forward_exp_bp"] >= args.forward_exp_min)
+                ].sort_values(
+                    ["forward_pf_eff", "forward_trades", "train_pf_eff"],
+                    ascending=[False, False, False],
+                )
+                write_csv(top_partial_path, top_df)
+                processed_since_flush = 0
             progress = combo_done / total_tasks if total_tasks else 0.0
             elapsed = time.time() - start_ts
             eta = (elapsed / progress - elapsed) if progress > 0 else None
@@ -1403,12 +2155,54 @@ def main() -> None:
     )
     tracker.flush()
 
+    if cache_flag:
+        total_cache_ops = cache_hit_total + cache_miss_total
+        if total_cache_ops > 0:
+            reuse_pct = (cache_hit_total / total_cache_ops) * 100.0
+            logger.log(f"Cache reuse: {cache_hit_total}/{total_cache_ops} combos ({reuse_pct:.1f}%) served from cache")
+        else:
+            logger.log("Cache reuse: no parameter combos evaluated")
+    if asha_pruned_total > 0:
+        logger.log(f"ASHA pruned {asha_pruned_total} parameter combos prior to full evaluation")
+    if bayes_trials_total > 0:
+        logger.log(f"Bayesian refine trials executed: {bayes_trials_total}")
+
     if not summary_records:
         logger.log("No summary records produced")
         logger.close()
         return
 
     summary_df = pd.DataFrame(summary_records)
+    if lp_manager and not summary_df.empty:
+        selection_mask = (
+            (summary_df["train_pf_eff"] >= args.train_pf_min)
+            & (summary_df["train_trades"] >= args.min_train_trades)
+            & (summary_df["forward_pf_eff"] >= args.forward_pf_min)
+            & (summary_df["forward_trades"] >= args.min_forward_trades)
+            & (summary_df["train_exp_bp"] >= args.train_exp_min)
+            & (summary_df["forward_exp_bp"] >= args.forward_exp_min)
+        )
+        selected_map = dict(zip(summary_df["code"], selection_mask.astype(bool)))
+        lp_manager.update(summary_df, selected_map, timestamp=dt.datetime.now())
+        lp_manager.write_report(outdir, run_type, summary_df["code"].tolist())
+        lp_manager.save()
+        if excluded_codes:
+            excluded_path = outdir / "low_priority_excluded.csv"
+            with excluded_path.open("w", encoding="utf-8") as fp:
+                fp.write("code\n")
+                for item in excluded_codes:
+                    fp.write(f"{item}\n")
+    if mask_tracker and not summary_df.empty:
+        mask_tracker.update(
+            plan_key,
+            summary_df,
+            window=args.mask_window,
+            threshold=args.mask_threshold,
+            timestamp=dt.datetime.now(),
+        )
+        mask_tracker.write_report(outdir, plan_key)
+        mask_tracker.save()
+
     summary_cols = [
         "code",
         "mode",

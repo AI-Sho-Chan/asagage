@@ -120,14 +120,18 @@ def aggregate_candidates(frames: List[pd.DataFrame], out_path: Path) -> Dict[str
 
 
 def ensure_dashboard_formulas(repo_root: Path) -> None:
-    """Run repair script and verify RSS columns remain intact."""
+    """Restore formulas via COM and verify key RSS columns.
+
+    Note: We prefer restore_dashboard_formulas.py as it reapplies the canonical
+    formulas (I–V) including SignalStatus/Kind, and re-protects the sheet.
+    """
     try:
-        run([sys.executable, "scripts/repair_realtime_formulas.py"], cwd=repo_root)
+        run([sys.executable, "scripts/restore_dashboard_formulas.py"], cwd=repo_root)
     except SystemExit:
         write_status(
             state="running",
             step="repair_formulas",
-            message="repair_realtime_formulas.py failed",
+            message="restore_dashboard_formulas.py failed",
         )
         return
 
@@ -253,7 +257,21 @@ def _main_impl() -> None:
     ap.add_argument("--universe-source", default="data/universe/topvol_*.csv")
     ap.add_argument("--excel-ticker-sheet", default="Ticker")
     ap.add_argument("--universe-metric", choices=["amt", "vol"], default="amt")
+    ap.add_argument("--run-type", choices=["auto", "weekday", "weekend"], default="auto")
+    ap.add_argument("--enable-asha", action="store_true", help="Pass --enable-asha to coarse runs")
+    ap.add_argument("--enable-bayes", action="store_true", help="Pass --enable-bayes to refine runs")
+    ap.add_argument("--bayes-trials", type=int, default=40, help="Bayesian trials per refine run when enabled")
+    ap.add_argument("--bayes-timeout", type=int, default=0, help="Bayesian timeout seconds (0=disabled)")
+    ap.add_argument("--mask-ineffective", action="store_true", help="Enable ineffective-band masking during coarse runs")
+    ap.add_argument("--mask-window", type=int, default=20, help="Mask history window (runs)")
+    ap.add_argument("--mask-threshold", type=float, default=1.05, help="Forward pf_eff threshold for mask retention")
+    ap.add_argument("--cache-refresh-weekend", action="store_true", help="Force --cache-refresh on weekend runs")
     args = ap.parse_args()
+
+    run_type = args.run_type
+    if run_type == "auto":
+        run_type = "weekend" if dt.datetime.now().weekday() >= 5 else "weekday"
+    is_weekend = run_type == "weekend"
 
     base = Path(args.base_out)
     date_tag = dt.datetime.now().strftime("%Y%m%d")
@@ -283,6 +301,7 @@ def _main_impl() -> None:
         base_out=str(base),
         date_tag=date_tag,
         total_plans=total_plans,
+        run_type=run_type,
     )
 
     codes_file_for_runs: Optional[Path] = None
@@ -394,54 +413,70 @@ def _main_impl() -> None:
         cand_dir = Path("output/excel") / f"NIGHTLY_{date_tag}" / tag
         cand_dir.mkdir(parents=True, exist_ok=True)
 
-        run(
-            [
-                sys.executable,
-                "scripts/bt_opt30_forward.py",
-                "--excel",
-                args.excel,
-                "--outdir",
-                str(out_coarse),
-                "--mode",
-                "coarse",
-                "--signal-mode",
-                sig,
-                "--session-start",
-                "09:00",
-                "--session-end",
-                sess_end,
-                "--lookback",
-                str(args.lookback),
-                "--chunk-days",
-                str(args.chunk_days),
-                "--train-days",
-                str(args.train_days),
-                "--forward-days",
-                str(args.forward_days),
-                "--min-train-trades",
-                str(args.min_train_trades),
-                "--min-forward-trades",
-                str(args.min_forward_trades),
-                "--forward-pf-min",
-                str(args.forward_pf_min),
-                "--gap-guard-abs-bp",
-                str(args.gap_guard_abs_bp),
-                "--gap-guard-dir-bp",
-                str(args.gap_guard_dir_bp),
-                "--slipbp",
-                str(args.slipbp),
-                "--feebp",
-                str(args.feebp),
-                "--liquidity-quantile",
-                str(args.liquidity_quantile),
-                "--jobs",
-                str(args.jobs),
-                "--use-local-raw",
-            ]
-            + (["--codes-file", str(codes_file_for_runs)] if codes_file_for_runs else [])
-            + (["--excel-summary"] if args.excel_summary else []),
-            cwd=repo_root,
-        )
+        coarse_cmd = [
+            sys.executable,
+            "scripts/bt_opt30_forward.py",
+            "--excel",
+            args.excel,
+            "--outdir",
+            str(out_coarse),
+            "--mode",
+            "coarse",
+            "--signal-mode",
+            sig,
+            "--session-start",
+            "09:00",
+            "--session-end",
+            sess_end,
+            "--lookback",
+            str(args.lookback),
+            "--chunk-days",
+            str(args.chunk_days),
+            "--train-days",
+            str(args.train_days),
+            "--forward-days",
+            str(args.forward_days),
+            "--min-train-trades",
+            str(args.min_train_trades),
+            "--min-forward-trades",
+            str(args.min_forward_trades),
+            "--forward-pf-min",
+            str(args.forward_pf_min),
+            "--gap-guard-abs-bp",
+            str(args.gap_guard_abs_bp),
+            "--gap-guard-dir-bp",
+            str(args.gap_guard_dir_bp),
+            "--slipbp",
+            str(args.slipbp),
+            "--feebp",
+            str(args.feebp),
+            "--liquidity-quantile",
+            str(args.liquidity_quantile),
+            "--jobs",
+            str(args.jobs),
+            "--use-local-raw",
+            "--run-type",
+            run_type,
+        ]
+        if args.enable_asha:
+            coarse_cmd.append("--enable-asha")
+        if args.mask_ineffective and not is_weekend:
+            coarse_cmd.extend(
+                [
+                    "--mask-ineffective",
+                    "--mask-window",
+                    str(args.mask_window),
+                    "--mask-threshold",
+                    str(args.mask_threshold),
+                ]
+            )
+        if is_weekend and args.cache_refresh_weekend:
+            coarse_cmd.append("--cache-refresh")
+        if codes_file_for_runs:
+            coarse_cmd.extend(["--codes-file", str(codes_file_for_runs)])
+        if args.excel_summary:
+            coarse_cmd.append("--excel-summary")
+        run(coarse_cmd, cwd=repo_root)
 
         codes_file = out_coarse / "_TOP_CANDIDATES.csv"
         if not codes_file.exists() or codes_file.stat().st_size == 0:
@@ -494,57 +529,65 @@ def _main_impl() -> None:
             plan_counts=format_plan_counts(plan_counts),
         )
 
-        run(
-            [
-                sys.executable,
-                "scripts/bt_opt30_forward.py",
-                "--excel",
-                args.excel,
-                "--outdir",
-                str(out_refine),
-                "--mode",
-                "refine",
-                "--signal-mode",
-                sig,
-                "--session-start",
-                "09:00",
-                "--session-end",
-                sess_end,
-                "--lookback",
-                str(args.lookback),
-                "--chunk-days",
-                str(args.chunk_days),
-                "--train-days",
-                str(args.train_days),
-                "--forward-days",
-                str(args.forward_days),
-                "--min-train-trades",
-                str(args.min_train_trades),
-                "--min-forward-trades",
-                str(args.min_forward_trades),
-                "--forward-pf-min",
-                str(args.forward_pf_min),
-                "--gap-guard-abs-bp",
-                str(args.gap_guard_abs_bp),
-                "--gap-guard-dir-bp",
-                str(args.gap_guard_dir_bp),
-                "--slipbp",
-                str(args.slipbp),
-                "--feebp",
-                str(args.feebp),
-                "--liquidity-quantile",
-                str(args.liquidity_quantile),
-                "--jobs",
-                str(args.jobs),
-                "--codes-file",
-                str(codes_file),
-                "--candidate-dir",
-                str(cand_dir),
-                "--use-local-raw",
-            ]
-            + (["--excel-summary"] if args.excel_summary else []),
-            cwd=repo_root,
-        )
+        refine_cmd = [
+            sys.executable,
+            "scripts/bt_opt30_forward.py",
+            "--excel",
+            args.excel,
+            "--outdir",
+            str(out_refine),
+            "--mode",
+            "refine",
+            "--signal-mode",
+            sig,
+            "--session-start",
+            "09:00",
+            "--session-end",
+            sess_end,
+            "--lookback",
+            str(args.lookback),
+            "--chunk-days",
+            str(args.chunk_days),
+            "--train-days",
+            str(args.train_days),
+            "--forward-days",
+            str(args.forward_days),
+            "--min-train-trades",
+            str(args.min_train_trades),
+            "--min-forward-trades",
+            str(args.min_forward_trades),
+            "--forward-pf-min",
+            str(args.forward_pf_min),
+            "--gap-guard-abs-bp",
+            str(args.gap_guard_abs_bp),
+            "--gap-guard-dir-bp",
+            str(args.gap_guard_dir_bp),
+            "--slipbp",
+            str(args.slipbp),
+            "--feebp",
+            str(args.feebp),
+            "--liquidity-quantile",
+            str(args.liquidity_quantile),
+            "--jobs",
+            str(args.jobs),
+            "--codes-file",
+            str(codes_file),
+            "--candidate-dir",
+            str(cand_dir),
+            "--use-local-raw",
+            "--run-type",
+            run_type,
+        ]
+        if args.enable_bayes:
+            refine_cmd.append("--enable-bayes")
+            refine_cmd.extend(["--bayes-trials", str(args.bayes_trials)])
+            if args.bayes_timeout > 0:
+                refine_cmd.extend(["--bayes-timeout", str(args.bayes_timeout)])
+        if is_weekend and args.cache_refresh_weekend:
+            refine_cmd.append("--cache-refresh")
+        if args.excel_summary:
+            refine_cmd.append("--excel-summary")
+        run(refine_cmd, cwd=repo_root)
 
         candidates_found = 0
         candidate_path = next(cand_dir.glob(f"candidates_{date_tag}.csv"), None)
@@ -603,6 +646,44 @@ def _main_impl() -> None:
         message="Nightly batch completed",
         **summary,
     )
+
+    # Post-run analytics: generate param stats + auto-update masks + update optuna priors
+    reports_root = Path("reports/param_stats") / night_root.name
+    try:
+        run([sys.executable, "tools/analyze_param_stats.py", "--root", str(night_root)], cwd=repo_root)
+    except SystemExit:
+        pass
+    by_j_path = reports_root / "by_J_th.csv"
+    if by_j_path.exists():
+        try:
+            cmd = [
+                sys.executable,
+                "tools/update_ineffective_bands.py",
+                "--run-root",
+                str(reports_root),
+            ]
+            if is_weekend:
+                cmd.append("--allow-unmask")
+            run(cmd, cwd=repo_root)
+        except SystemExit:
+            pass
+    # Update priors: weekend replaces weekend set; weekday appends supplemental seeds
+    try:
+        run(
+            [
+                sys.executable,
+                "tools/update_optuna_priors.py",
+                "--run-root",
+                str(night_root),
+                "--source",
+                "weekend" if is_weekend else "weekday",
+                "--top-k",
+                str(48 if is_weekend else 12),
+            ],
+            cwd=repo_root,
+        )
+    except SystemExit:
+        pass
 
 
 def main() -> None:
