@@ -36,6 +36,7 @@ Private Const DEFAULT_MAX_BUDGET As Double = 10000000#
 Private Const DEFAULT_LOT_STEP As Long = 100
 Private Const DEFAULT_SLIP_BP As Double = 30#
 Private Const DASH_FORMULA_ROWS As Long = 400
+Private Const DASH_MIN_JTH As Double = 0.6
 Private Const RISK_PER_TICKER_FRAC As Double = 0.06
 Private Const RISK_TOTAL_FRAC As Double = 0.3
 Private Const SESSION_MODE_JONLY_RATIO As Double = 0.6
@@ -117,11 +118,11 @@ Private Function HeaderPrevCloseJP() As String
 End Function
 
 Private Function HeaderPreopenBidJP() As String
-    HeaderPreopenBidJP = ChrW(&H6C17) & ChrW(&H914D) & ChrW(&H5024) & ChrW(&HFF08) & ChrW(&H8CB7) & ChrW(&HFF09)
+    HeaderPreopenBidJP = ChrW(&H6700) & ChrW(&H826F) & ChrW(&H8CB7) & ChrW(&H6C17) & ChrW(&H914D) & ChrW(&H5024)
 End Function
 
 Private Function HeaderPreopenAskJP() As String
-    HeaderPreopenAskJP = ChrW(&H6C17) & ChrW(&H914D) & ChrW(&H5024) & ChrW(&HFF08) & ChrW(&H58F2) & ChrW(&HFF09)
+    HeaderPreopenAskJP = ChrW(&H6700) & ChrW(&H826F) & ChrW(&H58F2) & ChrW(&H6C17) & ChrW(&H914D) & ChrW(&H5024)
 End Function
 
 Private Function HeaderPreopenMidJP() As String
@@ -158,6 +159,14 @@ End Function
 
 Private Function RssFieldLastJP() As String
     RssFieldLastJP = HeaderLastJP()
+End Function
+
+Private Function RssFieldBestAskJP() As String
+    RssFieldBestAskJP = ChrW(&H6700) & ChrW(&H826F) & ChrW(&H58F2) & ChrW(&H6C17) & ChrW(&H914D) & ChrW(&H5024)
+End Function
+
+Private Function RssFieldBestBidJP() As String
+    RssFieldBestBidJP = ChrW(&H6700) & ChrW(&H826F) & ChrW(&H8CB7) & ChrW(&H6C17) & ChrW(&H914D) & ChrW(&H5024)
 End Function
 
 
@@ -234,26 +243,16 @@ Private Sub ApplyRealtimeColumns(ByVal ws As Worksheet, Optional ByVal fillLastO
     signalStatusCol = FindColumn(ws, DASH_HEADER_ROW, HeaderSignalStatusJP())
     If signalStatusCol = 0 And tickerCol > 0 Then signalStatusCol = tickerCol + 4
 
-    If signalStatusCol > 0 Then
-
-        SetColumnFormula ws, signalStatusCol, fillLast, "="""
-
-    End If
-
-
-
     Dim signalKindCol As Long
 
     signalKindCol = FindColumn(ws, DASH_HEADER_ROW, HeaderSignalKindJP())
     If signalKindCol = 0 And tickerCol > 0 Then signalKindCol = tickerCol + 5
 
-    If signalKindCol > 0 Then
+    Dim selectedCol As Long
+    selectedCol = FindColumn(ws, DASH_HEADER_ROW, "Selected")
 
-        SetColumnFormula ws, signalKindCol, fillLast, "="""
-
-    End If
-
-
+    Dim signalModeCol As Long
+    signalModeCol = FindColumn(ws, DASH_HEADER_ROW, "SignalMode")
 
     Dim currentJCol As Long
 
@@ -376,7 +375,8 @@ Private Sub ApplyRealtimeColumns(ByVal ws As Worksheet, Optional ByVal fillLastO
 
         bidRef = BuildR1C1Ref(tickerCol, bidCol)
 
-        SetColumnFormula ws, bidCol, fillLast, "=IF(" & bidRef & "="","",IFERROR(RssMarket(" & bidRef & "," & QuoteForFormula(RssFieldPreopenBidCode()) & "),""))"
+        ' Bid/Ask は銘柄コード文字列をそのまま渡す（285A.T 等のアルファベットを含むコード対応）
+        SetColumnFormula ws, bidCol, fillLast, "=IF(" & bidRef & "="","",IFERROR(RssMarket(" & bidRef & "," & QuoteForFormula(RssFieldBestBidJP()) & "),""))"
 
     End If
 
@@ -393,7 +393,7 @@ Private Sub ApplyRealtimeColumns(ByVal ws As Worksheet, Optional ByVal fillLastO
 
         askRef = BuildR1C1Ref(tickerCol, askCol)
 
-        SetColumnFormula ws, askCol, fillLast, "=IF(" & askRef & "="","",IFERROR(RssMarket(" & askRef & "," & QuoteForFormula(RssFieldPreopenAskCode()) & "),""))"
+        SetColumnFormula ws, askCol, fillLast, "=IF(" & askRef & "="","",IFERROR(RssMarket(" & askRef & "," & QuoteForFormula(RssFieldBestAskJP()) & "),""))"
 
     End If
 
@@ -514,6 +514,50 @@ Private Sub ApplyRealtimeColumns(ByVal ws As Worksheet, Optional ByVal fillLastO
 
     End If
 
+    If signalStatusCol > 0 And selectedCol > 0 And currentJCol > 0 And jthCol > 0 Then
+        Dim selRef As String
+        Dim jRef As String
+        Dim jthStatusRef As String
+        Dim bidRefStatus As String
+        Dim askRefStatus As String
+        Dim midRefStatus As String
+        Dim prevRefStatus As String
+        selRef = BuildR1C1Ref(selectedCol, signalStatusCol)
+        jRef = BuildR1C1Ref(currentJCol, signalStatusCol)
+        jthStatusRef = BuildR1C1Ref(jthCol, signalStatusCol)
+        bidRefStatus = "0"
+        If bidCol > 0 Then bidRefStatus = BuildR1C1Ref(bidCol, signalStatusCol)
+        askRefStatus = "0"
+        If askCol > 0 Then askRefStatus = BuildR1C1Ref(askCol, signalStatusCol)
+        midRefStatus = "0"
+        If midCol > 0 Then midRefStatus = BuildR1C1Ref(midCol, signalStatusCol)
+        prevRefStatus = "0"
+        If prevCloseCol > 0 Then prevRefStatus = BuildR1C1Ref(prevCloseCol, signalStatusCol)
+        Dim statusFormula As String
+        statusFormula = _
+            "=IF(" & selRef & "<>1,""""," & _
+                "IF(OR(" & jRef & "=""""," & jthStatusRef & "=""""," & jthStatusRef & "=0),""""," & _
+                    "IF(" & jRef & "<0," & _
+                        "IF(IF(" & askRefStatus & ">0," & askRefStatus & ",IF(" & midRefStatus & ">0," & midRefStatus & "," & prevRefStatus & "))<=0,""NO_PRICE"",IF(ABS(" & jRef & ")>=ABS(" & jthStatusRef & "),""BUY"",""""))," & _
+                        "IF(IF(" & bidRefStatus & ">0," & bidRefStatus & ",IF(" & midRefStatus & ">0," & midRefStatus & "," & prevRefStatus & "))<=0,""NO_PRICE"",IF(ABS(" & jRef & ")>=ABS(" & jthStatusRef & "),""SELL"","""")))))"
+        SetColumnFormula ws, signalStatusCol, fillLast, statusFormula
+    End If
+
+    If signalKindCol > 0 And signalStatusCol > 0 And signalModeCol > 0 Then
+        Dim statusRef As String
+        Dim modeRef As String
+
+        statusRef = BuildR1C1Ref(signalStatusCol, signalKindCol)
+        modeRef = BuildR1C1Ref(signalModeCol, signalKindCol)
+
+        Dim kindFormula As String
+        kindFormula = _
+            "=IF(" & statusRef & "="""",""""," & _
+                "IF(" & statusRef & "=""NO_PRICE"",""NO_PRICE"",IF(OR(" & statusRef & "=""BUY""," & statusRef & "=""SELL""),IF(" & modeRef & "=""""," & statusRef & "," & statusRef & " & "" / "" & " & modeRef & ")," & statusRef & "))))"
+        SetColumnFormula ws, signalKindCol, fillLast, kindFormula
+    End If
+
+
     If wasProtected Then
         ProtectRealtimeColumns ws
     End If
@@ -602,8 +646,6 @@ ApplyFailed:
     Err.Clear
     On Error GoTo 0
 End Sub
-End Sub
-
 
 Private Sub LogDebug(ByVal message As String)
     Dim folder As String
@@ -826,7 +868,7 @@ Public Sub AttachFormulasFromDashboardTemplate()
     End If
     Set wsDst = EnsureSheet(SHEET_DASHBOARD)
     Dim headers As Variant
-    headers = Array("霑ｴ・ｾ陜ｨ・ｨ陋滂ｽ､", "VWAP", "ATR")
+    headers = Array(HeaderLastJP(), HeaderVwapJP(), "ATR")
     Dim i As Long
     For i = LBound(headers) To UBound(headers)
         Dim h As String: h = CStr(headers(i))
@@ -1066,11 +1108,19 @@ Private Sub UpdateRiskUsageFromExecutions()
         If Len(key) > 0 Then hdrMap(key) = c
     Next c
 
-    Dim colDate As Long: If hdrMap.Exists("驍上・・ｮ螢ｽ蠕・) Then colDate = hdrMap("驍上・・ｮ螢ｽ蠕・) Else GoTo fallback
-    Dim colTicker As Long: If hdrMap.Exists("鬩ｫ菫ｶ豌帷ｹｧ・ｳ郢晢ｽｼ郢昴・) Then colTicker = hdrMap("鬩ｫ菫ｶ豌帷ｹｧ・ｳ郢晢ｽｼ郢昴・) Else GoTo fallback
-    Dim colSide As Long: If hdrMap.Exists("陞｢・ｲ髮具ｽｷ") Then colSide = hdrMap("陞｢・ｲ髮具ｽｷ") Else GoTo fallback
-    Dim colQty As Long: If hdrMap.Exists("驍上・・ｮ螢ｽ辟夐ｩ･繝ｻ) Then colQty = hdrMap("驍上・・ｮ螢ｽ辟夐ｩ･繝ｻ) Else GoTo fallback
-    Dim colPrice As Long: If hdrMap.Exists("驍上・・ｮ螢ｻ・ｾ・｡隴ｬ・ｼ") Then colPrice = hdrMap("驍上・・ｮ螢ｻ・ｾ・｡隴ｬ・ｼ") Else GoTo fallback
+    Dim colDate As Long
+    Dim colTicker As Long
+    Dim colSide As Long
+    Dim colQty As Long
+    Dim colPrice As Long
+
+    colDate = FindColumnWithAliases(wsExec, 1, "約定日時", "約定日付", "約定日", "timestamp", "exec_time")
+    colTicker = FindColumnWithAliases(wsExec, 1, "銘柄コード", "銘柄", "symbol", "ticker")
+    colSide = FindColumnWithAliases(wsExec, 1, "売買区分", "売買", "区分", "side")
+    colQty = FindColumnWithAliases(wsExec, 1, "約定数量", "数量", "株数", "qty", "quantity")
+    colPrice = FindColumnWithAliases(wsExec, 1, "約定単価", "約定価格", "単価", "price")
+
+    If colDate = 0 Or colTicker = 0 Or colSide = 0 Or colQty = 0 Or colPrice = 0 Then GoTo fallback
 
     Dim sessionCol As Long: sessionCol = FindColumn(wsDash, DASH_HEADER_ROW, "Session")
     Dim modeCol As Long: modeCol = FindColumn(wsDash, DASH_HEADER_ROW, "SignalMode")
@@ -1371,6 +1421,11 @@ Private Sub PushCandidatesToDashboard()
         If colPlanTag > 0 Then planTagRaw = CStr(wsCand.Cells(r, colPlanTag).value)
         Dim sessionLabel As String
         sessionLabel = ResolveSessionLabel(sessionRaw, planTagRaw)
+        Dim jthVal As Double
+        If colJth > 0 Then jthVal = CDbl(IfZero(wsCand.Cells(r, colJth).value, 0))
+        If colJth > 0 Then
+            If Abs(jthVal) > 0 And Abs(jthVal) < DASH_MIN_JTH Then GoTo NextCandidate
+        End If
         If colSessionDash > 0 Then wsDash.Cells(targetRow, colSessionDash).value = sessionLabel
         If colATR > 0 And colATRDash > 0 Then wsDash.Cells(targetRow, colATRDash).value = wsCand.Cells(r, colATR).value
         If colTP > 0 And colTPDash > 0 Then wsDash.Cells(targetRow, colTPDash).value = wsCand.Cells(r, colTP).value
@@ -2514,4 +2569,5 @@ Private Function CheckRiskAndBudgetLimits(ByVal ticker As String, ByVal sessionK
         CheckRiskAndBudgetLimits = True
     End If
 End Function
+
 

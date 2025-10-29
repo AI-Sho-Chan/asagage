@@ -1,0 +1,106 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import win32com.client  # type: ignore
+
+WB_PATH = Path("C:/AI/asagake/SHINSOKU.xlsm")
+SHEET_NAME = "NewDashboard"
+START_ROW = 6
+ROWS = 600
+
+
+def jp(*codes: int) -> str:
+    return "".join(chr(code) for code in codes)
+
+
+RSS_FIELD_NAME = jp(0x9298, 0x67C4, 0x540D, 0x79F0)  # 銘柄名称
+RSS_FIELD_LAST = jp(0x73FE, 0x5728, 0x5024)  # 現在値
+RSS_FIELD_VWAP = jp(0x51FA, 0x6765, 0x9AD8, 0x52A0, 0x91CD, 0x5E73, 0x5747)  # 出来高加重平均
+RSS_FIELD_PREV_CLOSE = jp(0x524D, 0x65E5, 0x7D42, 0x5024)  # 前日終値
+RSS_FIELD_BEST_BID = jp(0x6700, 0x826F, 0x8CB7, 0x6C17, 0x914D, 0x5024)  # 最良買気配値
+RSS_FIELD_BEST_ASK = jp(0x6700, 0x826F, 0x58F2, 0x6C17, 0x914D, 0x5024)  # 最良売気配値
+
+
+FORMULAS_R1C1 = {
+    "I": f'=IF(RC[-1]="", "", IFERROR(RssMarket(RC[-1], "{RSS_FIELD_NAME}"), ""))',
+    "J": '=IF(OR(RC[4]="", RC[5]="", RC[17]=0), "", ((RC[4]-RC[5])/RC[17])/100)',
+    "K": '=IF(OR(RC[19]="", RC[-1]="", RC[19]=0), "", ABS(RC[-1]-RC[19])/ABS(RC[19])*100)',
+    "L": '=IF(RC[12]<>1, "", IF(OR(RC[-2]="", RC[18]="", RC[18]=0), "", IF(ABS(RC[-2])>=ABS(RC[18]), IF(RC[-2]<0, "BUY", "SELL"), "")))',
+    "M": '=IF(RC[-1]="", "", IF(RC[-1]="NO_PRICE", "NO_PRICE", IF(OR(RC[-1]="BUY", RC[-1]="SELL"), IF(RC[12]="", RC[-1], RC[-1] & " / " & RC[12]), RC[-1])))',
+    "N": f'=IF(RC[-6]="", "", IFERROR(RssMarket(RC[-6], "{RSS_FIELD_LAST}"), ""))',
+    "O": f'=IF(RC[-7]="", "", IFERROR(RssMarket(RC[-7], "{RSS_FIELD_VWAP}"), ""))',
+    "P": f'=IF(RC[-8]="", "", IFERROR(RssMarket(RC[-8], "{RSS_FIELD_PREV_CLOSE}"), ""))',
+    # Bid/Ask は銘柄コード文字列（.T 含む）をそのまま渡す（285A.T 等のアルファベットを含むコード対応）
+    "Q": f'=IF(RC[-9]="", "", IFERROR(RssMarket(RC[-9], "{RSS_FIELD_BEST_BID}"), ""))',
+    "R": f'=IF(RC[-10]="", "", IFERROR(RssMarket(RC[-10], "{RSS_FIELD_BEST_ASK}"), ""))',
+    "S": '=IF(OR(RC[-2]="", RC[-1]=""), "", (RC[-2]+RC[-1])/2)',
+    "T": '=IF(OR(RC[-1]="", RC[-4]=""), "", (RC[-1]-RC[-4])/RC[-4]*10000)',
+    "U": '=IF(RC[-1]="", "", IF(ABS(RC[-1])>=120, ">=120bp", IF(ABS(RC[-1])>=80, "80-120bp", IF(ABS(RC[-1])>=50, "50-80bp", "<50bp"))))',
+    "V": '=IF(RC[-1]="", "", IF(RC[-1]=">=120bp", "j-cross only; TP-0.2; SL+0.2", IF(RC[-1]="80-120bp", "Skip opposite; J_th+0.2", IF(RC[-1]="50-80bp", "J_th+0.1", "Baseline"))))',
+}
+
+
+def col_to_index(col: str) -> int:
+    idx = 0
+    for ch in col:
+        idx = idx * 26 + (ord(ch.upper()) - 64)
+    return idx
+
+
+def main() -> int:
+    # Create timestamped backup before any modification
+    try:
+        backup = WB_PATH.with_name(f"SHINSOKU_backup_{__import__('datetime').datetime.now():%Y%m%d_%H%M%S}.xlsm")
+        import shutil
+        shutil.copy2(WB_PATH, backup)
+    except Exception:
+        pass
+
+    excel = win32com.client.DispatchEx("Excel.Application")
+    excel.Visible = False
+    excel.DisplayAlerts = False
+    try:
+        excel.AutomationSecurity = 1
+    except Exception:
+        pass
+
+    wb = excel.Workbooks.Open(str(WB_PATH))
+    try:
+        ws = wb.Worksheets(SHEET_NAME)
+        try:
+            ws.Unprotect(Password="")
+        except Exception:
+            pass
+
+        last_row = START_ROW + ROWS - 1
+
+        for col_letter, formula in FORMULAS_R1C1.items():
+            col_idx = col_to_index(col_letter)
+            rng = ws.Range(ws.Cells(START_ROW, col_idx), ws.Cells(last_row, col_idx))
+            first_cell = rng.Cells(1, 1)
+            first_cell.FormulaR1C1 = formula
+            if rng.Rows.Count > 1:
+                first_cell.AutoFill(Destination=rng)
+
+        try:
+            ws.Protect(
+                Password="",
+                UserInterfaceOnly=True,
+                AllowFormattingCells=True,
+                AllowSorting=True,
+                AllowFiltering=True,
+            )
+        except Exception:
+            pass
+
+        wb.Save()
+        print("Dashboard formulas restored (I-V columns).")
+        return 0
+    finally:
+        wb.Close(SaveChanges=True)
+        excel.Quit()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
