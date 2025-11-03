@@ -70,6 +70,17 @@ def ensure_numeric_mean(df: pd.DataFrame, column: str, decimals: int = 4) -> str
 
 
 def aggregate_candidates(frames: List[pd.DataFrame], out_path: Path) -> Dict[str, str]:
+    """Combine plan outputs, enforce quality filters, and pick one combo per ticker.
+
+    Filters (hard):
+      - J_th >= 0.8
+      - forward_win_ci_low >= 0.70
+      - forward_pf_eff >= 1.30
+      - forward_trades >= 5
+
+    One-per-ticker selection:
+      score = forward_pf_eff * (forward_winrate ** 1.2) * log1p(forward_trades) / (1 + MaxDD/1000)
+    """
     summary: Dict[str, str] = {
         "total_candidates": "0",
         "unique_tickers": "0",
@@ -81,41 +92,58 @@ def aggregate_candidates(frames: List[pd.DataFrame], out_path: Path) -> Dict[str
     if not frames:
         return summary
 
-    combined = pd.concat(frames, ignore_index=True)
-    # Ensure optional columns exist for downstream Excel (MaxDD used for DD penalty)
-    if "MaxDD" not in combined.columns and "max_dd" in combined.columns:
-        combined = combined.rename(columns={"max_dd": "MaxDD"})
-    if "MaxDD" not in combined.columns:
-        combined["MaxDD"] = ""
+    df = pd.concat(frames, ignore_index=True)
+    # Normalize/ensure columns
+    cols = {c.lower(): c for c in df.columns}
+    if "maxdd" not in cols and "max_dd" in cols:
+        df = df.rename(columns={cols["max_dd"]: "MaxDD"})
+        cols = {c.lower(): c for c in df.columns}
+    if "MaxDD" not in df.columns:
+        df["MaxDD"] = 0.0
 
-    sort_cols: List[str] = []
-    ascending: List[bool] = []
-    if "forward_pf_eff" in combined.columns:
-        sort_cols.append("forward_pf_eff")
-        ascending.append(False)
-    if "forward_trades" in combined.columns:
-        sort_cols.append("forward_trades")
-        ascending.append(False)
-    if sort_cols:
-        combined = combined.sort_values(sort_cols, ascending=ascending)
+    def c(name: str) -> str:
+        return cols.get(name.lower(), name)
 
-    if {"Ticker", "signal_mode", "session"}.issubset(combined.columns):
-        combined = combined.drop_duplicates(subset=["Ticker", "signal_mode", "session"], keep="first")
+    def num(col: str) -> pd.Series:
+        return pd.to_numeric(df.get(col, 0), errors="coerce").fillna(0)
+
+    # Hard filters
+    if c("J_th") in df.columns:
+        df = df[num(c("J_th")) >= 0.8]
+    if c("forward_win_ci_low") in df.columns:
+        df = df[num(c("forward_win_ci_low")) >= 0.70]
+    if c("forward_pf_eff") in df.columns:
+        df = df[num(c("forward_pf_eff")) >= 1.30]
+    if c("forward_trades") in df.columns:
+        df = df[num(c("forward_trades")) >= 5]
+
+    # Score
+    pf = num(c("forward_pf_eff"))
+    win = num(c("forward_winrate"))
+    trades = num(c("forward_trades"))
+    dd = num("MaxDD")
+    # log1p from numpy via pandas
+    score = pf * (win ** 1.2) * (trades.add(1).apply(np.log1p)) / (1.0 + dd / 1000.0)
+    df["_score"] = score
+
+    # One per ticker (best score)
+    if "Ticker" in df.columns:
+        df = df.sort_values(["Ticker", "_score"], ascending=[True, False])
+        df = df.drop_duplicates(subset=["Ticker"], keep="first")
+    else:
+        df = df.sort_values(["_score"], ascending=[False])
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    combined.to_csv(out_path, index=False, encoding="utf-8-sig")
+    if "_score" in df.columns:
+        df = df.drop(columns=["_score"])
+    df.to_csv(out_path, index=False, encoding="utf-8-sig")
 
-    summary["total_candidates"] = str(int(len(combined)))
-    if "Ticker" in combined.columns:
-        summary["unique_tickers"] = str(int(combined["Ticker"].nunique()))
-    else:
-        summary["unique_tickers"] = summary["total_candidates"]
-
-    summary["avg_forward_winrate"] = ensure_numeric_mean(combined, "forward_winrate")
-    summary["avg_forward_pf"] = ensure_numeric_mean(combined, "forward_pf_eff")
-    summary["avg_expected_return"] = ensure_numeric_mean(combined, "forward_exp_boot_mean")
-    summary["avg_forward_trades"] = ensure_numeric_mean(combined, "forward_trades", decimals=2)
-
+    summary["total_candidates"] = str(int(len(df)))
+    summary["unique_tickers"] = str(int(df["Ticker"].nunique())) if "Ticker" in df.columns else summary["total_candidates"]
+    summary["avg_forward_winrate"] = ensure_numeric_mean(df, c("forward_winrate"))
+    summary["avg_forward_pf"] = ensure_numeric_mean(df, c("forward_pf_eff"))
+    summary["avg_expected_return"] = ensure_numeric_mean(df, c("forward_exp_boot_mean"))
+    summary["avg_forward_trades"] = ensure_numeric_mean(df, c("forward_trades"), decimals=2)
     return summary
 
 
@@ -266,6 +294,17 @@ def _main_impl() -> None:
     ap.add_argument("--mask-window", type=int, default=20, help="Mask history window (runs)")
     ap.add_argument("--mask-threshold", type=float, default=1.05, help="Forward pf_eff threshold for mask retention")
     ap.add_argument("--cache-refresh-weekend", action="store_true", help="Force --cache-refresh on weekend runs")
+    ap.add_argument("--analysis-ledger", action="store_true", help="Pass --analysis-ledger to refine runs")
+    ap.add_argument(
+        "--enable-market-features",
+        action="store_true",
+        help="Attach --enable-market-features to coarse/refine runs for hypothesis capture",
+    )
+    ap.add_argument(
+        "--enable-rd-windows",
+        action="store_true",
+        help="Append optional mid/pm R&D windows (weekend only)",
+    )
     args = ap.parse_args()
 
     run_type = args.run_type
@@ -278,18 +317,28 @@ def _main_impl() -> None:
     night_root = base / f"NIGHTLY_{date_tag}"
     night_root.mkdir(parents=True, exist_ok=True)
 
-    plans: List[Tuple[str, str, str]] = [
-        ("AM0930", "09:30", "j-only"),
-        ("AM0930", "09:30", "j-cross"),
-        ("AM0945", "09:45", "j-only"),
-        ("AM0945", "09:45", "j-cross"),
-        ("AM1000", "10:00", "j-only"),
-        ("AM1000", "10:00", "j-cross"),
-        ("AM1015", "10:15", "j-only"),
-        ("AM1015", "10:15", "j-cross"),
-        ("AM1030", "10:30", "j-only"),
-        ("AM1030", "10:30", "j-cross"),
+    # Plan entries: (label, session_start, session_end, signal_mode)
+    plans: List[Tuple[str, str, str, str]] = [
+        ("AM0930", "09:00", "09:30", "j-only"),
+        ("AM0930", "09:00", "09:30", "j-cross"),
+        ("AM0945", "09:00", "09:45", "j-only"),
+        ("AM0945", "09:00", "09:45", "j-cross"),
+        ("AM1000", "09:00", "10:00", "j-only"),
+        ("AM1000", "09:00", "10:00", "j-cross"),
+        ("AM1015", "09:00", "10:15", "j-only"),
+        ("AM1015", "09:00", "10:15", "j-cross"),
+        ("AM1030", "09:00", "10:30", "j-only"),
+        ("AM1030", "09:00", "10:30", "j-cross"),
     ]
+
+    # Optional R&D windows for weekend runs (mid/pm time slices)
+    if is_weekend and getattr(args, "enable_rd_windows", False):
+        plans.extend(
+            [
+                ("MID1030", "10:30", "11:00", "j-cross"),
+                ("PM1230", "12:30", "13:00", "j-cross"),
+            ]
+        )
     total_plans = len(plans)
     plan_counts: Dict[str, int] = {f"{label}_{sig}": 0 for label, _, sig in plans}
     plan_order: List[str] = []
@@ -394,7 +443,7 @@ def _main_impl() -> None:
     candidate_files: List[Path] = []
     completed_plans = 0
 
-    for plan_idx, (sess_label, sess_end, sig) in enumerate(plans, start=1):
+    for plan_idx, (sess_label, sess_start, sess_end, sig) in enumerate(plans, start=1):
         tag = f"{sess_label}_{sig}"
         plan_order.append(tag)
         write_status(
@@ -425,7 +474,7 @@ def _main_impl() -> None:
             "--signal-mode",
             sig,
             "--session-start",
-            "09:00",
+            sess_start,
             "--session-end",
             sess_end,
             "--lookback",
@@ -468,10 +517,16 @@ def _main_impl() -> None:
                     str(args.mask_window),
                     "--mask-threshold",
                     str(args.mask_threshold),
+                    "--mask-keep-j-min",
+                    "1.35",
                 ]
             )
         if is_weekend and args.cache_refresh_weekend:
             coarse_cmd.append("--cache-refresh")
+        if args.enable_market_features:
+            coarse_cmd.extend(["--enable-market-features", "--market-adjust-j", "--market-j-delta-up", "0.10", "--market-j-delta-down", "0.10"])
+            # 動的TP/SLの実験は粗段階でも軽くオン（効果検証用）
+            coarse_cmd.extend(["--dynamic-risk-j", "--tp-per-j", "0.15", "--sl-per-j", "0.10"])
         if codes_file_for_runs:
             coarse_cmd.extend(["--codes-file", str(codes_file_for_runs)])
         if args.excel_summary:
@@ -541,7 +596,7 @@ def _main_impl() -> None:
             "--signal-mode",
             sig,
             "--session-start",
-            "09:00",
+            sess_start,
             "--session-end",
             sess_end,
             "--lookback",
@@ -587,6 +642,11 @@ def _main_impl() -> None:
             refine_cmd.append("--cache-refresh")
         if args.excel_summary:
             refine_cmd.append("--excel-summary")
+        if args.enable_market_features:
+            refine_cmd.extend(["--enable-market-features", "--market-adjust-j", "--market-j-delta-up", "0.10", "--market-j-delta-down", "0.10"])
+            refine_cmd.extend(["--dynamic-risk-j", "--tp-per-j", "0.15", "--sl-per-j", "0.10"])
+        if args.analysis_ledger:
+            refine_cmd.append("--analysis-ledger")
         run(refine_cmd, cwd=repo_root)
 
         candidates_found = 0
