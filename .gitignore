@@ -8,3 +8,12 @@ out/
 
 src/*.egg-info/
 data/signals/
+
+# ignore generated outputs and caches
+output/**
+cache/**
+reports/param_stats/**
+data/raw/**
+*.parquet
+*_GRID_FULL.csv
+
