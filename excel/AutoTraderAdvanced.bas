@@ -953,27 +953,24 @@ Private Sub UpdateStatusV2(ByVal mode As String)
 
     Dim ws As Worksheet: Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
 
-    Dim rng As Range
-
-    Set rng = ws.Range("A3:B3")
-
-    If rng.MergeCells Then
-        Set rng = rng.MergeArea
-    Else
-        rng.Merge
-        Set rng = rng.MergeArea
-    End If
+    Dim statusArea As Range
+    Set statusArea = ws.Range("A3:B3")
 
     On Error Resume Next
-    ws.Parent.Names.Add Name:="RunStatusV2", RefersTo:=rng
+    statusArea.UnMerge
     On Error GoTo 0
 
-    With rng
-        .HorizontalAlignment = MsoAlignCenter
-        .VerticalAlignment = MsoAlignCenter
+    On Error Resume Next
+    ws.Parent.Names.Add Name:="RunStatusV2", RefersTo:=statusArea
+    On Error GoTo 0
+
+    statusArea.ClearContents
+
+    With statusArea
+        .HorizontalAlignment = xlCenterAcrossSelection
+        .VerticalAlignment = xlCenter
         .Font.Bold = True
         .Font.Size = 16
-        .Value = mode
 
         Select Case mode
             Case "DEMO_RUNNING": .Interior.Color = RGB(220, 240, 255)
@@ -981,6 +978,8 @@ Private Sub UpdateStatusV2(ByVal mode As String)
             Case Else: .Interior.Color = RGB(230, 230, 230)
         End Select
     End With
+
+    statusArea.Cells(1, 1).Value = mode
 
 End Sub
 
