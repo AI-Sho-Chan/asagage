@@ -1,7 +1,9 @@
-import argparse
+﻿import argparse
 import datetime as dt
+import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -69,12 +71,12 @@ def ensure_numeric_mean(df: pd.DataFrame, column: str, decimals: int = 4) -> str
     return f"{series.mean():.{decimals}f}"
 
 
-def aggregate_candidates(frames: List[pd.DataFrame], out_path: Path) -> Dict[str, str]:
+def aggregate_candidates(frames: List[pd.DataFrame], out_path: Path, *, min_forward_ci: float = 0.65) -> Dict[str, str]:
     """Combine plan outputs, enforce quality filters, and pick one combo per ticker.
 
     Filters (hard):
       - J_th >= 0.8
-      - forward_win_ci_low >= 0.70
+      - forward_win_ci_low >= min_forward_ci (default 0.65)
       - forward_pf_eff >= 1.30
       - forward_trades >= 5
 
@@ -111,7 +113,7 @@ def aggregate_candidates(frames: List[pd.DataFrame], out_path: Path) -> Dict[str
     if c("J_th") in df.columns:
         df = df[num(c("J_th")) >= 0.8]
     if c("forward_win_ci_low") in df.columns:
-        df = df[num(c("forward_win_ci_low")) >= 0.70]
+        df = df[num(c("forward_win_ci_low")) >= float(min_forward_ci)]
     if c("forward_pf_eff") in df.columns:
         df = df[num(c("forward_pf_eff")) >= 1.30]
     if c("forward_trades") in df.columns:
@@ -133,10 +135,37 @@ def aggregate_candidates(frames: List[pd.DataFrame], out_path: Path) -> Dict[str
     else:
         df = df.sort_values(["_score"], ascending=[False])
 
+    weekly_base = Path("output/excel/weekly_candidates_latest.csv")
+    if weekly_base.exists():
+        try:
+            weekly_df = pd.read_csv(weekly_base)
+            if "Ticker" in weekly_df.columns:
+                before = len(df)
+                df = weekly_df.merge(df, on="Ticker", how="left", suffixes=("_weekly", ""))
+                for col in list(df.columns):
+                    if col.endswith("_weekly"):
+                        base_col = col[:-7]
+                        if base_col in df.columns:
+                            df[base_col] = df[base_col].where(df[base_col].notna(), df[col])
+                            df.drop(columns=[col], inplace=True)
+                df = df[df["Ticker"].notna()]
+                summary["message"] = f"weekly base {len(df)}/{before}"
+        except Exception as exc:  # pragma: no cover
+            summary["message"] = f"weekly merge failed: {exc}"
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     if "_score" in df.columns:
         df = df.drop(columns=["_score"])
     df.to_csv(out_path, index=False, encoding="utf-8-sig")
+
+    latest = Path("output/excel") / "weekly_candidates_latest.csv"
+    try:
+        df.to_csv(latest, index=False, encoding="utf-8-sig")
+        summary["weekly_synced"] = "1"
+    except Exception:
+        summary["weekly_synced"] = "0"
+
+    cols = {c.lower(): c for c in df.columns}
 
     summary["total_candidates"] = str(int(len(df)))
     summary["unique_tickers"] = str(int(df["Ticker"].nunique())) if "Ticker" in df.columns else summary["total_candidates"]
@@ -151,7 +180,7 @@ def ensure_dashboard_formulas(repo_root: Path) -> None:
     """Restore formulas via COM and verify key RSS columns.
 
     Note: We prefer restore_dashboard_formulas.py as it reapplies the canonical
-    formulas (I–V) including SignalStatus/Kind, and re-protects the sheet.
+    formulas (I窶天) including SignalStatus/Kind, and re-protects the sheet.
     """
     try:
         run([sys.executable, "scripts/restore_dashboard_formulas.py"], cwd=repo_root)
@@ -229,13 +258,16 @@ def build_yahoo_universe(
     metric: str,
     universe_size: int,
     output_dir: Path,
+    *,
+    target_date: Optional[dt.date] = None,
 ) -> Optional[Path]:
     if not base_codes:
         return None
 
+    anchor = target_date or dt.date.today()
     ticker = Ticker(base_codes, asynchronous=True)
-    end_date = dt.date.today() + dt.timedelta(days=1)
-    start_date = dt.date.today() - dt.timedelta(days=2)
+    end_date = anchor + dt.timedelta(days=1)
+    start_date = anchor - dt.timedelta(days=2)
     hist = ticker.history(start=str(start_date), end=str(end_date), interval="1m")
     if not isinstance(hist, pd.DataFrame) or hist.empty:
         return None
@@ -273,6 +305,18 @@ def _main_impl() -> None:
     ap.add_argument("--min-train-trades", type=int, default=15)
     ap.add_argument("--min-forward-trades", type=int, default=3)
     ap.add_argument("--forward-pf-min", type=float, default=1.3)
+    ap.add_argument(
+        "--min-forward-ci",
+        type=float,
+        default=0.65,
+        help="Minimum forward winrate CI lower bound to accept in aggregation (default 0.65)",
+    )
+    ap.add_argument(
+        "--repeat-mask-threshold",
+        type=float,
+        default=10.0,
+        help="Allow forward_repeat_index up to this value before masking (default 10.0).",
+    )
     ap.add_argument("--gap-guard-abs-bp", type=float, default=80.0)
     ap.add_argument("--gap-guard-dir-bp", type=float, default=40.0)
     ap.add_argument("--slipbp", type=float, default=4.0)
@@ -286,6 +330,30 @@ def _main_impl() -> None:
     ap.add_argument("--excel-ticker-sheet", default="Ticker")
     ap.add_argument("--universe-metric", choices=["amt", "vol"], default="amt")
     ap.add_argument("--run-type", choices=["auto", "weekday", "weekend"], default="auto")
+    ap.add_argument("--target-date", help="Override trading date tag (YYYYMMDD). Defaults to today.")
+    ap.add_argument(
+        "--minute-cache-history",
+        type=int,
+        default=5,
+        help="Trading days of Yahoo minute data to stage locally before runs (default 5)",
+    )
+    ap.add_argument(
+        "--minute-cache-limit",
+        type=int,
+        default=1000,
+        help="Maximum number of tickers to refresh when updating minute cache (default 1000)",
+    )
+    ap.add_argument(
+        "--disable-minute-cache",
+        action="store_true",
+        help="Skip automatic minute cache refresh for Yahoo minute data",
+    )
+    ap.add_argument(
+        "--minute-backfill-days",
+        type=int,
+        default=1,
+        help="How many oldest trading days to extend per run (default 1, set 0 to disable)",
+    )
     ap.add_argument("--enable-asha", action="store_true", help="Pass --enable-asha to coarse runs")
     ap.add_argument("--enable-bayes", action="store_true", help="Pass --enable-bayes to refine runs")
     ap.add_argument("--bayes-trials", type=int, default=40, help="Bayesian trials per refine run when enabled")
@@ -296,6 +364,11 @@ def _main_impl() -> None:
     ap.add_argument("--cache-refresh-weekend", action="store_true", help="Force --cache-refresh on weekend runs")
     ap.add_argument("--analysis-ledger", action="store_true", help="Pass --analysis-ledger to refine runs")
     ap.add_argument(
+        "--refine-quick-grid",
+        action="store_true",
+        help="Add --quick-grid and --optimize-io to refine runs for faster turnaround.",
+    )
+    ap.add_argument(
         "--enable-market-features",
         action="store_true",
         help="Attach --enable-market-features to coarse/refine runs for hypothesis capture",
@@ -303,17 +376,30 @@ def _main_impl() -> None:
     ap.add_argument(
         "--enable-rd-windows",
         action="store_true",
-        help="Append optional mid/pm R&D windows (weekend only)",
+        help="Append optional mid/pm R&D windows",
+    )
+    ap.add_argument(
+        "--rd-only",
+        action="store_true",
+        help="Run only the R&D windows (skip standard plans)",
     )
     args = ap.parse_args()
 
+    if args.target_date:
+        try:
+            target_date = dt.datetime.strptime(str(args.target_date), "%Y%m%d").date()
+        except ValueError as exc:
+            raise SystemExit(f"invalid --target-date: {args.target_date}") from exc
+    else:
+        target_date = dt.datetime.now().date()
+
     run_type = args.run_type
     if run_type == "auto":
-        run_type = "weekend" if dt.datetime.now().weekday() >= 5 else "weekday"
+        run_type = "weekend" if target_date.weekday() >= 5 else "weekday"
     is_weekend = run_type == "weekend"
 
     base = Path(args.base_out)
-    date_tag = dt.datetime.now().strftime("%Y%m%d")
+    date_tag = target_date.strftime("%Y%m%d")
     night_root = base / f"NIGHTLY_{date_tag}"
     night_root.mkdir(parents=True, exist_ok=True)
 
@@ -331,16 +417,17 @@ def _main_impl() -> None:
         ("AM1030", "09:00", "10:30", "j-cross"),
     ]
 
-    # Optional R&D windows for weekend runs (mid/pm time slices)
-    if is_weekend and getattr(args, "enable_rd_windows", False):
-        plans.extend(
-            [
-                ("MID1030", "10:30", "11:00", "j-cross"),
-                ("PM1230", "12:30", "13:00", "j-cross"),
-            ]
-        )
+    # Optional R&D windows (mid/pm time slices). Can be enabled for any run-type.
+    rd_windows: List[Tuple[str, str, str, str]] = [
+        ("MID1030", "10:30", "11:00", "j-cross"),
+        ("PM1230", "12:30", "13:00", "j-cross"),
+    ]
+    if getattr(args, "rd_only", False):
+        plans = rd_windows
+    elif getattr(args, "enable_rd_windows", False):
+        plans.extend(rd_windows)
     total_plans = len(plans)
-    plan_counts: Dict[str, int] = {f"{label}_{sig}": 0 for label, _, sig in plans}
+    plan_counts: Dict[str, int] = {f"{label}_{sig}": 0 for label, _, __, sig in plans}
     plan_order: List[str] = []
 
     write_status(
@@ -349,11 +436,13 @@ def _main_impl() -> None:
         message="Starting nightly batch",
         base_out=str(base),
         date_tag=date_tag,
+        target_date=date_tag,
         total_plans=total_plans,
         run_type=run_type,
     )
 
     codes_file_for_runs: Optional[Path] = None
+    base_codes: List[str] = []
     if args.universe_mode == "yahoo-top":
         write_status(
             state="running",
@@ -363,7 +452,6 @@ def _main_impl() -> None:
             completed_plans=0,
         )
 
-        base_codes: List[str] = []
         src_path = Path(args.universe_source)
         if "*" in src_path.name or "?" in src_path.name:
             parent = src_path.parent if src_path.parent != Path("") else Path(".")
@@ -406,6 +494,7 @@ def _main_impl() -> None:
                     metric=args.universe_metric,
                     universe_size=args.universe_size,
                     output_dir=night_root,
+                    target_date=target_date,
                 )
             except Exception as exc:
                 codes_file_for_runs = None
@@ -437,8 +526,52 @@ def _main_impl() -> None:
             total_plans=total_plans,
             completed_plans=0,
         )
+        base_codes = load_codes_from_excel(Path(args.excel), args.excel_ticker_sheet)
 
     repo_root = Path(__file__).resolve().parent.parent
+
+    if not args.disable_minute_cache:
+        minute_codes = set(base_codes)
+        if codes_file_for_runs and codes_file_for_runs.exists():
+            try:
+                df_codes = pd.read_csv(codes_file_for_runs)
+                if "code" in df_codes.columns:
+                    minute_codes.update(
+                        df_codes["code"].dropna().astype(str).str.strip().tolist()
+                    )
+            except Exception:
+                pass
+        if minute_codes:
+            tmp_path: Optional[Path] = None
+            with tempfile.NamedTemporaryFile(
+                "w", suffix=".csv", delete=False, encoding="utf-8", newline=""
+            ) as tmp:
+                tmp.write("code\n")
+                for code in sorted(minute_codes):
+                    tmp.write(f"{code}\n")
+                tmp_path = Path(tmp.name)
+            try:
+                update_cmd = [
+                    sys.executable,
+                    "tools/update_minute_cache.py",
+                    "--codes-file",
+                    str(tmp_path),
+                    "--universe-glob",
+                    "data/universe/topvol_*.csv",
+                    "--universe-limit",
+                    str(args.minute_cache_limit),
+                    "--history-days",
+                    str(args.minute_cache_history),
+                    "--backfill-days",
+                    str(args.minute_backfill_days),
+                ]
+                run(update_cmd, cwd=repo_root)
+            finally:
+                if tmp_path is not None:
+                    try:
+                        os.unlink(tmp_path)
+                    except Exception:
+                        pass
     candidate_frames: List[pd.DataFrame] = []
     candidate_files: List[Path] = []
     completed_plans = 0
@@ -501,6 +634,8 @@ def _main_impl() -> None:
             str(args.feebp),
             "--liquidity-quantile",
             str(args.liquidity_quantile),
+            "--repeat-mask-threshold",
+            str(args.repeat_mask_threshold),
             "--jobs",
             str(args.jobs),
             "--use-local-raw",
@@ -525,8 +660,7 @@ def _main_impl() -> None:
             coarse_cmd.append("--cache-refresh")
         if args.enable_market_features:
             coarse_cmd.extend(["--enable-market-features", "--market-adjust-j", "--market-j-delta-up", "0.10", "--market-j-delta-down", "0.10"])
-            # 動的TP/SLの実験は粗段階でも軽くオン（効果検証用）
-            coarse_cmd.extend(["--dynamic-risk-j", "--tp-per-j", "0.15", "--sl-per-j", "0.10"])
+            # 蜍慕噪TP/SL縺ｮ螳滄ｨ薙・邊玲ｮｵ髫弱〒繧りｻｽ縺上が繝ｳ・亥柑譫懈､懆ｨｼ逕ｨ・・            coarse_cmd.extend(["--dynamic-risk-j", "--tp-per-j", "0.15", "--sl-per-j", "0.10"])
         if codes_file_for_runs:
             coarse_cmd.extend(["--codes-file", str(codes_file_for_runs)])
         if args.excel_summary:
@@ -623,6 +757,8 @@ def _main_impl() -> None:
             str(args.feebp),
             "--liquidity-quantile",
             str(args.liquidity_quantile),
+            "--repeat-mask-threshold",
+            str(args.repeat_mask_threshold),
             "--jobs",
             str(args.jobs),
             "--codes-file",
@@ -647,6 +783,8 @@ def _main_impl() -> None:
             refine_cmd.extend(["--dynamic-risk-j", "--tp-per-j", "0.15", "--sl-per-j", "0.10"])
         if args.analysis_ledger:
             refine_cmd.append("--analysis-ledger")
+        if args.refine_quick_grid:
+            refine_cmd.extend(["--quick-grid", "--optimize-io"])
         run(refine_cmd, cwd=repo_root)
 
         candidates_found = 0
@@ -688,7 +826,7 @@ def _main_impl() -> None:
     )
 
     out_all = Path("output/excel") / "candidates_nextday.csv"
-    summary = aggregate_candidates(candidate_frames, out_all)
+    summary = aggregate_candidates(candidate_frames, out_all, min_forward_ci=float(getattr(args, "min_forward_ci", 0.65)))
     summary.update(
         {
             "plans": ",".join(plan_order),
@@ -697,6 +835,29 @@ def _main_impl() -> None:
             "candidates_path": str(out_all.resolve()),
         }
     )
+
+    # Fallback aggregator when no candidates from in-process aggregation
+    try:
+        total_cand = int(summary.get("total_candidates", "0"))
+    except Exception:
+        total_cand = 0
+    if total_cand <= 0 or not out_all.exists():
+        try:
+            run([sys.executable, "tools/aggregate_candidates_today.py", "--output", str(out_all)], cwd=repo_root)
+            # best-effort stats refresh
+            try:
+                import pandas as pd  # type: ignore
+                df_out = pd.read_csv(out_all)
+                summary.update(
+                    {
+                        "total_candidates": str(int(len(df_out))),
+                        "unique_tickers": str(int(df_out["Ticker"].nunique())) if "Ticker" in df_out.columns else str(int(len(df_out))),
+                    }
+                )
+            except Exception:
+                pass
+        except SystemExit:
+            pass
 
     ensure_dashboard_formulas(repo_root)
 
@@ -739,6 +900,44 @@ def _main_impl() -> None:
                 "weekend" if is_weekend else "weekday",
                 "--top-k",
                 str(48 if is_weekend else 12),
+            ],
+            cwd=repo_root,
+        )
+    except SystemExit:
+        pass
+
+    # Slippage diagnostics (next-minute adverse move and intrabar ranges)
+    try:
+        run(
+            [
+                sys.executable,
+                "tools/analyze_slippage.py",
+                "--run-root",
+                str(night_root),
+                "--output",
+                str(night_root / "slippage_detail.csv"),
+                "--plan-output",
+                str(night_root / "slippage_plan_summary.csv"),
+                "--recommend-output",
+                str(repo_root / "output/excel/slippage_overrides.csv"),
+            ],
+            cwd=repo_root,
+        )
+    except SystemExit:
+        pass
+
+    # Walk-forward summary artifacts for downstream reporting
+    try:
+        run(
+            [
+                sys.executable,
+                "tools/walk_forward_report.py",
+                "--run-root",
+                str(night_root),
+                "--output",
+                str(night_root / "walk_forward_detail.csv"),
+                "--plan-output",
+                str(night_root / "walk_forward_plan_summary.csv"),
             ],
             cwd=repo_root,
         )
