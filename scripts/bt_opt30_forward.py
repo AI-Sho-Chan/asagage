@@ -1456,6 +1456,14 @@ def write_gap_summaries(summary_df: pd.DataFrame, outdir: Path) -> None:
             write_csv(outdir / "_GAP_SUMMARY_FORWARD.csv", agg_forward)
 
 
+def ensure_param_defaults(param: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = dict(param)
+    normalized.setdefault("dJ_th", 0.0)
+    normalized.setdefault("vEMA_th", 0.0)
+    normalized.setdefault("TMAX", 0.0)
+    return normalized
+
+
 def _eval_code_task(payload) -> Tuple[str, pd.DataFrame, Dict[str, float], Dict[str, int]]:
     (
         code,
@@ -1501,10 +1509,11 @@ def _eval_code_task(payload) -> Tuple[str, pd.DataFrame, Dict[str, float], Dict[
             subset_slices = list(slices[:stage_size])
             stage_scores: List[Tuple[float, str]] = []
             for param in param_grid:
+                norm_param = ensure_param_defaults(param)
                 train_metrics, forward_metrics = evaluate_params_for_code(
                     code_df,
                     subset_slices,
-                    param,
+                    norm_param,
                     cost_bp,
                     abs_guard_bp,
                     dir_guard_bp,
@@ -1514,7 +1523,7 @@ def _eval_code_task(payload) -> Tuple[str, pd.DataFrame, Dict[str, float], Dict[
                 )
                 record = assemble_record(
                     code=code,
-                    param=param,
+                    param=norm_param,
                     mode=mode,
                     signal_mode=signal_mode,
                     session_label=session_label,
@@ -1522,7 +1531,7 @@ def _eval_code_task(payload) -> Tuple[str, pd.DataFrame, Dict[str, float], Dict[
                     forward_metrics=forward_metrics,
                     bootstrap_n=int(bootstrap_n),
                 )
-                p_hash = make_param_hash(param)
+                p_hash = make_param_hash(norm_param)
                 stage1_records[p_hash] = record
                 score_val = score_record(record, min_forward_trades, forward_pf_min)
                 stage_scores.append((score_val, p_hash))
@@ -1539,10 +1548,11 @@ def _eval_code_task(payload) -> Tuple[str, pd.DataFrame, Dict[str, float], Dict[
     bayes_trials_done = 0
     fallback_param: Optional[Dict[str, float]] = None
     for param in param_grid:
+        norm_param = ensure_param_defaults(param)
         if fallback_param is None:
-            fallback_param = param
+            fallback_param = norm_param
         record: Optional[Dict[str, Any]] = None
-        param_hash = make_param_hash(param)
+        param_hash = make_param_hash(norm_param)
         if asha_enabled and param_hash in stage1_records and param_hash not in selected_param_hashes:
             code_records.append(stage1_records[param_hash])
             evaluated_hashes.add(param_hash)
@@ -1555,7 +1565,7 @@ def _eval_code_task(payload) -> Tuple[str, pd.DataFrame, Dict[str, float], Dict[
             train_metrics, forward_metrics = evaluate_params_for_code(
                 code_df,
                 slices,
-                param,
+                norm_param,
                 cost_bp,
                 abs_guard_bp,
                 dir_guard_bp,
@@ -1565,7 +1575,7 @@ def _eval_code_task(payload) -> Tuple[str, pd.DataFrame, Dict[str, float], Dict[
             )
             record = assemble_record(
                 code=code,
-                param=param,
+                param=norm_param,
                 mode=mode,
                 signal_mode=signal_mode,
                 session_label=session_label,

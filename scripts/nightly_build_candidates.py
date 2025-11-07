@@ -374,12 +374,6 @@ def _main_impl() -> None:
         default=0.65,
         help="Minimum forward winrate CI lower bound to accept in aggregation (default 0.65)",
     )
-    ap.add_argument(
-        "--repeat-mask-threshold",
-        type=float,
-        default=10.0,
-        help="Allow forward_repeat_index up to this value before masking (default 10.0).",
-    )
     ap.add_argument("--gap-guard-abs-bp", type=float, default=80.0)
     ap.add_argument("--gap-guard-dir-bp", type=float, default=40.0)
     ap.add_argument("--slipbp", type=float, default=4.0)
@@ -427,7 +421,7 @@ def _main_impl() -> None:
     ap.add_argument("--mask-window", type=int, default=20, help="Mask history window (runs)")
     ap.add_argument("--mask-threshold", type=float, default=1.05, help="Forward pf_eff threshold for mask retention")
     ap.add_argument("--cache-refresh-weekend", action="store_true", help="Force --cache-refresh on weekend runs")
-    ap.add_argument("--analysis-ledger", action="store_true", help="Pass --analysis-ledger to refine runs")
+    ap.add_argument("--analysis-ledger", action="store_true", help="(deprecated) no-op placeholder")
     ap.add_argument(
         "--refine-quick-grid",
         action="store_true",
@@ -699,8 +693,6 @@ def _main_impl() -> None:
             str(args.feebp),
             "--liquidity-quantile",
             str(args.liquidity_quantile),
-            "--repeat-mask-threshold",
-            str(args.repeat_mask_threshold),
             "--jobs",
             str(args.jobs),
             "--use-local-raw",
@@ -717,15 +709,10 @@ def _main_impl() -> None:
                     str(args.mask_window),
                     "--mask-threshold",
                     str(args.mask_threshold),
-                    "--mask-keep-j-min",
-                    "1.35",
                 ]
             )
         if is_weekend and args.cache_refresh_weekend:
             coarse_cmd.append("--cache-refresh")
-        if args.enable_market_features:
-            coarse_cmd.extend(["--enable-market-features", "--market-adjust-j", "--market-j-delta-up", "0.10", "--market-j-delta-down", "0.10"])
-            # 蜍慕噪TP/SL縺ｮ螳滄ｨ薙・邊玲ｮｵ髫弱〒繧りｻｽ縺上が繝ｳ・亥柑譫懈､懆ｨｼ逕ｨ・・            coarse_cmd.extend(["--dynamic-risk-j", "--tp-per-j", "0.15", "--sl-per-j", "0.10"])
         if codes_file_for_runs:
             coarse_cmd.extend(["--codes-file", str(codes_file_for_runs)])
         if args.excel_summary:
@@ -822,8 +809,6 @@ def _main_impl() -> None:
             str(args.feebp),
             "--liquidity-quantile",
             str(args.liquidity_quantile),
-            "--repeat-mask-threshold",
-            str(args.repeat_mask_threshold),
             "--jobs",
             str(args.jobs),
             "--codes-file",
@@ -843,11 +828,6 @@ def _main_impl() -> None:
             refine_cmd.append("--cache-refresh")
         if args.excel_summary:
             refine_cmd.append("--excel-summary")
-        if args.enable_market_features:
-            refine_cmd.extend(["--enable-market-features", "--market-adjust-j", "--market-j-delta-up", "0.10", "--market-j-delta-down", "0.10"])
-            refine_cmd.extend(["--dynamic-risk-j", "--tp-per-j", "0.15", "--sl-per-j", "0.10"])
-        if args.analysis_ledger:
-            refine_cmd.append("--analysis-ledger")
         if args.refine_quick_grid:
             refine_cmd.extend(["--quick-grid", "--optimize-io"])
         run(refine_cmd, cwd=repo_root)

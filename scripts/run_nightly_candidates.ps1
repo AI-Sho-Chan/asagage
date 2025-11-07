@@ -7,8 +7,25 @@ $logPath = Join-Path $repo 'logs\run_nightly_candidates.log'
 
 $now = Get-Date
 if ($now.DayOfWeek -eq 'Friday') {
-    "[$($now.ToString('s'))] nightly_build_candidates skip (Friday run disabled)" | Out-File -FilePath $logPath -Append -Encoding utf8
-    exit 0
+    "[$($now.ToString('s'))] nightly_build_candidates start weekend_seq" | Out-File -FilePath $logPath -Append -Encoding utf8
+    try {
+        & "$repo\scripts\run_weekend_then_nightly.ps1"
+        $seqCode = $LASTEXITCODE
+        "[$([DateTime]::Now.ToString('s'))] weekend_seq exit $seqCode" | Out-File -FilePath $logPath -Append -Encoding utf8
+        if ($seqCode -ne 0) { exit $seqCode }
+        try {
+            & "$repo\scripts\run_trade_analysis.ps1" | Out-Null
+            "[$([DateTime]::Now.ToString('s'))] run_trade_analysis completed" | Out-File -FilePath $logPath -Append -Encoding utf8
+        }
+        catch {
+            "[$([DateTime]::Now.ToString('s'))] run_trade_analysis error $_" | Out-File -FilePath $logPath -Append -Encoding utf8
+        }
+        exit 0
+    }
+    catch {
+        "[$([DateTime]::Now.ToString('s'))] weekend_seq error $_" | Out-File -FilePath $logPath -Append -Encoding utf8
+        exit 1
+    }
 }
 
 $checkArgs = @('scripts/check_trading_day.py', '--date', $now.ToString('yyyy-MM-dd'))
