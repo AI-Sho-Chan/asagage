@@ -10,17 +10,21 @@ def main():
         sys.exit(1)
 
     if len(sys.argv) < 3:
-        print("Usage: python scripts/excel_install_macros.py C:/AI/asagake/SHINSOKU.xlsm excel/vba/AutoTrader.bas")
+        print(
+            "Usage: python scripts/excel_install_macros.py "
+            "C:/AI/asagake/SHINSOKU.xlsm excel/AutoTraderAdvanced.bas [excel/cDashboardWatcher.cls ...]"
+        )
         sys.exit(2)
 
     wb_path = Path(sys.argv[1])
-    bas_path = Path(sys.argv[2])
     if not wb_path.exists():
         print("Workbook not found:", wb_path)
         sys.exit(3)
-    if not bas_path.exists():
-        print("BAS file not found:", bas_path)
-        sys.exit(4)
+    module_paths = [Path(p) for p in sys.argv[2:]]
+    for mod in module_paths:
+        if not mod.exists():
+            print("Module file not found:", mod)
+            sys.exit(4)
 
     win32 = win32com.client.DispatchEx("Excel.Application")
     win32.Visible = False
@@ -38,12 +42,8 @@ def main():
             AddToMru=False,
         )
         vbproj = wb.VBProject  # type: ignore[attr-defined]
-        remove_module(vbproj, "AutoTrader")
-        vbcomp = vbproj.VBComponents.Add(1)  # vbext_ct_StdModule = 1
-        vbcomp.Name = "AutoTrader"
-        with open(bas_path, "r", encoding="utf-8") as f:
-            code = normalize_module_text(f.read())
-        vbcomp.CodeModule.AddFromString(code)
+        for module_path in module_paths:
+            install_module(vbproj, module_path)
         wb.Save()
         print("Imported module into:", wb_path)
     finally:
@@ -70,6 +70,32 @@ def normalize_module_text(text: str) -> str:
         lines = lines[1:]
     # Ensure trailing newline so AddFromString ends cleanly
     return "\r\n".join(lines).rstrip() + "\r\n"
+
+
+def extract_module_name(text: str, default: str) -> str:
+    for line in text.splitlines():
+        line = line.strip()
+        if line.lower().startswith("attribute vb_name"):
+            start = line.find('"')
+            end = line.rfind('"')
+            if start >= 0 and end > start:
+                return line[start + 1 : end]
+    return default
+
+
+def install_module(vbproj, module_path: Path) -> None:
+    raw_text = module_path.read_text(encoding="utf-8")
+    module_name = extract_module_name(raw_text, module_path.stem)
+    code = normalize_module_text(raw_text)
+    remove_module(vbproj, module_name)
+    ext = module_path.suffix.lower()
+    if ext == ".cls":
+        comp_type = 2  # vbext_ct_ClassModule
+    else:
+        comp_type = 1  # standard module
+    vbcomp = vbproj.VBComponents.Add(comp_type)
+    vbcomp.Name = module_name
+    vbcomp.CodeModule.AddFromString(code)
 
 
 if __name__ == "__main__":

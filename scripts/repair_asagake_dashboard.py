@@ -63,61 +63,61 @@ PARAM_DEFAULTS = [
 PARAM_INDEX = {name: idx for idx, name in enumerate(PARAM_HEADERS, start=1)}
 
 JP_MAP = {
-    "Ticker": ("險ｼ蛻ｸ繧ｳ繝ｼ繝・, "蛟呵｣憺釜譟・・繧ｳ繝ｼ繝峨・SV縺九ｉ隱ｭ縺ｿ霎ｼ縺ｿ縺ｾ縺・),
-    "Name": ("驫俶氛蜷咲ｧｰ", "RssMarket(\"驫俶氛蜷咲ｧｰ\")縺ｧ閾ｪ蜍募叙蠕・),
-    "J_th_base": ("J_th繝吶・繧ｹ", "騾ｱ譛ｫ/繝翫う繝医ヰ繝・メ縺九ｉ蜿悶ｊ霎ｼ繧繝吶・繧ｹ髢ｾ蛟､"),
-    "J_th": ("J_th(陬懈ｭ｣蠕・", "蟶ょｴ繝舌う繧｢繧ｹ繝ｻ繧ｮ繝｣繝・・繝ｻ逶ｸ髢｢縺ｧ陬懈ｭ｣縺輔ｌ縺滄明蛟､"),
-    "J": ("J蛟､", "・育樟蝨ｨ蛟､竏歎WAP・・ATR_n/100"),
-    "Last": ("迴ｾ蝨ｨ蛟､", "RssMarket(\"迴ｾ蝨ｨ蛟､\")"),
-    "VWAP": ("蜃ｺ譚･鬮伜刈驥榊ｹｳ蝮・, "RssMarket(\"蜃ｺ譚･鬮伜刈驥榊ｹｳ蝮Ⅸ")"),
-    "OrderQtyPlan": ("逋ｺ豕ｨ莠亥ｮ壽焚驥・, "莠育ｮ療ｷ迴ｾ蝨ｨ蛟､繧偵Ο繝・ヨ蜊倅ｽ阪〒荳ｸ繧√◆謨ｰ驥・),
-    "Selected": ("逶｣隕飽N/OFF", "1縺ｧ逶｣隕門ｯｾ雎｡"),
-    "EntryBuyPx": ("雋ｷ謖・､", "VWAP繧貞渕貅悶↓J_th縺ｧ邂怜・"),
-    "EntrySellPx": ("螢ｲ謖・､", "VWAP繧貞渕貅悶↓J_th縺ｧ邂怜・"),
-    "EntrySide": ("繧ｵ繧､繝・, "J蛟､縺ｮ隨ｦ蜿ｷ縺ｧBUY/SELL"),
-    "EntryStatus": ("逋ｺ豕ｨ繧ｹ繝・・繧ｿ繧ｹ", "逋ｺ豕ｨ蜃ｦ逅・〒譖ｸ縺崎ｾｼ縺ｿ"),
-    "TP_price": ("蛻ｩ遒ｺ謖・､", "J蛟､ﾃ裕P_per_J"),
-    "SL_price": ("謳榊・謖・､", "J蛟､ﾃ祐L_per_J"),
-    "StopTrail": ("繝医Ξ繝ｼ繝ｪ繝ｳ繧ｰ", "繝医Ξ繝ｼ繝ｪ繝ｳ繧ｰ逕ｨ繧ｻ繝ｫ・亥ｿ・ｦ∵凾縺ｫVBA縺梧峩譁ｰ・・),
-    "SettleStatus": ("豎ｺ貂育憾豕・, "豎ｺ貂医Ο繧ｰ縺ｧ菴ｿ逕ｨ"),
-    "BestBid": ("譛濶ｯ雋ｷ豌鈴・蛟､", "RssMarket(\"譛濶ｯ雋ｷ豌鈴・蛟､\")"),
-    "BestAsk": ("譛濶ｯ螢ｲ豌鈴・蛟､", "RssMarket(\"譛濶ｯ螢ｲ豌鈴・蛟､\")"),
-    "Gap_bp": ("繧ｮ繝｣繝・・(bp)", "(荳ｭ蛟､竏貞燕譌･邨ょ､)/蜑肴律邨ょ､ﾃ・0000"),
-    "CorrNKY": ("逶ｸ髢｢(NKY)", "驫俶氛縺ｨ譌･邨悟ｹｳ蝮・・逶ｸ髢｢菫よ焚"),
-    "PrevClose": ("蜑肴律邨ょ､", "RssMarket(\"蜑肴律邨ょ､\")"),
-    "ForwardPfEff": ("繝輔か繝ｯ繝ｼ繝臼F蜉ｹ邇・, "騾ｱ譛ｫ/繝翫う繝育ｵ先棡"),
-    "WinCiLow": ("蜍晉紫CI荳矩剞", "騾ｱ譛ｫ/繝翫う繝育ｵ先棡"),
-    "ForwardTrades": ("繝輔か繝ｯ繝ｼ繝牙叙蠑墓焚", "騾ｱ譛ｫ/繝翫う繝育ｵ先棡"),
-    "ExpBp": ("繝輔か繝ｯ繝ｼ繝画悄蠕・p", "騾ｱ譛ｫ/繝翫う繝育ｵ先棡"),
-    "ATR_n": ("ATR譛滄俣", "繝舌ャ繝∵耳螂ｨ蛟､・育┌縺・ｴ蜷医・2・・),
-    "TPk": ("TP蛟咲紫", "繝舌ャ繝∵耳螂ｨ蛟､"),
-    "SLk": ("SL蛟咲紫", "繝舌ャ繝∵耳螂ｨ蛟､"),
-    "SignalMode": ("繧ｷ繧ｰ繝翫Ν繝｢繝ｼ繝・, "j-only / j-cross 遲・),
-    "session": ("蜿門ｼ輔そ繝・す繝ｧ繝ｳ", "AM0930 遲・),
-    "plan_tag": ("繝舌ャ繝√・繝ｩ繝ｳ", "refine 縺ｮ繝励Λ繝ｳ蜷・),
-    "BiasSlope_row": ("Bias菫よ焚(驫俶氛)", "驫俶氛蝗ｺ譛峨・BiasSlope縲らｩｺ谺・↑繧芽｡・縺ｮ蛟､繧剃ｽｿ逕ｨ"),
-    "GapSlope_row": ("Gap菫よ焚(驫俶氛)", "驫俶氛蝗ｺ譛峨・GapSlope縲らｩｺ谺・↑繧芽｡・縺ｮ蛟､繧剃ｽｿ逕ｨ"),
-    "CorrSlope_row": ("Corr菫よ焚(驫俶氛)", "驫俶氛蝗ｺ譛峨・CorrSlope縲らｩｺ谺・↑繧芽｡・縺ｮ蛟､繧剃ｽｿ逕ｨ"),
-    "TP_per_J_row": ("TP/J蝓ｺ貅・驫俶氛)", "驫俶氛蝗ｺ譛峨・TP/J蝓ｺ貅門､"),
-    "SL_per_J_row": ("SL/J蝓ｺ貅・驫俶氛)", "驫俶氛蝗ｺ譛峨・SL/J蝓ｺ貅門､"),
-    "Trail_per_J_row": ("Trail/J蝓ｺ貅・驫俶氛)", "驫俶氛蝗ｺ譛峨・繝医Ξ繝ｼ繝ｪ繝ｳ繧ｰ蟷・渕貅・),
-    "TP_per_J_eff": ("TP/J(螳溷柑)", "蜍慕噪隱ｿ謨ｴ蠕後・TP/J菫よ焚"),
-    "SL_per_J_eff": ("SL/J(螳溷柑)", "蜍慕噪隱ｿ謨ｴ蠕後・SL/J菫よ焚"),
-    "Trail_per_J_eff": ("Trail/J(螳溷柑)", "蜍慕噪隱ｿ謨ｴ蠕後・繝医Ξ繝ｼ繝ｪ繝ｳ繧ｰ菫よ焚"),
-    "BatchKind": ("Batch種別", "nightly / weekend などの区別"),
-    "NKY_day_trend": ("NKY日次トレンド", "AutoTraderAdvanced が更新"),
-    "NKY_window_trend": ("NKY窓トレンド", "直近15本の方向"),
-    "NKY_allowed_side": ("NKY許容サイド", "BUY / SELL / BOTH"),
-    "J_ratio": ("J到達率", "|J| / |J_th|"),
-    "VolatilityTag": ("繝懊Λ繧ｿ繧ｰ", "蠖捺律繝懊Λ迥ｶ豕√Γ繝｢"),
+    "Ticker": ("証券コード", "候補銘柄のコード。CSVから読み込みます"),
+    "Name": ("銘柄名称", "RssMarket(\"銘柄名称\")で自動取得"),
+    "J_th_base": ("J_thベース", "週末/ナイトバッチから取り込むベース閾値"),
+    "J_th": ("J_th(補正後)", "市場バイアス・ギャップ・相関で補正された閾値"),
+    "J": ("J値", "（現在値?VWAP）/ATR_n/100"),
+    "Last": ("現在値", "RssMarket(\"現在値\")"),
+    "VWAP": ("出来高加重平均", "RssMarket(\"出来高加重平均\")"),
+    "OrderQtyPlan": ("発注予定数量", "予算÷現在値をロット単位で丸めた数量"),
+    "Selected": ("監視ON/OFF", "1で監視対象"),
+    "EntryBuyPx": ("買指値", "VWAPを基準にJ_thで算出"),
+    "EntrySellPx": ("売指値", "VWAPを基準にJ_thで算出"),
+    "EntrySide": ("サイド", "J値の符号でBUY/SELL"),
+    "EntryStatus": ("発注ステータス", "発注処理で書き込み"),
+    "TP_price": ("利確指値", "J値×TP_per_J"),
+    "SL_price": ("損切指値", "J値×SL_per_J"),
+    "StopTrail": ("トレーリング", "トレーリング用セル（必要時にVBAが更新）"),
+    "SettleStatus": ("決済状況", "決済ログで使用"),
+    "BestBid": ("最良買気配値", "RssMarket(\"最良買気配値\")"),
+    "BestAsk": ("最良売気配値", "RssMarket(\"最良売気配値\")"),
+    "Gap_bp": ("ギャップ(bp)", "(中値?前日終値)/前日終値×10000"),
+    "CorrNKY": ("相関(NKY)", "銘柄と日経平均の相関係数"),
+    "PrevClose": ("前日終値", "RssMarket(\"前日終値\")"),
+    "ForwardPfEff": ("フォワードPF効率", "週末/ナイト結果"),
+    "WinCiLow": ("勝率CI下限", "週末/ナイト結果"),
+    "ForwardTrades": ("フォワード取引数", "週末/ナイト結果"),
+    "ExpBp": ("フォワード期待bp", "週末/ナイト結果"),
+    "ATR_n": ("ATR期間", "バッチ推奨値（無い場合は2）"),
+    "TPk": ("TP倍率", "バッチ推奨値"),
+    "SLk": ("SL倍率", "バッチ推奨値"),
+    "SignalMode": ("シグナルモード", "j-only / j-cross 等"),
+    "session": ("取引セッション", "AM0930 等"),
+    "plan_tag": ("バッチプラン", "refine のプラン名"),
+    "BiasSlope_row": ("Bias係数(銘柄)", "銘柄固有のBiasSlope。空欄なら行2の値を使用"),
+    "GapSlope_row": ("Gap係数(銘柄)", "銘柄固有のGapSlope。空欄なら行2の値を使用"),
+    "CorrSlope_row": ("Corr係数(銘柄)", "銘柄固有のCorrSlope。空欄なら行2の値を使用"),
+    "TP_per_J_row": ("TP/J基準(銘柄)", "銘柄固有のTP/J基準値"),
+    "SL_per_J_row": ("SL/J基準(銘柄)", "銘柄固有のSL/J基準値"),
+    "Trail_per_J_row": ("Trail/J基準(銘柄)", "銘柄固有のトレーリング幅基準"),
+    "TP_per_J_eff": ("TP/J(実効)", "動的調整後のTP/J係数"),
+    "SL_per_J_eff": ("SL/J(実効)", "動的調整後のSL/J係数"),
+    "Trail_per_J_eff": ("Trail/J(実効)", "動的調整後のトレーリング係数"),
+    "BatchKind": ("Batch?種別", "nightly/weekend ?????L???"),
+    "NKY_day_trend": ("NKY?w??g?????h", "AutoTraderAdvanced ???X?V"),
+    "NKY_window_trend": ("NKY?E???h?g?????h", "?????15????????"),
+    "NKY_allowed_side": ("NKY?L?????T?C?h", "BUY/SELL/BOTH"),
+    "J_ratio": ("J?i?[?g??", "|J| / |J_th|"),
+    "VolatilityTag": ("ボラタグ", "当日ボラ状況メモ"),
 }
 
 BUTTONS = [
-    ("btn_live_start", "譛ｬ逡ｪ蜿門ｼ暮幕蟋・, 3, 4, "AutoTraderAdvanced.StartLiveV2"),
-    ("btn_live_stop", "譛ｬ逡ｪ蜿門ｼ募●豁｢", 3, 6, "AutoTraderAdvanced.StopLiveV2"),
-    ("btn_demo_start", "繝・Δ蜿門ｼ暮幕蟋・, 3, 8, "AutoTraderAdvanced.StartDemoV2"),
-    ("btn_demo_stop", "繝・Δ蜿門ｼ募●豁｢", 3, 10, "AutoTraderAdvanced.StopDemoV2"),
-    ("btn_import", "蛟呵｣憺釜譟・叙霎ｼ", 3, 12, "AutoTraderAdvanced.ImportCandidatesV2"),
+    ("btn_live_start", "本番取引開始", 3, 4, "AutoTraderAdvanced.StartLiveV2"),
+    ("btn_live_stop", "本番取引停止", 3, 6, "AutoTraderAdvanced.StopLiveV2"),
+    ("btn_demo_start", "デモ取引開始", 3, 8, "AutoTraderAdvanced.StartDemoV2"),
+    ("btn_demo_stop", "デモ取引停止", 3, 10, "AutoTraderAdvanced.StopDemoV2"),
+    ("btn_import", "候補銘柄取込", 3, 12, "AutoTraderAdvanced.ImportCandidatesV2"),
 ]
 
 ORDER_HEADERS = list(JP_MAP.keys())
@@ -210,8 +210,8 @@ def build_dashboard(excel_path: Path) -> None:
 
         # Ensure NKY related formulas persist (RSS index depends on code in A2)
         try:
-            ws.Cells(2, 2).FormulaR1C1Local = '=IF(RC[-1]="", "", IFERROR(RssIndexMarket(RC[-1],"迴ｾ蝨ｨ蛟､"),""))'
-            ws.Cells(2, 3).FormulaR1C1Local = '=IF(RC[-2]="", "", IFERROR(RssIndexMarket(RC[-2],"鬨ｰ關ｽ邇・),""))'
+            ws.Cells(2, 2).FormulaR1C1Local = '=IF(RC[-1]="", "", IFERROR(RssIndexMarket(RC[-1],"現在値"),""))'
+            ws.Cells(2, 3).FormulaR1C1Local = '=IF(RC[-2]="", "", IFERROR(RssIndexMarket(RC[-2],"騰落率"),""))'
             ws.Cells(2, 4).FormulaR1C1 = "=(RC[-1])*100"
         except Exception:
             pass
@@ -254,32 +254,32 @@ def build_dashboard(excel_path: Path) -> None:
         fill_formula(
             ws,
             COL_INDEX["Name"],
-            f'=IF({rc_relative(COL_INDEX["Name"], ticker_col)}="","",IFERROR(RssMarket(SUBSTITUTE({rc_relative(COL_INDEX["Name"], ticker_col)},".T",""),"驫俶氛蜷咲ｧｰ"),""))',
+            f'=IF({rc_relative(COL_INDEX["Name"], ticker_col)}="","",IFERROR(RssMarket(SUBSTITUTE({rc_relative(COL_INDEX["Name"], ticker_col)},".T",""),"銘柄名称"),""))',
         )
         fill_formula(
             ws,
             COL_INDEX["Last"],
-            f'=IF({rc_relative(COL_INDEX["Last"], ticker_col)}="","",IFERROR(RssMarket(SUBSTITUTE({rc_relative(COL_INDEX["Last"], ticker_col)},".T",""),"迴ｾ蝨ｨ蛟､"),""))',
+            f'=IF({rc_relative(COL_INDEX["Last"], ticker_col)}="","",IFERROR(RssMarket(SUBSTITUTE({rc_relative(COL_INDEX["Last"], ticker_col)},".T",""),"現在値"),""))',
         )
         fill_formula(
             ws,
             COL_INDEX["VWAP"],
-            f'=IF({rc_relative(COL_INDEX["VWAP"], ticker_col)}="","",IFERROR(RssMarket(SUBSTITUTE({rc_relative(COL_INDEX["VWAP"], ticker_col)},".T",""),"蜃ｺ譚･鬮伜刈驥榊ｹｳ蝮・),""))',
+            f'=IF({rc_relative(COL_INDEX["VWAP"], ticker_col)}="","",IFERROR(RssMarket(SUBSTITUTE({rc_relative(COL_INDEX["VWAP"], ticker_col)},".T",""),"出来高加重平均"),""))',
         )
         fill_formula(
             ws,
             COL_INDEX["PrevClose"],
-            f'=IF({rc_relative(COL_INDEX["PrevClose"], ticker_col)}="","",IFERROR(RssMarket(SUBSTITUTE({rc_relative(COL_INDEX["PrevClose"], ticker_col)},".T",""),"蜑肴律邨ょ､"),""))',
+            f'=IF({rc_relative(COL_INDEX["PrevClose"], ticker_col)}="","",IFERROR(RssMarket(SUBSTITUTE({rc_relative(COL_INDEX["PrevClose"], ticker_col)},".T",""),"前日終値"),""))',
         )
         fill_formula(
             ws,
             COL_INDEX["BestBid"],
-            f'=IF({rc_relative(COL_INDEX["BestBid"], ticker_col)}="","",IFERROR(RssMarket(SUBSTITUTE({rc_relative(COL_INDEX["BestBid"], ticker_col)},".T",""),"譛濶ｯ雋ｷ豌鈴・蛟､"),""))',
+            f'=IF({rc_relative(COL_INDEX["BestBid"], ticker_col)}="","",IFERROR(RssMarket(SUBSTITUTE({rc_relative(COL_INDEX["BestBid"], ticker_col)},".T",""),"最良買気配値"),""))',
         )
         fill_formula(
             ws,
             COL_INDEX["BestAsk"],
-            f'=IF({rc_relative(COL_INDEX["BestAsk"], ticker_col)}="","",IFERROR(RssMarket(SUBSTITUTE({rc_relative(COL_INDEX["BestAsk"], ticker_col)},".T",""),"譛濶ｯ螢ｲ豌鈴・蛟､"),""))',
+            f'=IF({rc_relative(COL_INDEX["BestAsk"], ticker_col)}="","",IFERROR(RssMarket(SUBSTITUTE({rc_relative(COL_INDEX["BestAsk"], ticker_col)},".T",""),"最良売気配値"),""))',
         )
         fill_formula(
             ws,
@@ -322,7 +322,7 @@ def build_dashboard(excel_path: Path) -> None:
             COL_INDEX["Last"],
             (
                 f'=IF({rc_relative(COL_INDEX["Last"], COL_INDEX["Ticker"])}="", "",'
-                f'IFERROR(RssMarket(SUBSTITUTE({rc_relative(COL_INDEX["Last"], COL_INDEX["Ticker"])},".T",""),"迴ｾ蝨ｨ蛟､"),""))'
+                f'IFERROR(RssMarket(SUBSTITUTE({rc_relative(COL_INDEX["Last"], COL_INDEX["Ticker"])},".T",""),"現在値"),""))'
             ),
         )
         fill_formula(
