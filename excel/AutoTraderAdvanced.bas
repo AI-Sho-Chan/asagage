@@ -26,19 +26,19 @@ Private Const DEFAULT_NKY_INITIAL_BP As Double = 10#
 Private Const DEFAULT_NKY_STEADY_BP As Double = 15#
 Private Const DEFAULT_ALERT_COOLDOWN_MIN As Double = 10#
 
-Private Dim gDashboardWatcher As cDashboardWatcher
-Private Dim gThresholdState As Object
-Private Dim gAlertCooldown As Object
-Private Dim gNkyHistoryTimes As Collection
-Private Dim gNkyHistoryPrices As Collection
-Private Dim gNkySessionDate As Date
-Private Dim gNkySessionOpen As Double
-Private Dim gLastHistoryRecord As Date
-Private Dim gNkyTrendDay As String
-Private Dim gNkyTrendWindow As String
-Private Dim gNkyAllowedSide As String
-Private Dim gStrategyRules As Object
-Private Dim gLastOrderAllowedSide As String
+Private gDashboardWatcher As cDashboardWatcher
+Private gThresholdState As Object
+Private gAlertCooldown As Object
+Private gNkyHistoryTimes As Collection
+Private gNkyHistoryPrices As Collection
+Private gNkySessionDate As Date
+Private gNkySessionOpen As Double
+Private gLastHistoryRecord As Date
+Private gNkyTrendDay As String
+Private gNkyTrendWindow As String
+Private gNkyAllowedSide As String
+Private gStrategyRules As Object
+Private gLastOrderAllowedSide As String
 
 
 Private Function HeaderTickerJP() As String: HeaderTickerJP = "Ticker": End Function

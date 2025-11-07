@@ -104,11 +104,11 @@ JP_MAP = {
     "TP_per_J_eff": ("TP/J(実効)", "動的調整後のTP/J係数"),
     "SL_per_J_eff": ("SL/J(実効)", "動的調整後のSL/J係数"),
     "Trail_per_J_eff": ("Trail/J(実効)", "動的調整後のトレーリング係数"),
-    "BatchKind": ("Batch?種別", "nightly/weekend ?????L???"),
-    "NKY_day_trend": ("NKY?w??g?????h", "AutoTraderAdvanced ???X?V"),
-    "NKY_window_trend": ("NKY?E???h?g?????h", "?????15????????"),
-    "NKY_allowed_side": ("NKY?L?????T?C?h", "BUY/SELL/BOTH"),
-    "J_ratio": ("J?i?[?g??", "|J| / |J_th|"),
+    "BatchKind": ("Batch種別", "nightly / weekend のバッチ区分"),
+    "NKY_day_trend": ("NKY日次トレンド", "AutoTraderAdvanced が RSS から算出"),
+    "NKY_window_trend": ("NKY窓トレンド", "直近15分回帰＋寄付き比較で判定"),
+    "NKY_allowed_side": ("NKY許容サイド", "BUY/SELL/BOTH を表示"),
+    "J_ratio": ("J到達率", "|J| / |J_th|"),
     "VolatilityTag": ("ボラタグ", "当日ボラ状況メモ"),
 }
 

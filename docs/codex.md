@@ -7,6 +7,7 @@
 - When AutoTrader.bas is updated, import via `python scripts/excel_install_macros.py C:/AI/asagake/SHINSOKU.xlsm C:/AI/asagake/AutoTrader.bas` instead of using the VBA editor.
 - For dashboard構成の修正や V2 レイアウト更新は、必ず `python scripts/repair_asagake_dashboard.py --excel C:/AI/asagake/ASAGAKE.xlsm` → `python scripts/excel_install_macros.py C:/AI/asagake/ASAGAKE.xlsm excel/AutoTraderAdvanced.bas excel/cDashboardWatcher.cls` の手順で行い、Excel/VBE は開かない（貼付エラー防止のため）。
 - Excel を閉じた状態で `repair_asagake_dashboard.py` と `excel_install_macros.py` を実行し、完了後に Excel を再起動して反映を確認すること。ASAGAKE.xlsm の更新時刻と `cDashboardWatcher` が VBAProject に存在するかを確認する。
+- NewDashboardV2 の AP～AT 行タイトルが文字化けした場合は、`scripts/repair_asagake_dashboard.py` の `JP_MAP` を UTF-8 で修正したうえで repair → macro install の順に再実行する。旧 `JP_MAP`（mojibake）のままだと今回のように変更が反映されない。
 - Always log the source backup and the applied changes in `docs/handover_YYYYMMDD.md`.
 
 ## Backup Expectations
