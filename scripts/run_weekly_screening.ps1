@@ -1,0 +1,102 @@
+param(
+  [string]$DateTag = (Get-Date -Format 'yyyyMMdd'),
+  [int]$TopUniverse = 300,
+  [int]$TargetTop = 50
+)
+
+$ErrorActionPreference = 'Stop'
+$Repo = "C:\\AI\\asagake"
+$Python = 'C:\\Python313\\python.exe'
+$Status = Join-Path $Repo 'logs\weekly_screening_status.txt'
+
+function Write-Status([string]$step, [string]$msg) {
+  $now = Get-Date
+  @(
+    "updated=$($now.ToString('s'))",
+    "step=$step",
+    "message=$msg"
+  ) | Out-File -FilePath $Status -Append -Encoding utf8
+}
+
+$targetDate = [datetime]::ParseExact($DateTag, 'yyyyMMdd', $null)
+$maxBacktrack = 10
+while ($maxBacktrack -gt 0) {
+  $checkArgs = @('scripts/check_trading_day.py', '--date', $targetDate.ToString('yyyy-MM-dd'))
+  $checkProcess = Start-Process -FilePath $Python -ArgumentList $checkArgs -WorkingDirectory $Repo -NoNewWindow -PassThru -Wait
+  if ($checkProcess.ExitCode -eq 0) { break }
+  $targetDate = $targetDate.AddDays(-1)
+  $maxBacktrack--
+}
+if ($maxBacktrack -le 0) {
+  Write-Status 'error' "could not find prior trading day for $DateTag"
+  throw "no trading day found"
+}
+
+$resolvedTag = $targetDate.ToString('yyyyMMdd')
+$OutRoot = "C:\\AI\\asagake\\output\\bt30\\WEEKLY_$resolvedTag"
+if ($resolvedTag -ne $DateTag) {
+  Write-Status 'info' "resolved trading day $resolvedTag"
+}
+
+try {
+  New-Item -ItemType Directory -Force -Path $OutRoot | Out-Null
+  Write-Status 'start' "weekly screening begin"
+
+$args = @(
+    'scripts/nightly_build_candidates.py',
+    '--excel','SHINSOKU.xlsm',
+    '--base-out',$OutRoot,
+    '--run-type','weekend',
+    '--target-date',$resolvedTag,
+    '--universe-mode','yahoo-top','--universe-size',$TopUniverse,
+    '--lookback','60','--chunk-days','5','--train-days','12','--forward-days','4',
+    '--min-train-trades','12','--min-forward-trades','5','--forward-pf-min','1.3','--min-forward-ci','0.65',
+    '--gap-guard-abs-bp','80.0','--gap-guard-dir-bp','40.0','--slipbp','4.0','--feebp','4.0',
+    '--liquidity-quantile','0.5','--jobs','6','--enable-asha','--enable-bayes','--bayes-trials','24','--bayes-timeout','900',
+    '--enable-market-features','--excel-summary','--analysis-ledger','--refine-quick-grid'
+)
+  $p = Start-Process -FilePath $Python -ArgumentList $args -WorkingDirectory $Repo -NoNewWindow -PassThru -Wait
+  if ($p.ExitCode -ne 0) { throw "weekly coarse/refine failed ($($p.ExitCode))" }
+
+  # Aggregate to weekly candidates (~Top50 by score with filters: win>=0.70, pf>=1.30, exp_bp>0)
+  $weeklyOut = Join-Path $Repo "output/excel/weekly_candidates_$resolvedTag.csv"
+  $aggArgs = @(
+    'tools/aggregate_weekly_candidates.py',
+    '--date',$resolvedTag,
+    '--target-top',"$TargetTop",
+    '--output',$weeklyOut
+  )
+  $aggJson = & $Python $aggArgs | ConvertFrom-Json
+  if ($LASTEXITCODE -ne 0) { throw "aggregate weekly failed ($LASTEXITCODE)" }
+
+  if ($aggJson -and $aggJson.written) {
+    $written = [System.IO.Path]::GetFullPath($aggJson.written)
+    $latest = Join-Path $Repo 'output/excel/weekly_candidates_latest.csv'
+    Copy-Item $written $latest -Force
+    # 週末結果を直ちに翌営業日候補に反映
+    Copy-Item $written (Join-Path $Repo 'output/excel/candidates_nextday.csv') -Force
+    Write-Status 'aggregate' "weekly candidates: $($aggJson.rows) rows -> $written"
+  }
+
+  $coeffArgs = @(
+    'tools/compute_dashboard_coeffs.py',
+    '--codes-file',$weeklyOut,
+    '--history-days','90',
+    '--save-dated'
+  )
+  & $Python $coeffArgs
+  if ($LASTEXITCODE -ne 0) { throw "dashboard coeff calc failed ($LASTEXITCODE)" }
+
+  Write-Status 'completed' "weekly screening completed"
+  try {
+    & "$Repo\scripts\run_trade_analysis.ps1" | Out-Null
+    Write-Status 'analysis' "run_trade_analysis completed"
+  }
+  catch {
+    Write-Status 'analysis_error' $_.Exception.Message
+  }
+}
+catch {
+  Write-Status 'error' ($_.Exception.Message)
+  throw
+}

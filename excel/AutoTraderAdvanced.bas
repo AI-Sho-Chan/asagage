@@ -22,6 +22,23 @@ Private Const MsoShapeRectangle As Long = 1
 
 Private Const MsoAlignCenter As Long = -4108
 
+Private Const DEFAULT_NKY_INITIAL_BP As Double = 10#
+Private Const DEFAULT_NKY_STEADY_BP As Double = 15#
+Private Const DEFAULT_ALERT_COOLDOWN_MIN As Double = 10#
+
+Private Dim gDashboardWatcher As cDashboardWatcher
+Private Dim gThresholdState As Object
+Private Dim gAlertCooldown As Object
+Private Dim gNkyHistoryTimes As Collection
+Private Dim gNkyHistoryPrices As Collection
+Private Dim gNkySessionDate As Date
+Private Dim gNkySessionOpen As Double
+Private Dim gLastHistoryRecord As Date
+Private Dim gNkyTrendDay As String
+Private Dim gNkyTrendWindow As String
+Private Dim gNkyAllowedSide As String
+Private Dim gStrategyRules As Object
+Private Dim gLastOrderAllowedSide As String
 
 
 Private Function HeaderTickerJP() As String: HeaderTickerJP = "Ticker": End Function
@@ -55,6 +72,128 @@ Private Function FindColumn(ByVal ws As Worksheet, ByVal headerRow As Long, ByVa
 End Function
 
 
+Private Function FindParamColumn(ByVal ws As Worksheet, ByVal headerName As String) As Long
+    Dim c As Range
+    For Each c In ws.Rows(1).Cells
+        If Len(Trim$(CStr(c.Value))) = 0 And c.Column > 60 Then Exit For
+        If StrComp(Trim$(CStr(c.Value)), headerName, vbTextCompare) = 0 Then
+            FindParamColumn = c.Column
+            Exit Function
+        End If
+    Next c
+    FindParamColumn = 0
+End Function
+
+Private Function GetParamDouble(ByVal ws As Worksheet, ByVal col As Long, ByVal defaultValue As Double) As Double
+    On Error GoTo Fail
+    If col <= 0 Then
+        GetParamDouble = defaultValue
+        Exit Function
+    End If
+    Dim val As Variant
+    val = ws.Cells(2, col).Value
+    If IsNumeric(val) Then
+        GetParamDouble = CDbl(val)
+    Else
+        GetParamDouble = defaultValue
+    End If
+    Exit Function
+Fail:
+    GetParamDouble = defaultValue
+End Function
+
+Private Function ToDouble(ByVal value As Variant, ByVal defaultValue As Double) As Double
+    On Error GoTo Fail
+    If IsNumeric(value) Then
+        ToDouble = CDbl(value)
+    Else
+        ToDouble = defaultValue
+    End If
+    Exit Function
+Fail:
+    ToDouble = defaultValue
+End Function
+
+Private Function RowWithFallback(ByVal ws As Worksheet, ByVal rowIndex As Long, ByVal colIndex As Long, ByVal fallbackValue As Double) As Double
+    If colIndex <= 0 Then
+        RowWithFallback = fallbackValue
+        Exit Function
+    End If
+    Dim val As Variant
+    val = ws.Cells(rowIndex, colIndex).Value
+    If Len(Trim$(CStr(val))) = 0 Then
+        RowWithFallback = fallbackValue
+    ElseIf IsNumeric(val) Then
+        RowWithFallback = CDbl(val)
+    Else
+        RowWithFallback = fallbackValue
+    End If
+End Function
+
+Private Function DetermineBasePrice(ByVal vwapVal As Double, ByVal prevVal As Double) As Double
+    If vwapVal > 0# Then
+        DetermineBasePrice = vwapVal
+    ElseIf prevVal > 0# Then
+        DetermineBasePrice = prevVal
+    Else
+        DetermineBasePrice = 0#
+    End If
+End Function
+
+Private Sub ClearRowDynamicCells(ByVal ws As Worksheet, ByVal rowIndex As Long, ParamArray cols() As Variant)
+    Dim i As Long
+    For i = LBound(cols) To UBound(cols)
+        If IsNumeric(cols(i)) Then
+            If CLng(cols(i)) > 0 Then
+                ws.Cells(rowIndex, CLng(cols(i))).ClearContents
+            End If
+        End If
+    Next i
+End Sub
+
+Private Function ComputeVolFactor(ByVal gapAbsPct As Double, ByVal jAbs As Double, ByVal atrVal As Double) As Double
+    Dim factor As Double
+    factor = 1#
+    If gapAbsPct / 5# > 0.5 Then
+        factor = factor + 0.5
+    Else
+        factor = factor + gapAbsPct / 5#
+    End If
+    If jAbs / 3# > 0.4 Then
+        factor = factor + 0.4
+    Else
+        factor = factor + jAbs / 3#
+    End If
+    If atrVal > 0# Then
+        If atrVal / 30# > 0.3 Then
+            factor = factor + 0.3
+        Else
+            factor = factor + atrVal / 30#
+        End If
+    End If
+    If factor < 0.7 Then factor = 0.7
+    If factor > 1.8 Then factor = 1.8
+    ComputeVolFactor = factor
+End Function
+
+Private Function ClassifyVolFactor(ByVal factor As Double) As String
+    If factor >= 1.4 Then
+        ClassifyVolFactor = "HIGH"
+    ElseIf factor >= 1.0 Then
+        ClassifyVolFactor = "MID"
+    Else
+        ClassifyVolFactor = "LOW"
+    End If
+End Function
+
+Private Function ResolveRowBase(ByVal ws As Worksheet, ByVal rowIndex As Long, ByVal colIndex As Long, ByVal fallbackValue As Double) As Double
+    If colIndex <= 0 Then
+        ResolveRowBase = fallbackValue
+    Else
+        ResolveRowBase = RowWithFallback(ws, rowIndex, colIndex, fallbackValue)
+    End If
+End Function
+
 
 Private Sub SetColumnFormula(ByVal ws As Worksheet, ByVal col As Long, ByVal fillLast As Long, ByVal formulaR1C1 As String)
 
@@ -84,6 +223,318 @@ Private Sub SetColumnFormula(ByVal ws As Worksheet, ByVal col As Long, ByVal fil
 
     On Error GoTo 0
 
+End Sub
+
+Private Sub EnsureDashboardWatcher()
+    On Error Resume Next
+    If gDashboardWatcher Is Nothing Then
+        Set gDashboardWatcher = New cDashboardWatcher
+        Set gDashboardWatcher.App = Application
+    End If
+    On Error GoTo 0
+End Sub
+
+Public Sub OnDashboardCalculate(ByVal Sh As Worksheet)
+    On Error GoTo CleanExit
+    If Sh Is Nothing Then Exit Sub
+    If StrComp(Sh.Name, DASH2_SHEET, vbTextCompare) <> 0 Then Exit Sub
+    UpdateNkyTrend Sh
+    HandleThresholdAlerts Sh
+CleanExit:
+End Sub
+
+Private Sub EnsureAlertState()
+    If gThresholdState Is Nothing Then
+        Set gThresholdState = CreateObject("Scripting.Dictionary")
+        gThresholdState.CompareMode = vbTextCompare
+    End If
+    If gAlertCooldown Is Nothing Then
+        Set gAlertCooldown = CreateObject("Scripting.Dictionary")
+        gAlertCooldown.CompareMode = vbTextCompare
+    End If
+End Sub
+
+Private Sub EnsureStrategyRules()
+    If Not gStrategyRules Is Nothing Then Exit Sub
+    Set gStrategyRules = CreateObject("Scripting.Dictionary")
+    gStrategyRules.CompareMode = vbTextCompare
+    Dim rulesPath As String
+    rulesPath = ThisWorkbook.path & "\state\strategy_rules.ini"
+    Dim fso As Object
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If Not fso.FileExists(rulesPath) Then Exit Sub
+    On Error Resume Next
+    Dim stream As Object
+    Set stream = fso.OpenTextFile(rulesPath, 1, False)
+    If Err.Number <> 0 Then
+        Err.Clear
+        Exit Sub
+    End If
+    On Error GoTo 0
+    Do While Not stream.AtEndOfStream
+        Dim raw As String
+        raw = Trim$(stream.ReadLine)
+        If Len(raw) = 0 Then GoTo ContinueLoop
+        If Left$(raw, 1) = "#" Then GoTo ContinueLoop
+        Dim pos As Long: pos = InStr(1, raw, "=")
+        If pos > 1 Then
+            Dim key As String: key = Trim$(Left$(raw, pos - 1))
+            Dim val As String: val = Trim$(Mid$(raw, pos + 1))
+            If Len(key) > 0 Then gStrategyRules(key) = val
+        End If
+ContinueLoop:
+    Loop
+    stream.Close
+End Sub
+
+Private Function GetStrategyRule(ByVal key As String, ByVal defaultValue As String) As String
+    EnsureStrategyRules
+    If gStrategyRules Is Nothing Then
+        GetStrategyRule = defaultValue
+    ElseIf gStrategyRules.Exists(key) Then
+        GetStrategyRule = CStr(gStrategyRules(key))
+    Else
+        GetStrategyRule = defaultValue
+    End If
+End Function
+
+Private Function GetStrategyRuleDouble(ByVal key As String, ByVal defaultValue As Double) As Double
+    Dim raw As String
+    raw = GetStrategyRule(key, CStr(defaultValue))
+    On Error GoTo Fail
+    GetStrategyRuleDouble = CDbl(raw)
+    Exit Function
+Fail:
+    GetStrategyRuleDouble = defaultValue
+End Function
+
+Private Function CanFireAlert(ByVal key As String) As Boolean
+    EnsureAlertState
+    Dim cooldownMinutes As Double
+    cooldownMinutes = GetStrategyRuleDouble("alert_cooldown_min", DEFAULT_ALERT_COOLDOWN_MIN)
+    Dim cooldownDays As Double
+    cooldownDays = (cooldownMinutes / 60#) / 24#
+    If gAlertCooldown.Exists(key) Then
+        Dim lastVal As Double
+        lastVal = CDbl(gAlertCooldown(key))
+        If Now - lastVal < cooldownDays Then
+            CanFireAlert = False
+            Exit Function
+        End If
+    End If
+    gAlertCooldown(key) = CDbl(Now)
+    CanFireAlert = True
+End Function
+
+Private Sub RaiseThresholdAlert(ByVal ws As Worksheet, ByVal rowIndex As Long, ByVal ticker As String, ByVal side As String, ByVal ratio As Double)
+    Dim message As String
+    message = "THRESHOLD " & ticker & " " & side & " ratio " & Format$(ratio, "0.00")
+    Application.StatusBar = message
+    Dim entryStatusCol As Long
+    entryStatusCol = FindColumn(ws, DASH2_HEADER_ROW, "EntryStatus")
+    If entryStatusCol > 0 Then
+        ws.Cells(rowIndex, entryStatusCol).Value = "BLOCKED_ALERT " & Format$(Now, "HH:MM:SS")
+    End If
+End Sub
+
+Private Sub HandleThresholdAlerts(ByVal ws As Worksheet)
+    Dim tickerCol As Long: tickerCol = FindColumn(ws, DASH2_HEADER_ROW, HeaderTickerJP())
+    Dim sideCol As Long: sideCol = FindColumn(ws, DASH2_HEADER_ROW, "EntrySide")
+    Dim ratioCol As Long: ratioCol = FindColumn(ws, DASH2_HEADER_ROW, "J_ratio")
+    Dim jCol As Long: jCol = FindColumn(ws, DASH2_HEADER_ROW, HeaderJValueJP())
+    Dim jthCol As Long: jthCol = FindColumn(ws, DASH2_HEADER_ROW, HeaderJThJP())
+    If ratioCol = 0 Or tickerCol = 0 Or jCol = 0 Or jthCol = 0 Then Exit Sub
+    EnsureAlertState
+    Dim lastRow As Long
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    Dim r As Long
+    For r = DASH2_DATA_START To lastRow
+        Dim ticker As String
+        ticker = Trim$(CStr(ws.Cells(r, tickerCol).Value))
+        If Len(ticker) = 0 Then Exit For
+        Dim entrySide As String
+        entrySide = Trim$(CStr(ws.Cells(r, sideCol).Value))
+        If Len(entrySide) = 0 Then
+            Dim jVal As Double: jVal = ToDouble(ws.Cells(r, jCol).Value, 0#)
+            If jVal < 0# Then
+                entrySide = "BUY"
+            ElseIf jVal > 0# Then
+                entrySide = "SELL"
+            Else
+                entrySide = ""
+            End If
+        End If
+        If Len(entrySide) = 0 Then GoTo ContinueLoop
+        Dim ratio As Double
+        ratio = ToDouble(ws.Cells(r, ratioCol).Value, 0#)
+        Dim key As String
+        key = ticker & "|" & entrySide
+        Dim prevAbove As Boolean
+        prevAbove = False
+        If gThresholdState.Exists(key) Then
+            prevAbove = CBool(gThresholdState(key))
+        End If
+        Dim nowAbove As Boolean
+        nowAbove = (ratio >= 1#)
+        If nowAbove Then
+            If Not prevAbove Then
+                If CanFireAlert(key) Then
+                    RaiseThresholdAlert ws, r, ticker, entrySide, ratio
+                End If
+            End If
+            gThresholdState(key) = True
+        Else
+            gThresholdState(key) = False
+        End If
+ContinueLoop:
+    Next r
+End Sub
+
+Private Sub UpdateNkyHistory(ByVal currentPrice As Double)
+    If gNkyHistoryPrices Is Nothing Then
+        Set gNkyHistoryPrices = New Collection
+        Set gNkyHistoryTimes = New Collection
+    End If
+    Dim shouldAppend As Boolean
+    shouldAppend = False
+    If gLastHistoryRecord = 0# Then
+        shouldAppend = True
+    ElseIf Now - gLastHistoryRecord >= TimeSerial(0, 1, 0) Then
+        shouldAppend = True
+    End If
+    If shouldAppend Then
+        gNkyHistoryPrices.Add currentPrice
+        gNkyHistoryTimes.Add Now
+        gLastHistoryRecord = Now
+    End If
+    Do While gNkyHistoryPrices.Count > 15
+        gNkyHistoryPrices.Remove 1
+        gNkyHistoryTimes.Remove 1
+    Loop
+End Sub
+
+Private Sub UpdateNkyTrend(ByVal ws As Worksheet)
+    Dim nkyLastCol As Long: nkyLastCol = FindParamColumn(ws, "NKY_Last")
+    If nkyLastCol <= 0 Then Exit Sub
+    Dim currentPrice As Double: currentPrice = ToDouble(ws.Cells(2, nkyLastCol).Value, 0#)
+    If currentPrice <= 0# Then Exit Sub
+
+    Dim today As Date: today = Date
+    If gNkySessionDate <> today Or gNkySessionOpen <= 0# Then
+        gNkySessionDate = today
+        gNkySessionOpen = currentPrice
+        Set gNkyHistoryPrices = Nothing
+        Set gNkyHistoryTimes = Nothing
+        gLastHistoryRecord = 0#
+    End If
+
+    UpdateNkyHistory currentPrice
+
+    Dim openRet As Double
+    If gNkySessionOpen > 0# Then
+        openRet = (currentPrice - gNkySessionOpen) / gNkySessionOpen * 10000#
+    Else
+        openRet = 0#
+    End If
+
+    Dim historyCount As Long
+    If Not gNkyHistoryPrices Is Nothing Then
+        historyCount = gNkyHistoryPrices.Count
+    End If
+
+    Dim earliestPrice As Double
+    If historyCount >= 1 Then
+        earliestPrice = ToDouble(gNkyHistoryPrices(1), currentPrice)
+    Else
+        earliestPrice = gNkySessionOpen
+    End If
+
+    Dim windowRet As Double
+    If earliestPrice > 0# Then
+        windowRet = (currentPrice - earliestPrice) / earliestPrice * 10000#
+    Else
+        windowRet = openRet
+    End If
+
+    Dim initialThreshold As Double
+    initialThreshold = GetStrategyRuleDouble("nky_initial_bp", DEFAULT_NKY_INITIAL_BP)
+    Dim steadyThreshold As Double
+    steadyThreshold = GetStrategyRuleDouble("nky_steady_bp", DEFAULT_NKY_STEADY_BP)
+    Dim threshold As Double
+    If historyCount < 15 Then
+        threshold = initialThreshold
+    Else
+        threshold = steadyThreshold
+    End If
+
+    Dim trendDay As String
+    If Abs(openRet) >= threshold Then
+        trendDay = IIf(openRet > 0#, "up", "down")
+    Else
+        trendDay = "flat"
+    End If
+
+    Dim trendWindow As String
+    If historyCount >= 2 And Abs(windowRet) >= threshold Then
+        trendWindow = IIf(windowRet > 0#, "up", "down")
+    Else
+        trendWindow = trendDay
+    End If
+
+    Dim allowedSide As String
+    If trendWindow = "up" Then
+        allowedSide = "BUY"
+    ElseIf trendWindow = "down" Then
+        allowedSide = "SELL"
+    ElseIf trendDay = "up" Then
+        allowedSide = "BUY"
+    ElseIf trendDay = "down" Then
+        allowedSide = "SELL"
+    Else
+        allowedSide = "BOTH"
+    End If
+
+    gNkyTrendDay = trendDay
+    gNkyTrendWindow = trendWindow
+    gNkyAllowedSide = allowedSide
+
+    Dim dayCol As Long: dayCol = FindParamColumn(ws, "NKY_TrendDay")
+    Dim windowCol As Long: windowCol = FindParamColumn(ws, "NKY_TrendWindow")
+    Dim sideCol As Long: sideCol = FindParamColumn(ws, "NKY_AllowedSide")
+    If dayCol > 0 Then ws.Cells(2, dayCol).Value = trendDay
+    If windowCol > 0 Then ws.Cells(2, windowCol).Value = trendWindow
+    If sideCol > 0 Then ws.Cells(2, sideCol).Value = allowedSide
+    If allowedSide <> gLastOrderAllowedSide Then
+        CancelOppositeOrders allowedSide
+        gLastOrderAllowedSide = allowedSide
+    End If
+End Sub
+
+Private Sub CancelOppositeOrders(ByVal allowedSide As String)
+    If Len(allowedSide) = 0 Or allowedSide = "BOTH" Then Exit Sub
+    Dim cancelSide As String
+    If StrComp(allowedSide, "BUY", vbTextCompare) = 0 Then
+        cancelSide = "SELL"
+    ElseIf StrComp(allowedSide, "SELL", vbTextCompare) = 0 Then
+        cancelSide = "BUY"
+    Else
+        Exit Sub
+    End If
+    Dim sh As Worksheet
+    On Error Resume Next
+    Set sh = ThisWorkbook.Worksheets("Orders")
+    On Error GoTo 0
+    If sh Is Nothing Then Exit Sub
+    Dim lastRow As Long
+    lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
+    Dim r As Long
+    For r = 2 To lastRow
+        Dim orderSide As String
+        orderSide = UCase$(CStr(sh.Cells(r, 3).Value))
+        If orderSide = UCase$(cancelSide) Then
+            sh.Cells(r, 7).Value = "CANCELLED_AUTO"
+        End If
+    Next r
 End Sub
 
 
@@ -225,6 +676,26 @@ Public Sub SetupNewDashboardV2()
 
     ws.Cells(r, 18).Value = "OrderQtyPlan"
 
+    ws.Cells(r, 19).Value = "BiasSlope_row"
+
+    ws.Cells(r, 20).Value = "GapSlope_row"
+
+    ws.Cells(r, 21).Value = "CorrSlope_row"
+
+    ws.Cells(r, 22).Value = "TP_per_J_row"
+
+    ws.Cells(r, 23).Value = "SL_per_J_row"
+
+    ws.Cells(r, 24).Value = "Trail_per_J_row"
+
+    ws.Cells(r, 25).Value = "TP_per_J_eff"
+
+    ws.Cells(r, 26).Value = "SL_per_J_eff"
+
+    ws.Cells(r, 27).Value = "Trail_per_J_eff"
+
+    ws.Cells(r, 28).Value = "VolatilityTag"
+
 End Sub
 
 
@@ -242,6 +713,9 @@ Public Sub InstallRealtimeFormulasV2()
     On Error GoTo 0
 
     If ws Is Nothing Then Exit Sub
+
+    EnsureDashboardWatcher
+    UpdateNkyTrend ws
 
     Dim gapCol As Long: gapCol = FindColumn(ws, DASH2_HEADER_ROW, "Gap_bp")
 
@@ -263,6 +737,56 @@ Public Sub InstallRealtimeFormulasV2()
 
     End If
 
+    Dim ratioCol As Long: ratioCol = FindColumn(ws, DASH2_HEADER_ROW, "J_ratio")
+    Dim jCol As Long: jCol = FindColumn(ws, DASH2_HEADER_ROW, HeaderJValueJP())
+    Dim jthCol As Long: jthCol = FindColumn(ws, DASH2_HEADER_ROW, HeaderJThJP())
+    If ratioCol > 0 And jCol > 0 And jthCol > 0 Then
+        Dim ratioFormula As String
+        ratioFormula = "=IF(OR(RC[" & (jCol - ratioCol) & "]="""",RC[" & (jthCol - ratioCol) & "]="""",N(RC[" & (jthCol - ratioCol) & "])=0),"""",ABS(RC[" & (jCol - ratioCol) & "])/ABS(RC[" & (jthCol - ratioCol) & "]))"
+        SetColumnFormula ws, ratioCol, lastRow, ratioFormula
+        ApplyThresholdFormatting ws, jCol, ratioCol, lastRow
+    End If
+
+    Dim nkyDayParamCol As Long: nkyDayParamCol = FindParamColumn(ws, "NKY_TrendDay")
+    Dim nkyWindowParamCol As Long: nkyWindowParamCol = FindParamColumn(ws, "NKY_TrendWindow")
+    Dim nkyAllowedParamCol As Long: nkyAllowedParamCol = FindParamColumn(ws, "NKY_AllowedSide")
+
+    Dim nkyDayCol As Long: nkyDayCol = FindColumn(ws, DASH2_HEADER_ROW, "NKY_day_trend")
+    If nkyDayCol > 0 And nkyDayParamCol > 0 Then
+        Dim dayFormula As String
+        dayFormula = "=IF(R2C" & nkyDayParamCol & "="""","",R2C" & nkyDayParamCol & ")"
+        SetColumnFormula ws, nkyDayCol, lastRow, dayFormula
+    End If
+
+    Dim nkyWindowCol As Long: nkyWindowCol = FindColumn(ws, DASH2_HEADER_ROW, "NKY_window_trend")
+    If nkyWindowCol > 0 And nkyWindowParamCol > 0 Then
+        Dim windowFormula As String
+        windowFormula = "=IF(R2C" & nkyWindowParamCol & "="""","",R2C" & nkyWindowParamCol & ")"
+        SetColumnFormula ws, nkyWindowCol, lastRow, windowFormula
+    End If
+
+    Dim nkyAllowedCol As Long: nkyAllowedCol = FindColumn(ws, DASH2_HEADER_ROW, "NKY_allowed_side")
+    If nkyAllowedCol > 0 And nkyAllowedParamCol > 0 Then
+        Dim allowedFormula As String
+        allowedFormula = "=IF(R2C" & nkyAllowedParamCol & "="""","",R2C" & nkyAllowedParamCol & ")"
+        SetColumnFormula ws, nkyAllowedCol, lastRow, allowedFormula
+    End If
+
+End Sub
+
+Private Sub ApplyThresholdFormatting(ByVal ws As Worksheet, ByVal jCol As Long, ByVal ratioCol As Long, ByVal lastRow As Long)
+    On Error Resume Next
+    Dim rng As Range
+    Set rng = ws.Range(ws.Cells(DASH2_DATA_START, jCol), ws.Cells(lastRow, jCol))
+    rng.FormatConditions.Delete
+    Dim offset As Long: offset = ratioCol - jCol
+    Dim fcSoft As FormatCondition
+    Set fcSoft = rng.FormatConditions.Add(Type:=2, Formula1:="=AND(RC<>"""",RC[" & offset & "]<>"""",N(RC[" & offset & "])>=0.8,N(RC[" & offset & "])<1)")
+    fcSoft.Interior.Color = RGB(226, 239, 218)
+    Dim fcHard As FormatCondition
+    Set fcHard = rng.FormatConditions.Add(Type:=2, Formula1:="=AND(RC<>"""",RC[" & offset & "]<>"""",N(RC[" & offset & "])>=1)")
+    fcHard.Interior.Color = RGB(182, 215, 168)
+    On Error GoTo 0
 End Sub
 
 
@@ -272,8 +796,6 @@ End Sub
 ' Signals and Orders
 
 ' ----------------------------------------------------------------------------
-Private Const SLIPPAGE_FILE As String = "output\excel\slippage_overrides.csv"
-
 Private Function LoadSlippageOverrides() As Object
     Dim dict As Object
     Set dict = CreateObject("Scripting.Dictionary")
@@ -282,7 +804,7 @@ Private Function LoadSlippageOverrides() As Object
     Set fso = CreateObject("Scripting.FileSystemObject")
 
     Dim fullPath As String
-    fullPath = ThisWorkbook.Path & "\" & SLIPPAGE_FILE
+    fullPath = ThisWorkbook.Path & "\output\excel\slippage_overrides.csv"
     If Not fso.FileExists(fullPath) Then
         Set LoadSlippageOverrides = dict
         Exit Function
@@ -409,116 +931,235 @@ End Function
 Public Sub ApplyDynamicSignalsV2()
 
     Dim ws As Worksheet
-
     On Error Resume Next
-
     Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
-
     On Error GoTo 0
-
     If ws Is Nothing Then Exit Sub
 
+    EnsureParamFormulas ws
+    EnsureDashboardWatcher
+    UpdateNkyTrend ws
 
-
-    Dim lastRow As Long: lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
-
+    Dim lastRow As Long
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
     If lastRow < DASH2_DATA_START Then Exit Sub
 
-
-
+    Dim tickerCol As Long: tickerCol = FindColumn(ws, DASH2_HEADER_ROW, HeaderTickerJP())
     Dim jCol As Long: jCol = FindColumn(ws, DASH2_HEADER_ROW, HeaderJValueJP())
-
-    Dim jthCol As Long: jthCol = FindColumn(ws, DASH2_HEADER_ROW, HeaderJThJP()) ' treated as adjusted
-
+    Dim jthCol As Long: jthCol = FindColumn(ws, DASH2_HEADER_ROW, HeaderJThJP())
     Dim jthBaseCol As Long: jthBaseCol = FindColumn(ws, DASH2_HEADER_ROW, "J_th_base")
-
     Dim vwapCol As Long: vwapCol = FindColumn(ws, DASH2_HEADER_ROW, "VWAP")
-
     Dim prevCol As Long: prevCol = FindColumn(ws, DASH2_HEADER_ROW, "PrevClose")
-
+    Dim lastCol As Long: lastCol = FindColumn(ws, DASH2_HEADER_ROW, "Last")
     Dim gapCol As Long: gapCol = FindColumn(ws, DASH2_HEADER_ROW, "Gap_bp")
-
     Dim corrCol As Long: corrCol = FindColumn(ws, DASH2_HEADER_ROW, "CorrNKY")
-
+    Dim atrCol As Long: atrCol = FindColumn(ws, DASH2_HEADER_ROW, "ATR_n")
     Dim eBuyCol As Long: eBuyCol = FindColumn(ws, DASH2_HEADER_ROW, "EntryBuyPx")
-
     Dim eSellCol As Long: eSellCol = FindColumn(ws, DASH2_HEADER_ROW, "EntrySellPx")
-
     Dim sideCol As Long: sideCol = FindColumn(ws, DASH2_HEADER_ROW, "EntrySide")
+    Dim qtyCol As Long: qtyCol = FindColumn(ws, DASH2_HEADER_ROW, "OrderQtyPlan")
+    Dim tpCol As Long: tpCol = FindColumn(ws, DASH2_HEADER_ROW, "TP_price")
+    Dim slCol As Long: slCol = FindColumn(ws, DASH2_HEADER_ROW, "SL_price")
+    Dim trailCol As Long: trailCol = FindColumn(ws, DASH2_HEADER_ROW, "StopTrail")
+    Dim biasSlopeRowCol As Long: biasSlopeRowCol = FindColumn(ws, DASH2_HEADER_ROW, "BiasSlope_row")
+    Dim gapSlopeRowCol As Long: gapSlopeRowCol = FindColumn(ws, DASH2_HEADER_ROW, "GapSlope_row")
+    Dim corrSlopeRowCol As Long: corrSlopeRowCol = FindColumn(ws, DASH2_HEADER_ROW, "CorrSlope_row")
+    Dim tpRowCol As Long: tpRowCol = FindColumn(ws, DASH2_HEADER_ROW, "TP_per_J_row")
+    Dim slRowCol As Long: slRowCol = FindColumn(ws, DASH2_HEADER_ROW, "SL_per_J_row")
+    Dim trailRowCol As Long: trailRowCol = FindColumn(ws, DASH2_HEADER_ROW, "Trail_per_J_row")
+    Dim tpEffCol As Long: tpEffCol = FindColumn(ws, DASH2_HEADER_ROW, "TP_per_J_eff")
+    Dim slEffCol As Long: slEffCol = FindColumn(ws, DASH2_HEADER_ROW, "SL_per_J_eff")
+    Dim trailEffCol As Long: trailEffCol = FindColumn(ws, DASH2_HEADER_ROW, "Trail_per_J_eff")
+    Dim entryStatusCol As Long: entryStatusCol = FindColumn(ws, DASH2_HEADER_ROW, "EntryStatus")
+    Dim selCol As Long: selCol = FindColumn(ws, DASH2_HEADER_ROW, "Selected")
+    Dim batchKindCol As Long: batchKindCol = FindColumn(ws, DASH2_HEADER_ROW, "BatchKind")
+    Dim volTagCol As Long: volTagCol = FindColumn(ws, DASH2_HEADER_ROW, "VolatilityTag")
 
+    If tickerCol = 0 Or jCol = 0 Or jthCol = 0 Or jthBaseCol = 0 Then Exit Sub
 
+    Dim biasParamCol As Long: biasParamCol = FindParamColumn(ws, "Bias_bp")
+    Dim biasSlopeParamCol As Long: biasSlopeParamCol = FindParamColumn(ws, "BiasSlope")
+    Dim gapSlopeParamCol As Long: gapSlopeParamCol = FindParamColumn(ws, "GapSlope")
+    Dim corrSlopeParamCol As Long: corrSlopeParamCol = FindParamColumn(ws, "CorrSlope")
+    Dim gapBanParamCol As Long: gapBanParamCol = FindParamColumn(ws, "GapBanPct")
+    Dim tpParamCol As Long: tpParamCol = FindParamColumn(ws, "TP_per_J")
+    Dim slParamCol As Long: slParamCol = FindParamColumn(ws, "SL_per_J")
+    Dim trailParamCol As Long: trailParamCol = FindParamColumn(ws, "Trail_per_J")
+    Dim budgetParamCol As Long: budgetParamCol = FindParamColumn(ws, "BudgetPerTicker")
+    Dim lotSizeParamCol As Long: lotSizeParamCol = FindParamColumn(ws, "LotSize")
 
-    ' Parameter cells on row2 (row1 is labels)
+    Dim biasBpGlobal As Double: biasBpGlobal = GetParamDouble(ws, biasParamCol, 0#)
+    Dim biasSlopeGlobal As Double: biasSlopeGlobal = GetParamDouble(ws, biasSlopeParamCol, 0.1)
+    Dim gapSlopeGlobal As Double: gapSlopeGlobal = GetParamDouble(ws, gapSlopeParamCol, 0.2)
+    Dim corrSlopeGlobal As Double: corrSlopeGlobal = GetParamDouble(ws, corrSlopeParamCol, 0.05)
+    Dim gapBanPct As Double: gapBanPct = GetParamDouble(ws, gapBanParamCol, 3#)
+    Dim tpParam As Double: tpParam = GetParamDouble(ws, tpParamCol, 0.15)
+    Dim slParam As Double: slParam = GetParamDouble(ws, slParamCol, 0.1)
+    Dim trailParam As Double: trailParam = GetParamDouble(ws, trailParamCol, 0.1)
+    Dim budgetPerTicker As Double: budgetPerTicker = GetParamDouble(ws, budgetParamCol, 1000000#)
+    Dim lotSize As Double: lotSize = GetParamDouble(ws, lotSizeParamCol, 100#)
+    If lotSize <= 0# Then lotSize = 1#
 
-    Dim biasBpRef As String: biasBpRef = ws.Cells(2, 4).Address(False, False, xlR1C1) ' D2
+    Dim weeklySellRule As String: weeklySellRule = GetStrategyRule("weekly_sell", "allow")
+    Dim jcrossRequireDown As Boolean: jcrossRequireDown = (GetStrategyRule("jcross_sell_require_nky_down", "1") = "1")
+    Dim jcrossMinGap As Double: jcrossMinGap = GetStrategyRuleDouble("jcross_sell_min_gap_bp", 20#)
 
-    Dim biasSlopeRef As String: biasSlopeRef = ws.Cells(2, 5).Address(False, False, xlR1C1) ' E2
+    Dim r As Long
+    For r = DASH2_DATA_START To lastRow
+        Dim ticker As String: ticker = Trim$(CStr(ws.Cells(r, tickerCol).Value))
+        If ticker = "" Then
+            ws.Cells(r, jthCol).Value = ""
+            ClearRowDynamicCells ws, r, eBuyCol, eSellCol, sideCol, tpEffCol, slEffCol, trailEffCol, qtyCol, volTagCol
+            GoTo ContinueLoop
+        End If
 
-    Dim gapSlopeRef As String: gapSlopeRef = ws.Cells(2, 6).Address(False, False, xlR1C1)  ' F2
+        Dim baseJ As Double: baseJ = ToDouble(ws.Cells(r, jthBaseCol).Value, 0#)
+        If baseJ = 0# And Trim$(CStr(ws.Cells(r, jthBaseCol).Value)) = "" Then
+            ws.Cells(r, jthCol).Value = ""
+            ClearRowDynamicCells ws, r, eBuyCol, eSellCol, sideCol, tpEffCol, slEffCol, trailEffCol, qtyCol, volTagCol
+            GoTo ContinueLoop
+        End If
 
-    Dim gapBanRef As String: gapBanRef = ws.Cells(2, 7).Address(False, False, xlR1C1)      ' G2
+        Dim gapVal As Double: gapVal = ToDouble(ws.Cells(r, gapCol).Value, 0#)
+        Dim corrVal As Double: corrVal = ToDouble(ws.Cells(r, corrCol).Value, 0#)
+        Dim gapAbsPct As Double: gapAbsPct = Abs(gapVal) / 100#
 
-    Dim corrSlopeRef As String: corrSlopeRef = ws.Cells(2, 12).Address(False, False, xlR1C1) ' L2
+        If gapBanPct > 0# And gapAbsPct > gapBanPct Then
+            ws.Cells(r, jthCol).Value = "BAN"
+            ClearRowDynamicCells ws, r, eBuyCol, eSellCol, sideCol, tpEffCol, slEffCol, trailEffCol, qtyCol, volTagCol
+            If volTagCol > 0 Then ws.Cells(r, volTagCol).Value = "BAN"
+            GoTo ContinueLoop
+        End If
 
+        Dim biasSlopeVal As Double: biasSlopeVal = RowWithFallback(ws, r, biasSlopeRowCol, biasSlopeGlobal)
+        Dim gapSlopeVal As Double: gapSlopeVal = RowWithFallback(ws, r, gapSlopeRowCol, gapSlopeGlobal)
+        Dim corrSlopeVal As Double: corrSlopeVal = RowWithFallback(ws, r, corrSlopeRowCol, corrSlopeGlobal)
 
+        Dim adjJth As Double
+        adjJth = baseJ + biasSlopeVal * (biasBpGlobal / 100#) + gapSlopeVal * gapAbsPct + corrSlopeVal * corrVal * (biasBpGlobal / 100#)
+        ws.Cells(r, jthCol).Value = adjJth
 
-    ' J_th adjusted = base + BiasSlope*(Bias_bp/100) + GapSlope*abs(Gap%)+ CorrSlope*CorrNKY*(Bias_bp/100)
+        Dim vwapVal As Double: vwapVal = ToDouble(ws.Cells(r, vwapCol).Value, 0#)
+        Dim prevVal As Double: prevVal = ToDouble(ws.Cells(r, prevCol).Value, 0#)
+        Dim lastVal As Double: lastVal = 0#
+        If lastCol > 0 Then
+            lastVal = ToDouble(ws.Cells(r, lastCol).Value, 0#)
+        Else
+            lastVal = 0#
+        End If
+        Dim basePrice As Double: basePrice = DetermineBasePrice(vwapVal, prevVal)
+        If basePrice <= 0# Then basePrice = lastVal
 
-    If jthCol > 0 And jthBaseCol > 0 Then
+        If basePrice > 0# Then
+            If eBuyCol > 0 Then ws.Cells(r, eBuyCol).Value = basePrice - 0.001 * Abs(adjJth) * basePrice
+            If eSellCol > 0 Then ws.Cells(r, eSellCol).Value = basePrice + 0.001 * Abs(adjJth) * basePrice
+        Else
+            ClearRowDynamicCells ws, r, eBuyCol, eSellCol
+        End If
 
-        Dim gapExpr As String: gapExpr = BuildR1C1Ref(gapCol, jthCol)
+        Dim jVal As Double: jVal = ToDouble(ws.Cells(r, jCol).Value, 0#)
+        Dim entrySide As String
+        If jVal < 0# Then
+            entrySide = "BUY"
+        ElseIf jVal > 0# Then
+            entrySide = "SELL"
+        Else
+            entrySide = ""
+        End If
+        If sideCol > 0 Then
+            If entrySide = "" Then
+                ws.Cells(r, sideCol).ClearContents
+            Else
+                ws.Cells(r, sideCol).Value = entrySide
+            End If
+        End If
 
-        Dim corrExpr As String: corrExpr = BuildR1C1Ref(corrCol, jthCol)
+        Dim blockReason As String: blockReason = ""
+        Dim batchKindVal As String
+        If batchKindCol > 0 Then batchKindVal = Trim$(CStr(ws.Cells(r, batchKindCol).Value))
+        Dim signalModeVal As String
+        If colMode > 0 Then signalModeVal = Trim$(CStr(ws.Cells(r, colMode).Value))
+        Dim filterSide As String
+        filterSide = gNkyAllowedSide
+        If Len(filterSide) = 0 Then filterSide = "BOTH"
+        If entrySide <> "" And filterSide <> "BOTH" Then
+            If StrComp(entrySide, filterSide, vbTextCompare) <> 0 Then
+                blockReason = "BLOCKED_NKY_" & UCase$(filterSide)
+            End If
+        End If
+        Dim isWeekend As Boolean
+        isWeekend = (StrComp(batchKindVal, "weekend", vbTextCompare) = 0)
+        If blockReason = "" And entrySide = "SELL" And weeklySellRule = "disable" And isWeekend Then
+            blockReason = "BLOCKED_WEEKEND_SELL"
+        End If
+        If blockReason = "" And entrySide = "SELL" And StrComp(signalModeVal, "j-cross", vbTextCompare) = 0 Then
+            If jcrossRequireDown Then
+                If StrComp(gNkyTrendDay, "down", vbTextCompare) <> 0 And StrComp(gNkyTrendWindow, "down", vbTextCompare) <> 0 Then
+                    blockReason = "BLOCKED_JCROSS_NKY"
+                End If
+            End If
+            If blockReason = "" Then
+                Dim gapGate As Double
+                If gapCol > 0 Then gapGate = ToDouble(ws.Cells(r, gapCol).Value, 0#) Else gapGate = 0#
+                If Abs(gapGate) < jcrossMinGap Then
+                    blockReason = "BLOCKED_JCROSS_GAP"
+                End If
+            End If
+        End If
+        If blockReason <> "" Then
+            If selCol > 0 Then ws.Cells(r, selCol).Value = 0
+            If entryStatusCol > 0 Then ws.Cells(r, entryStatusCol).Value = blockReason
+            GoTo ContinueLoop
+        Else
+            If entryStatusCol > 0 Then
+                Dim curStatus As String: curStatus = CStr(ws.Cells(r, entryStatusCol).Value)
+                If Left$(curStatus, 7) = "BLOCKED" Then
+                    ws.Cells(r, entryStatusCol).ClearContents
+                    If selCol > 0 And ws.Cells(r, selCol).Value = 0 Then
+                        ws.Cells(r, selCol).Value = 1
+                    End If
+                End If
+            End If
+        End If
 
-        Dim baseRef As String: baseRef = BuildR1C1Ref(jthBaseCol, jthCol)
+        Dim priceForQty As Double: priceForQty = lastVal
+        If priceForQty <= 0# Then priceForQty = basePrice
+        Dim qty As Double
+        If priceForQty > 0# Then
+            qty = Int(budgetPerTicker / priceForQty / lotSize) * lotSize
+            If qty < 0# Then qty = 0#
+        Else
+            qty = 0#
+        End If
+        If qtyCol > 0 Then
+            If qty > 0# Then
+                ws.Cells(r, qtyCol).Value = qty
+            Else
+                ws.Cells(r, qtyCol).ClearContents
+            End If
+        End If
 
-        Dim jthF As String
+        Dim atrVal As Double: atrVal = ToDouble(ws.Cells(r, atrCol).Value, 0#)
+        Dim volFactor As Double: volFactor = ComputeVolFactor(gapAbsPct, Abs(jVal), atrVal)
+        If volTagCol > 0 Then ws.Cells(r, volTagCol).Value = ClassifyVolFactor(volFactor)
 
-        jthF = "=IF(ABS(" & gapExpr & ")/100>" & gapBanRef & "," & DQ & "BAN" & DQ & "," & baseRef & "+(" & biasSlopeRef & ")*" & biasBpRef & "/100+(" & gapSlopeRef & ")*ABS(" & gapExpr & ")/100+(" & corrSlopeRef & ")*" & corrExpr & "*" & biasBpRef & "/100)"
+        Dim tpBase As Double: tpBase = ResolveRowBase(ws, r, tpRowCol, tpParam)
+        Dim slBase As Double: slBase = ResolveRowBase(ws, r, slRowCol, slParam)
+        Dim trailBase As Double: trailBase = ResolveRowBase(ws, r, trailRowCol, trailParam)
 
-        SetColumnFormula ws, jthCol, lastRow, jthF
+        Dim tpEff As Double: tpEff = Round(tpBase * volFactor, 4)
+        Dim slEff As Double: slEff = Round(slBase * volFactor, 4)
+        Dim trailEff As Double: trailEff = Round(trailBase * volFactor, 4)
 
-    End If
+        If tpRowCol > 0 Then ws.Cells(r, tpRowCol).Value = tpBase
+        If slRowCol > 0 Then ws.Cells(r, slRowCol).Value = slBase
+        If trailRowCol > 0 Then ws.Cells(r, trailRowCol).Value = trailBase
+        If tpEffCol > 0 Then ws.Cells(r, tpEffCol).Value = tpEff
+        If slEffCol > 0 Then ws.Cells(r, slEffCol).Value = slEff
+        If trailEffCol > 0 Then ws.Cells(r, trailEffCol).Value = trailEff
 
-
-
-    If eBuyCol > 0 And eSellCol > 0 And vwapCol > 0 And jthCol > 0 Then
-
-        Dim vwapEB As String: vwapEB = BuildR1C1Ref(vwapCol, eBuyCol)
-
-        Dim vwapES As String: vwapES = BuildR1C1Ref(vwapCol, eSellCol)
-
-        Dim jthEB As String: jthEB = BuildR1C1Ref(jthCol, eBuyCol)
-
-        Dim baseB As String: baseB = "IF(" & vwapEB & "=" & DQ & DQ & ",RC[" & (prevCol - eBuyCol) & "]," & vwapEB & ")"
-
-        Dim baseS As String: baseS = "IF(" & vwapES & "=" & DQ & DQ & ",RC[" & (prevCol - eSellCol) & "]," & vwapES & ")"
-
-        Dim k As String: k = "0.001"
-
-        Dim eBuyF As String
-
-        Dim eSellF As String
-
-        eBuyF = "=IF(OR(" & baseB & "=" & DQ & DQ & "," & jthEB & "=" & DQ & DQ & "," & jthEB & "=" & DQ & "BAN" & DQ & ")," & DQ & DQ & ",(" & baseB & ")-" & k & "*ABS(" & jthEB & ")*" & baseB & ")"
-
-        eSellF = "=IF(OR(" & baseS & "=" & DQ & DQ & "," & jthEB & "=" & DQ & DQ & "," & jthEB & "=" & DQ & "BAN" & DQ & ")," & DQ & DQ & ",(" & baseS & ")+" & k & "*ABS(" & jthEB & ")*" & baseS & ")"
-
-        SetColumnFormula ws, eBuyCol, lastRow, eBuyF
-
-        SetColumnFormula ws, eSellCol, lastRow, eSellF
-
-    End If
-
-
-
-    If sideCol > 0 And jCol > 0 Then
-
-        Dim jSide As String: jSide = BuildR1C1Ref(jCol, sideCol)
-
-        SetColumnFormula ws, sideCol, lastRow, "=IF(" & jSide & "<0," & DQ & "BUY" & DQ & ",IF(" & jSide & ">0," & DQ & "SELL" & DQ & "," & DQ & DQ & "))"
-
-    End If
+ContinueLoop:
+    Next r
 
 End Sub
 
@@ -900,12 +1541,12 @@ Private Sub ApplyJapaneseLabelsV2(ByVal ws As Worksheet)
     Dim labels As Variant
 
     labels = Array("Ticker", "Name", "J_th_base", "J_th", "J", "PrevClose", "VWAP", "OrderQtyPlan", "Selected", _
-
-                   "EntryBuyPx", "EntrySellPx", "EntrySide", "EntryStatus", "TP_price", "SL_price", "StopTrail", "SettleStatus", "BestBid", "BestAsk", "Gap_bp", "CorrNKY")
+                   "EntryBuyPx", "EntrySellPx", "EntrySide", "EntryStatus", "TP_price", "SL_price", "StopTrail", "SettleStatus", "BestBid", "BestAsk", "Gap_bp", "CorrNKY", _
+                   "BiasSlope_row", "GapSlope_row", "CorrSlope_row", "TP_per_J_row", "SL_per_J_row", "Trail_per_J_row", "TP_per_J_eff", "SL_per_J_eff", "Trail_per_J_eff", "VolatilityTag")
 
     Dim i As Long
 
-    For i = 1 To 20
+    For i = 1 To UBound(labels) + 1
 
         ws.Cells(4, i).Value = labels(i - 1)
 
@@ -925,7 +1566,8 @@ Private Sub ReorderHeadersV2(ByVal ws As Worksheet)
 
     Dim order As Variant
 
-    order = Array("Ticker", "Name", "J_th_base", "J_th", "J", "PrevClose", "VWAP", "OrderQtyPlan", "Selected", "EntryBuyPx", "EntrySellPx", "EntrySide", "EntryStatus", "TP_price", "SL_price", "StopTrail", "SettleStatus", "BestBid", "BestAsk", "Gap_bp", "CorrNKY")
+    order = Array("Ticker", "Name", "J_th_base", "J_th", "J", "PrevClose", "VWAP", "OrderQtyPlan", "Selected", "EntryBuyPx", "EntrySellPx", "EntrySide", "EntryStatus", "TP_price", "SL_price", "StopTrail", "SettleStatus", "BestBid", "BestAsk", "Gap_bp", "CorrNKY", _
+                  "BiasSlope_row", "GapSlope_row", "CorrSlope_row", "TP_per_J_row", "SL_per_J_row", "Trail_per_J_row", "TP_per_J_eff", "SL_per_J_eff", "Trail_per_J_eff", "VolatilityTag")
 
     Dim c As Long
 
@@ -1028,6 +1670,12 @@ Public Sub ImportCandidatesV2()
     Dim colExp As Long: colExp = FindColumn(ws, DASH2_HEADER_ROW, "ExpBp")
 
     Dim colAtr As Long: colAtr = FindColumn(ws, DASH2_HEADER_ROW, "ATR_n")
+    Dim colBiasSlope As Long: colBiasSlope = FindColumn(ws, DASH2_HEADER_ROW, "BiasSlope_row")
+    Dim colGapSlope As Long: colGapSlope = FindColumn(ws, DASH2_HEADER_ROW, "GapSlope_row")
+    Dim colCorrSlope As Long: colCorrSlope = FindColumn(ws, DASH2_HEADER_ROW, "CorrSlope_row")
+    Dim colTpRow As Long: colTpRow = FindColumn(ws, DASH2_HEADER_ROW, "TP_per_J_row")
+    Dim colSlRow As Long: colSlRow = FindColumn(ws, DASH2_HEADER_ROW, "SL_per_J_row")
+    Dim colTrailRow As Long: colTrailRow = FindColumn(ws, DASH2_HEADER_ROW, "Trail_per_J_row")
 
     Dim colTpk As Long: colTpk = FindColumn(ws, DASH2_HEADER_ROW, "TPk")
 
@@ -1038,6 +1686,7 @@ Public Sub ImportCandidatesV2()
     Dim colSession As Long: colSession = FindColumn(ws, DASH2_HEADER_ROW, "session")
 
     Dim colPlan As Long: colPlan = FindColumn(ws, DASH2_HEADER_ROW, "plan_tag")
+    Dim colBatchKind As Long: colBatchKind = FindColumn(ws, DASH2_HEADER_ROW, "BatchKind")
 
     Dim maxExisting As Long: maxExisting = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
 
@@ -1045,11 +1694,15 @@ Public Sub ImportCandidatesV2()
 
     Dim idxTicker As Long, idxJtb As Long, idxPf As Long, idxCi As Long, idxTrades As Long, idxExpBp As Long
 
-    Dim idxAtr As Long, idxTpk As Long, idxSlk As Long, idxMode As Long, idxSession As Long, idxPlan As Long
+    Dim idxAtr As Long, idxTpk As Long, idxSlk As Long, idxMode As Long, idxSession As Long, idxPlan As Long, idxBatchKind As Long
+    Dim idxBiasSlope As Long, idxGapSlope As Long, idxCorrSlope As Long
+    Dim idxTpRow As Long, idxSlRow As Long, idxTrailRow As Long
 
     idxTicker = -1: idxJtb = -1: idxPf = -1: idxCi = -1: idxTrades = -1: idxExpBp = -1
 
-    idxAtr = -1: idxTpk = -1: idxSlk = -1: idxMode = -1: idxSession = -1: idxPlan = -1
+    idxAtr = -1: idxTpk = -1: idxSlk = -1: idxMode = -1: idxSession = -1: idxPlan = -1: idxBatchKind = -1
+    idxBiasSlope = -1: idxGapSlope = -1: idxCorrSlope = -1
+    idxTpRow = -1: idxSlRow = -1: idxTrailRow = -1
 
     Dim hdr As Variant
     Do While Not EOF(f)
@@ -1098,6 +1751,13 @@ Public Sub ImportCandidatesV2()
                 If h = "session" Then idxSession = i
 
                 If h = "plan_tag" Then idxPlan = i
+                If h = "batchkind" Or h = "batch_kind" Then idxBatchKind = i
+                If h = "bias_slope" Or h = "biasslope" Then idxBiasSlope = i
+                If h = "gap_slope" Or h = "gapslope" Then idxGapSlope = i
+                If h = "corr_slope" Or h = "corrslope" Then idxCorrSlope = i
+                If h = "tp_per_j" Or h = "tp_per_j_row" Then idxTpRow = i
+                If h = "sl_per_j" Or h = "sl_per_j_row" Then idxSlRow = i
+                If h = "trail_per_j" Or h = "trail_per_j_row" Then idxTrailRow = i
 
             Next i
 
@@ -1160,6 +1820,26 @@ Public Sub ImportCandidatesV2()
                     If idxSession >= 0 And idxSession <= UBound(parts) And colSession > 0 Then ws.Cells(r, colSession).Value = Trim$(parts(idxSession))
 
                     If idxPlan >= 0 And idxPlan <= UBound(parts) And colPlan > 0 Then ws.Cells(r, colPlan).Value = Trim$(parts(idxPlan))
+                    If idxBatchKind >= 0 And idxBatchKind <= UBound(parts) And colBatchKind > 0 Then ws.Cells(r, colBatchKind).Value = Trim$(parts(idxBatchKind))
+
+                    If idxBiasSlope >= 0 And idxBiasSlope <= UBound(parts) And colBiasSlope > 0 Then
+                        ws.Cells(r, colBiasSlope).Value = ToDouble(Trim$(parts(idxBiasSlope)), 0#)
+                    End If
+                    If idxGapSlope >= 0 And idxGapSlope <= UBound(parts) And colGapSlope > 0 Then
+                        ws.Cells(r, colGapSlope).Value = ToDouble(Trim$(parts(idxGapSlope)), 0#)
+                    End If
+                    If idxCorrSlope >= 0 And idxCorrSlope <= UBound(parts) And colCorrSlope > 0 Then
+                        ws.Cells(r, colCorrSlope).Value = ToDouble(Trim$(parts(idxCorrSlope)), 0#)
+                    End If
+                    If idxTpRow >= 0 And idxTpRow <= UBound(parts) And colTpRow > 0 Then
+                        ws.Cells(r, colTpRow).Value = ToDouble(Trim$(parts(idxTpRow)), 0#)
+                    End If
+                    If idxSlRow >= 0 And idxSlRow <= UBound(parts) And colSlRow > 0 Then
+                        ws.Cells(r, colSlRow).Value = ToDouble(Trim$(parts(idxSlRow)), 0#)
+                    End If
+                    If idxTrailRow >= 0 And idxTrailRow <= UBound(parts) And colTrailRow > 0 Then
+                        ws.Cells(r, colTrailRow).Value = ToDouble(Trim$(parts(idxTrailRow)), 0#)
+                    End If
 
                     r = r + 1
 
@@ -1207,6 +1887,18 @@ Public Sub ImportCandidatesV2()
 
             If colPlan > 0 Then ws.Cells(clearRow, colPlan).ClearContents
 
+            If colBiasSlope > 0 Then ws.Cells(clearRow, colBiasSlope).ClearContents
+
+            If colGapSlope > 0 Then ws.Cells(clearRow, colGapSlope).ClearContents
+
+            If colCorrSlope > 0 Then ws.Cells(clearRow, colCorrSlope).ClearContents
+
+            If colTpRow > 0 Then ws.Cells(clearRow, colTpRow).ClearContents
+
+            If colSlRow > 0 Then ws.Cells(clearRow, colSlRow).ClearContents
+
+            If colTrailRow > 0 Then ws.Cells(clearRow, colTrailRow).ClearContents
+
         Next clearRow
 
     End If
@@ -1218,8 +1910,10 @@ Public Sub ImportCandidatesV2()
 End Sub
 
 
-
-
-
-
-
+Private Sub EnsureParamFormulas(ByVal ws As Worksheet)
+    On Error Resume Next
+    ws.Cells(2, 2).FormulaR1C1Local = '=IF(RC[-1]="", "", IFERROR(RssIndexMarket(RC[-1],"現在値"),""))'
+    ws.Cells(2, 3).FormulaR1C1Local = '=IF(RC[-2]="", "", IFERROR(RssIndexMarket(RC[-2],"騰落率"),""))'
+    ws.Cells(2, 4).FormulaR1C1 = "=(RC[-1])*100"
+    On Error GoTo 0
+End Sub

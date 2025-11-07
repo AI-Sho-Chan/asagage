@@ -156,6 +156,7 @@ def aggregate_candidates(frames: List[pd.DataFrame], out_path: Path, *, min_forw
     out_path.parent.mkdir(parents=True, exist_ok=True)
     if "_score" in df.columns:
         df = df.drop(columns=["_score"])
+    df["BatchKind"] = run_type
     df.to_csv(out_path, index=False, encoding="utf-8-sig")
 
     latest = Path("output/excel") / "weekly_candidates_latest.csv"
@@ -174,6 +175,68 @@ def aggregate_candidates(frames: List[pd.DataFrame], out_path: Path, *, min_forw
     summary["avg_expected_return"] = ensure_numeric_mean(df, c("forward_exp_boot_mean"))
     summary["avg_forward_trades"] = ensure_numeric_mean(df, c("forward_trades"), decimals=2)
     return summary
+
+
+def enrich_dashboard_columns(csv_path: Path, coeff_path: Path) -> None:
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return
+    if df.empty:
+        return
+
+    if coeff_path.exists():
+        try:
+            coeff_df = pd.read_csv(coeff_path)
+        except Exception:
+            coeff_df = None
+    if coeff_df is not None and not coeff_df.empty:
+        coeff_df = coeff_df.rename(
+            columns={
+                "bias_slope": "BiasSlope_row",
+                "gap_slope": "GapSlope_row",
+                "corr_slope": "CorrSlope_row",
+            }
+        )
+        keep_cols = ["Ticker", "BiasSlope_row", "GapSlope_row", "CorrSlope_row"]
+        coeff_df = coeff_df[[c for c in keep_cols if c in coeff_df.columns]]
+        if "Ticker" in coeff_df.columns:
+            df = df.merge(coeff_df, on="Ticker", how="left")
+
+    for col, default in (
+        ("BiasSlope_row", 0.1),
+        ("GapSlope_row", 0.2),
+        ("CorrSlope_row", 0.05),
+    ):
+        if col not in df.columns:
+            df[col] = default
+        else:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(default)
+
+    if "TP_per_J_row" not in df.columns:
+        df["TP_per_J_row"] = df.get("TPk")
+    df["TP_per_J_row"] = pd.to_numeric(df["TP_per_J_row"], errors="coerce")
+    if "TPk" in df.columns:
+        df["TP_per_J_row"] = df["TP_per_J_row"].fillna(pd.to_numeric(df["TPk"], errors="coerce"))
+    df["TP_per_J_row"] = df["TP_per_J_row"].fillna(0.15)
+
+    if "SL_per_J_row" not in df.columns:
+        df["SL_per_J_row"] = df.get("SLk")
+    df["SL_per_J_row"] = pd.to_numeric(df["SL_per_J_row"], errors="coerce")
+    if "SLk" in df.columns:
+        df["SL_per_J_row"] = df["SL_per_J_row"].fillna(pd.to_numeric(df["SLk"], errors="coerce"))
+    df["SL_per_J_row"] = df["SL_per_J_row"].fillna(0.1)
+
+    if "Trail_per_J_row" not in df.columns:
+        df["Trail_per_J_row"] = df["SL_per_J_row"]
+    df["Trail_per_J_row"] = pd.to_numeric(df["Trail_per_J_row"], errors="coerce").fillna(df["SL_per_J_row"])
+    df["Trail_per_J_row"] = df["Trail_per_J_row"].fillna(0.1)
+
+    for eff_col in ("TP_per_J_eff", "SL_per_J_eff", "Trail_per_J_eff", "VolatilityTag"):
+        if eff_col not in df.columns:
+            df[eff_col] = ""
+
+    df.to_csv(csv_path, index=False, encoding="utf-8-sig")
 
 
 def ensure_dashboard_formulas(repo_root: Path) -> None:
@@ -358,6 +421,8 @@ def _main_impl() -> None:
     ap.add_argument("--enable-bayes", action="store_true", help="Pass --enable-bayes to refine runs")
     ap.add_argument("--bayes-trials", type=int, default=40, help="Bayesian trials per refine run when enabled")
     ap.add_argument("--bayes-timeout", type=int, default=0, help="Bayesian timeout seconds (0=disabled)")
+    ap.add_argument("--coeff-history-days", type=int, default=60, help="Trading days used for dashboard coefficient regression")
+    ap.add_argument("--disable-dashboard-coeffs", action="store_true", help="Skip coefficient refresh/merge")
     ap.add_argument("--mask-ineffective", action="store_true", help="Enable ineffective-band masking during coarse runs")
     ap.add_argument("--mask-window", type=int, default=20, help="Mask history window (runs)")
     ap.add_argument("--mask-threshold", type=float, default=1.05, help="Forward pf_eff threshold for mask retention")
@@ -858,6 +923,24 @@ def _main_impl() -> None:
                 pass
         except SystemExit:
             pass
+
+    coeff_latest = repo_root / "output/excel/dashboard_coeffs_latest.csv"
+    if not args.disable_dashboard_coeffs:
+        try:
+            run(
+                [
+                    sys.executable,
+                    "tools/compute_dashboard_coeffs.py",
+                    "--codes-file",
+                    str(out_all),
+                    "--history-days",
+                    str(args.coeff_history_days),
+                ],
+                cwd=repo_root,
+            )
+        except SystemExit:
+            pass
+    enrich_dashboard_columns(out_all, coeff_latest)
 
     ensure_dashboard_formulas(repo_root)
 
