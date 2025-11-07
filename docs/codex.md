@@ -5,6 +5,7 @@
 - When changes are required, take a timestamped copy (e.g. `SHINSOKU_work_YYYYMMDD_HHMMSS.xlsm`). Modify XML or `.bas` files offline (zip/unzip), validate, then replace the production file and keep the previous version as backup.
 - Use `python scripts/repair_realtime_formulas.py` to reapply dashboard formulas (I/J/K/N/O/P/Q/R/S/T columns) whenever formulas are lost.
 - When AutoTrader.bas is updated, import via `python scripts/excel_install_macros.py C:/AI/asagake/SHINSOKU.xlsm C:/AI/asagake/AutoTrader.bas` instead of using the VBA editor.
+- For dashboard構成の修正や V2 レイアウト更新は、必ず `python scripts/repair_asagake_dashboard.py --excel C:/AI/asagake/ASAGAKE.xlsm` → `python scripts/excel_install_macros.py C:/AI/asagake/ASAGAKE.xlsm excel/AutoTraderAdvanced.bas excel/cDashboardWatcher.cls` の手順で行い、Excel/VBE は開かない（貼付エラー防止のため）。
 - Always log the source backup and the applied changes in `docs/handover_YYYYMMDD.md`.
 
 ## Backup Expectations
