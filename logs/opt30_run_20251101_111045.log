@@ -1,0 +1,25 @@
+[2025-11-01 11:10:45] Run started
+[2025-11-01 11:10:45] Run type resolved to weekend
+[2025-11-01 11:10:46] Codes limited via output\bt30\NIGHTLY_20251101\RUN_coarse_AM0930_j-cross\_TOP_CANDIDATES.csv: 27 tickers (was 20)
+[2025-11-01 11:11:04] Fetching Yahoo Finance 1m bars for 27 tickers (lookback=60, chunk=5)
+[2025-11-01 11:11:48] Entry window marks set: 25887 rows flagged out of 316964
+[2025-11-01 11:11:48] Liquidity filter q=0.50 kept 23 tickers and 165042 rows
+[2025-11-01 11:11:48] Using 5 rolling slices (train=12, forward=4)
+[2025-11-01 11:11:48] Parameter grid size: 9072 (mode=refine, signal=j-cross)
+[2025-11-01 13:12:00] [1/23] 1360.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=20/7
+[2025-11-01 13:22:26] [2/23] 4004.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-01 13:35:51] [3/23] 1357.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=32/18
+[2025-11-01 13:38:14] [4/23] 1570.T: best train_pf_eff=999.000, forward_pf_eff=11.950, trades=21/13
+[2025-11-01 13:40:01] [5/23] 6503.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=13/1
+[2025-11-01 14:15:14] [6/23] 6963.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-01 14:54:40] [7/23] 5706.T: best train_pf_eff=1.440, forward_pf_eff=999.000, trades=20/9
+[2025-11-01 15:03:55] [8/23] 5016.T: best train_pf_eff=2.100, forward_pf_eff=999.000, trades=42/14
+[2025-11-01 15:07:36] [9/23] 6501.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=34/6
+[2025-11-01 15:57:21] [10/23] 7832.T: best train_pf_eff=999.000, forward_pf_eff=0.000, trades=4/0
+[2025-11-01 16:14:18] [11/23] 8002.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=15/5
+[2025-11-01 16:22:40] [12/23] 6981.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=9/3
+[2025-11-01 17:10:50] [13/23] 6758.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=27/6
+[2025-11-01 17:56:27] [14/23] 7011.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=53/9
+[2025-11-01 18:01:54] [15/23] 7012.T: best train_pf_eff=2.691, forward_pf_eff=999.000, trades=57/8
+[2025-11-01 18:18:34] [16/23] 9503.T: best train_pf_eff=999.000, forward_pf_eff=0.000, trades=8/0
+[2025-11-01 18:45:12] [17/23] 7267.T: best train_pf_eff=0.525, forward_pf_eff=999.000, trades=25/4

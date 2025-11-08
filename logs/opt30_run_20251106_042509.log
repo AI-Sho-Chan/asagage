@@ -1,0 +1,24 @@
+[2025-11-06 04:25:09] Run started
+[2025-11-06 04:25:09] Run type resolved to weekend
+[2025-11-06 04:25:10] Codes limited via C:\AI\asagake\output\bt30\WEEKLY_\NIGHTLY_20251106\RUN_coarse_AM0930_j-cross\_TOP_CANDIDATES.csv: 10 tickers (was 20)
+[2025-11-06 04:25:13] Fetching Yahoo Finance 1m bars for 10 tickers (lookback=60, chunk=5)
+[2025-11-06 04:25:42] Fetching Yahoo Finance 1m bars for 1 tickers (lookback=60, chunk=5)
+[2025-11-06 04:26:06] Entry window marks set: 9752 rows flagged out of 119973
+[2025-11-06 04:26:06] Liquidity filter q=0.50 kept 10 tickers and 61760 rows
+[2025-11-06 04:26:06] Using 5 rolling slices (train=12, forward=4)
+[2025-11-06 04:26:06] Parameter grid size: 24 (mode=refine, signal=j-cross)
+[2025-11-06 04:26:19] [1/10] 6525.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-06 04:26:31] [2/10] 6526.T: best train_pf_eff=2.789, forward_pf_eff=999.000, trades=18/5
+[2025-11-06 04:26:40] [3/10] 285A.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=7/5
+[2025-11-06 04:26:42] [4/10] 5801.T: best train_pf_eff=2.301, forward_pf_eff=0.651, trades=9/3
+[2025-11-06 04:26:52] [5/10] 6857.T: best train_pf_eff=2.441, forward_pf_eff=3.695, trades=23/11
+[2025-11-06 04:26:53] [6/10] 5016.T: best train_pf_eff=3.456, forward_pf_eff=999.000, trades=17/7
+[2025-11-06 04:26:53] [7/10] 7012.T: best train_pf_eff=0.843, forward_pf_eff=0.000, trades=2/0
+[2025-11-06 04:26:53] [8/10] 8411.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-06 04:27:01] [9/10] 8136.T: best train_pf_eff=0.874, forward_pf_eff=2.847, trades=44/9
+[2025-11-06 04:27:02] [10/10] 8035.T: best train_pf_eff=2.880, forward_pf_eff=3.326, trades=17/6
+[2025-11-06 04:27:02] Cache reuse: 0/461 combos (0.0%) served from cache
+[2025-11-06 04:27:02] Bayesian refine trials executed: 221
+[2025-11-06 04:27:02] Refine candidates exported to output\excel\NIGHTLY_20251106\AM0930_j-cross\candidates_20251106.csv
+[2025-11-06 04:27:02] Excel summary written to C:\AI\asagake\output\bt30\WEEKLY_\NIGHTLY_20251106\RUN_refine_AM0930_j-cross\summary_20251106_042702.xlsx
+[2025-11-06 04:27:02] Run completed in 1.9 minutes

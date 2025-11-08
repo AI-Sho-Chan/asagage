@@ -1,0 +1,24 @@
+[2025-11-09 00:13:45] Run started
+[2025-11-09 00:13:45] Run type resolved to weekend
+[2025-11-09 00:13:51] Entry window marks set: 20820 rows flagged out of 213231
+[2025-11-09 00:13:51] Liquidity filter q=0.50 kept 15 tickers and 110879 rows
+[2025-11-09 00:13:51] Using 5 rolling slices (train=12, forward=4)
+[2025-11-09 00:13:51] Parameter grid size: 288 (mode=coarse, signal=j-cross)
+[2025-11-09 00:14:56] [1/15] 5706.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=3/1
+[2025-11-09 00:15:42] [2/15] 1357.T: best train_pf_eff=0.000, forward_pf_eff=1.779, trades=0/2
+[2025-11-09 00:16:04] [3/15] 285A.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=24/10
+[2025-11-09 00:16:13] [4/15] 6525.T: best train_pf_eff=1.516, forward_pf_eff=1.516, trades=6/2
+[2025-11-09 00:16:44] [5/15] 5801.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=9/3
+[2025-11-09 00:16:53] [6/15] 6526.T: best train_pf_eff=0.346, forward_pf_eff=2.638, trades=22/6
+[2025-11-09 00:16:55] [7/15] 6857.T: best train_pf_eff=3.931, forward_pf_eff=3.943, trades=35/8
+[2025-11-09 00:16:57] [8/15] 5016.T: best train_pf_eff=1.270, forward_pf_eff=0.000, trades=20/0
+[2025-11-09 00:17:05] [9/15] 7014.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-09 00:17:28] [10/15] 7735.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=4/2
+[2025-11-09 00:17:37] [11/15] 7012.T: best train_pf_eff=0.445, forward_pf_eff=0.000, trades=23/4
+[2025-11-09 00:17:44] [12/15] 9432.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-09 00:18:19] [13/15] 8035.T: best train_pf_eff=0.057, forward_pf_eff=0.159, trades=19/10
+[2025-11-09 00:18:25] [14/15] 8136.T: best train_pf_eff=3.678, forward_pf_eff=6.525, trades=18/7
+[2025-11-09 00:18:26] [15/15] 8411.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=6/2
+[2025-11-09 00:18:26] Cache reuse: 0/1440 combos (0.0%) served from cache
+[2025-11-09 00:18:26] ASHA pruned 2880 parameter combos prior to full evaluation
+[2025-11-09 00:18:26] Run completed in 4.7 minutes

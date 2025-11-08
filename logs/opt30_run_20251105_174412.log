@@ -1,0 +1,18 @@
+[2025-11-05 17:44:12] Run started
+[2025-11-05 17:44:12] Run type resolved to weekday
+[2025-11-05 17:44:13] Low-priority gating removed 16 tickers (remaining 4)
+[2025-11-05 17:44:16] Fetching Yahoo Finance 1m bars for 4 tickers (lookback=60, chunk=5)
+[2025-11-05 17:44:41] Fetching Yahoo Finance 1m bars for 1 tickers (lookback=60, chunk=5)
+[2025-11-05 17:45:09] Entry window marks set: 3643 rows flagged out of 44353
+[2025-11-05 17:45:09] Liquidity filter q=0.50 kept 4 tickers and 24205 rows
+[2025-11-05 17:45:09] Using 5 rolling slices (train=12, forward=4)
+[2025-11-05 17:45:09] Parameter grid size: 240 (mode=coarse, signal=j-cross)
+[2025-11-05 17:45:09] Ineffective-band mask removed 48 combos for J_th values [0.3, 0.4, 0.6, 0.7, 0.8]
+[2025-11-05 17:45:27] [1/4] 7269.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-05 17:45:27] [2/4] 1357.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-05 17:46:00] [3/4] 6857.T: best train_pf_eff=2.682, forward_pf_eff=2.927, trades=35/12
+[2025-11-05 17:46:00] [4/4] 8035.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=13/3
+[2025-11-05 17:46:00] Cache reuse: 0/256 combos (0.0%) served from cache
+[2025-11-05 17:46:00] ASHA pruned 512 parameter combos prior to full evaluation
+[2025-11-05 17:46:01] Excel summary written to output\bt30\NIGHTLY_20251105\RUN_coarse_AM0930_j-cross\summary_20251105_174600.xlsx
+[2025-11-05 17:46:01] Run completed in 1.8 minutes

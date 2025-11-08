@@ -1,0 +1,20 @@
+[2025-11-06 05:27:18] Run started
+[2025-11-06 05:27:18] Run type resolved to weekend
+[2025-11-06 05:27:18] Codes limited via C:\AI\asagake\output\bt30\WEEKLY_\NIGHTLY_20251106\RUN_coarse_AM1015_j-cross\_TOP_CANDIDATES.csv: 7 tickers (was 20)
+[2025-11-06 05:27:21] Fetching Yahoo Finance 1m bars for 7 tickers (lookback=60, chunk=5)
+[2025-11-06 05:27:48] Fetching Yahoo Finance 1m bars for 1 tickers (lookback=60, chunk=5)
+[2025-11-06 05:28:10] Entry window marks set: 18384 rows flagged out of 83067
+[2025-11-06 05:28:10] Liquidity filter q=0.50 kept 6 tickers and 45708 rows
+[2025-11-06 05:28:10] Using 5 rolling slices (train=12, forward=4)
+[2025-11-06 05:28:10] Parameter grid size: 24 (mode=refine, signal=j-cross)
+[2025-11-06 05:28:15] [1/6] 8411.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-06 05:28:18] [2/6] 6525.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-06 05:28:28] [3/6] 5016.T: best train_pf_eff=1.869, forward_pf_eff=2.986, trades=43/16
+[2025-11-06 05:28:28] [4/6] 5801.T: best train_pf_eff=0.759, forward_pf_eff=0.055, trades=6/10
+[2025-11-06 05:28:28] [5/6] 6857.T: best train_pf_eff=0.969, forward_pf_eff=2.245, trades=47/24
+[2025-11-06 05:28:29] [6/6] 8035.T: best train_pf_eff=1.004, forward_pf_eff=1.382, trades=53/21
+[2025-11-06 05:28:29] Cache reuse: 184/275 combos (66.9%) served from cache
+[2025-11-06 05:28:29] Bayesian refine trials executed: 131
+[2025-11-06 05:28:29] Refine candidates exported to output\excel\NIGHTLY_20251106\AM1015_j-cross\candidates_20251106.csv
+[2025-11-06 05:28:29] Excel summary written to C:\AI\asagake\output\bt30\WEEKLY_\NIGHTLY_20251106\RUN_refine_AM1015_j-cross\summary_20251106_052829.xlsx
+[2025-11-06 05:28:29] Run completed in 1.2 minutes

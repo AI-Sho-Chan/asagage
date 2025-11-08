@@ -29,18 +29,13 @@ Private Const DEFAULT_ALERT_COOLDOWN_MIN As Double = 10#
 Private gDashboardWatcher As cDashboardWatcher
 Private gThresholdState As Object
 Private gAlertCooldown As Object
-Private gNkyHistoryTimes As Collection
-Private gNkyHistoryPrices As Collection
-Private gNkySessionDate As Date
-Private gNkySessionOpen As Double
-Private gLastHistoryRecord As Date
-Private gNkyTrendDay As String
-Private gNkyTrendWindow As String
-Private gNkyAllowedSide As String
+Private gDriverConfigs As Object
+Private gDriverRuntime As Object
 Private gStrategyRules As Object
-Private gLastOrderAllowedSide As String
 Private gJStats As Object
 Private Const J_STATS_PATH As String = "state\j_stats.csv"
+Private Const DRIVER_NKY As String = "NKY"
+Private Const DRIVER_TOPIX As String = "TOPIX"
 
 
 Private Function HeaderTickerJP() As String: HeaderTickerJP = "Ticker": End Function
@@ -130,6 +125,125 @@ Private Function RowWithFallback(ByVal ws As Worksheet, ByVal rowIndex As Long, 
     Else
         RowWithFallback = fallbackValue
     End If
+End Function
+
+Private Sub EnsureDriverConfigStore()
+    If gDriverConfigs Is Nothing Then
+        Set gDriverConfigs = CreateObject("Scripting.Dictionary")
+        gDriverConfigs.CompareMode = vbTextCompare
+    End If
+End Sub
+
+Private Sub EnsureDriverConfigs(ByVal ws As Worksheet)
+    EnsureDriverConfigStore
+    AddDriverConfig DRIVER_NKY, "NKY_Code", "NKY_Last", "NKY_TrendDay", "NKY_TrendWindow", "NKY_AllowedSide"
+    AddDriverConfig DRIVER_TOPIX, "TOPIX_Code", "TOPIX_Last", "TOPIX_TrendDay", "TOPIX_TrendWindow", "TOPIX_AllowedSide"
+End Sub
+
+Private Sub AddDriverConfig(ByVal driverName As String, ByVal codeHeader As String, ByVal lastHeader As String, ByVal trendDayHeader As String, ByVal trendWindowHeader As String, ByVal allowedHeader As String)
+    EnsureDriverConfigStore
+    If gDriverConfigs.Exists(driverName) Then Exit Sub
+    Dim cfg As Object
+    Set cfg = CreateObject("Scripting.Dictionary")
+    cfg("code_header") = codeHeader
+    cfg("last_header") = lastHeader
+    cfg("trend_day_header") = trendDayHeader
+    cfg("trend_window_header") = trendWindowHeader
+    cfg("allowed_header") = allowedHeader
+    cfg("code_col") = 0
+    cfg("last_col") = 0
+    cfg("trend_day_col") = 0
+    cfg("trend_window_col") = 0
+    cfg("allowed_col") = 0
+    gDriverConfigs(driverName) = cfg
+End Sub
+
+Private Function EnsureDriverState(ByVal driverName As String) As Object
+    If gDriverRuntime Is Nothing Then
+        Set gDriverRuntime = CreateObject("Scripting.Dictionary")
+        gDriverRuntime.CompareMode = vbTextCompare
+    End If
+    If Not gDriverRuntime.Exists(driverName) Then
+        Dim state As Object
+        Set state = CreateObject("Scripting.Dictionary")
+        state("session_date") = 0#
+        state("session_open") = 0#
+        state("history_prices") = Nothing
+        state("last_history_record") = 0#
+        state("trend_day") = ""
+        state("trend_window") = ""
+        state("allowed_side") = "BOTH"
+        state("last_allowed_side") = ""
+        gDriverRuntime(driverName) = state
+    End If
+    Set EnsureDriverState = gDriverRuntime(driverName)
+End Function
+
+Private Function GetDriverColumn(ByVal ws As Worksheet, ByVal cfg As Object, ByVal cacheKey As String, ByVal headerKey As String) As Long
+    Dim col As Long
+    If cfg.Exists(cacheKey) Then
+        col = CLng(cfg(cacheKey))
+    Else
+        col = 0
+    End If
+    If col <= 0 Then
+        Dim headerName As String
+        headerName = CStr(cfg(headerKey))
+        col = FindParamColumn(ws, headerName)
+        cfg(cacheKey) = col
+    End If
+    GetDriverColumn = col
+End Function
+
+Private Function NormalizeDriverName(ByVal value As String) As String
+    Dim cleaned As String
+    cleaned = UCase$(Trim$(value))
+    If cleaned = DRIVER_TOPIX Then
+        NormalizeDriverName = DRIVER_TOPIX
+    Else
+        NormalizeDriverName = DRIVER_NKY
+    End If
+End Function
+
+Private Function GetDriverTrendDay(ByVal driverName As String) As String
+    Dim state As Object
+    Set state = EnsureDriverState(NormalizeDriverName(driverName))
+    Dim val As String
+    On Error Resume Next
+    val = CStr(state("trend_day"))
+    On Error GoTo 0
+    If Len(val) = 0 Then val = "flat"
+    GetDriverTrendDay = val
+End Function
+
+Private Function GetDriverTrendWindow(ByVal driverName As String) As String
+    Dim state As Object
+    Set state = EnsureDriverState(NormalizeDriverName(driverName))
+    Dim val As String
+    On Error Resume Next
+    val = CStr(state("trend_window"))
+    On Error GoTo 0
+    If Len(val) = 0 Then val = "flat"
+    GetDriverTrendWindow = val
+End Function
+
+Private Function GetDriverAllowedSide(ByVal driverName As String) As String
+    Dim state As Object
+    Set state = EnsureDriverState(NormalizeDriverName(driverName))
+    Dim val As String
+    On Error Resume Next
+    val = CStr(state("allowed_side"))
+    On Error GoTo 0
+    If Len(val) = 0 Then val = "BOTH"
+    GetDriverAllowedSide = val
+End Function
+
+Private Function DriverHasDownTrend(ByVal driverName As String) As Boolean
+    Dim dayState As String
+    Dim winState As String
+    dayState = GetDriverTrendDay(driverName)
+    winState = GetDriverTrendWindow(driverName)
+    DriverHasDownTrend = (StrComp(dayState, "down", vbTextCompare) = 0) Or (StrComp(winState, "down", vbTextCompare) = 0)
 End Function
 
 Private Function DetermineBasePrice(ByVal vwapVal As Double, ByVal prevVal As Double) As Double
@@ -316,7 +430,7 @@ Public Sub OnDashboardCalculate(ByVal Sh As Worksheet)
     On Error GoTo CleanExit
     If Sh Is Nothing Then Exit Sub
     If StrComp(Sh.Name, DASH2_SHEET, vbTextCompare) <> 0 Then Exit Sub
-    UpdateNkyTrend Sh
+    UpdateAllDriverTrends Sh
     HandleThresholdAlerts Sh
 CleanExit:
 End Sub
@@ -468,63 +582,90 @@ ContinueLoop:
     Next r
 End Sub
 
-Private Sub UpdateNkyHistory(ByVal currentPrice As Double)
-    If gNkyHistoryPrices Is Nothing Then
-        Set gNkyHistoryPrices = New Collection
-        Set gNkyHistoryTimes = New Collection
+Private Sub UpdateAllDriverTrends(ByVal ws As Worksheet)
+    EnsureDriverConfigs ws
+    If gDriverConfigs Is Nothing Then Exit Sub
+    Dim driverName As Variant
+    For Each driverName In gDriverConfigs.Keys
+        UpdateDriverTrend ws, CStr(driverName)
+    Next driverName
+End Sub
+
+Private Sub UpdateDriverTrend(ByVal ws As Worksheet, ByVal driverName As String)
+    EnsureDriverConfigs ws
+    If gDriverConfigs Is Nothing Then Exit Sub
+    If Not gDriverConfigs.Exists(driverName) Then Exit Sub
+    Dim cfg As Object
+    Set cfg = gDriverConfigs(driverName)
+    Dim lastCol As Long
+    lastCol = GetDriverColumn(ws, cfg, "last_col", "last_header")
+    If lastCol <= 0 Then Exit Sub
+    Dim currentPrice As Double
+    currentPrice = ToDouble(ws.Cells(2, lastCol).Value, 0#)
+    If currentPrice <= 0# Then Exit Sub
+
+    Dim state As Object
+    Set state = EnsureDriverState(driverName)
+    Dim sessionDate As Variant
+    Dim sessionOpen As Double
+    sessionOpen = 0#
+    On Error Resume Next
+    sessionDate = state("session_date")
+    sessionOpen = CDbl(state("session_open"))
+    On Error GoTo 0
+    If IsEmpty(sessionDate) Then sessionDate = 0#
+    If sessionDate <> Date Or sessionOpen <= 0# Then
+        state("session_date") = Date
+        state("session_open") = currentPrice
+        On Error Resume Next
+        Set state("history_prices") = Nothing
+        On Error GoTo 0
+        state("last_history_record") = 0#
+        sessionOpen = currentPrice
     End If
+
+    Dim historyPrices As Collection
+    On Error Resume Next
+    Set historyPrices = state("history_prices")
+    On Error GoTo 0
+    If historyPrices Is Nothing Then
+        Set historyPrices = New Collection
+    End If
+
+    Dim lastRec As Date
+    On Error Resume Next
+    lastRec = state("last_history_record")
+    On Error GoTo 0
     Dim shouldAppend As Boolean
-    shouldAppend = False
-    If gLastHistoryRecord = 0# Then
+    If lastRec = 0# Then
         shouldAppend = True
-    ElseIf Now - gLastHistoryRecord >= TimeSerial(0, 1, 0) Then
+    ElseIf Now - lastRec >= TimeSerial(0, 1, 0) Then
         shouldAppend = True
     End If
     If shouldAppend Then
-        gNkyHistoryPrices.Add currentPrice
-        gNkyHistoryTimes.Add Now
-        gLastHistoryRecord = Now
+        historyPrices.Add currentPrice
+        state("last_history_record") = Now
     End If
-    Do While gNkyHistoryPrices.Count > 15
-        gNkyHistoryPrices.Remove 1
-        gNkyHistoryTimes.Remove 1
+    Do While historyPrices.Count > 15
+        historyPrices.Remove 1
     Loop
-End Sub
-
-Private Sub UpdateNkyTrend(ByVal ws As Worksheet)
-    Dim nkyLastCol As Long: nkyLastCol = FindParamColumn(ws, "NKY_Last")
-    If nkyLastCol <= 0 Then Exit Sub
-    Dim currentPrice As Double: currentPrice = ToDouble(ws.Cells(2, nkyLastCol).Value, 0#)
-    If currentPrice <= 0# Then Exit Sub
-
-    Dim today As Date: today = Date
-    If gNkySessionDate <> today Or gNkySessionOpen <= 0# Then
-        gNkySessionDate = today
-        gNkySessionOpen = currentPrice
-        Set gNkyHistoryPrices = Nothing
-        Set gNkyHistoryTimes = Nothing
-        gLastHistoryRecord = 0#
-    End If
-
-    UpdateNkyHistory currentPrice
+    Set state("history_prices") = historyPrices
 
     Dim openRet As Double
-    If gNkySessionOpen > 0# Then
-        openRet = (currentPrice - gNkySessionOpen) / gNkySessionOpen * 10000#
+    If sessionOpen > 0# Then
+        openRet = (currentPrice - sessionOpen) / sessionOpen * 10000#
     Else
         openRet = 0#
     End If
 
     Dim historyCount As Long
-    If Not gNkyHistoryPrices Is Nothing Then
-        historyCount = gNkyHistoryPrices.Count
-    End If
+    historyCount = historyPrices.Count
 
     Dim earliestPrice As Double
     If historyCount >= 1 Then
-        earliestPrice = ToDouble(gNkyHistoryPrices(1), currentPrice)
+        earliestPrice = ToDouble(historyPrices(1), currentPrice)
     Else
-        earliestPrice = gNkySessionOpen
+        earliestPrice = sessionOpen
     End If
 
     Dim windowRet As Double
@@ -572,20 +713,25 @@ Private Sub UpdateNkyTrend(ByVal ws As Worksheet)
         allowedSide = "BOTH"
     End If
 
-    gNkyTrendDay = trendDay
-    gNkyTrendWindow = trendWindow
-    gNkyAllowedSide = allowedSide
-
-    Dim dayCol As Long: dayCol = FindParamColumn(ws, "NKY_TrendDay")
-    Dim windowCol As Long: windowCol = FindParamColumn(ws, "NKY_TrendWindow")
-    Dim sideCol As Long: sideCol = FindParamColumn(ws, "NKY_AllowedSide")
+    Dim dayCol As Long: dayCol = GetDriverColumn(ws, cfg, "trend_day_col", "trend_day_header")
+    Dim windowCol As Long: windowCol = GetDriverColumn(ws, cfg, "trend_window_col", "trend_window_header")
+    Dim sideCol As Long: sideCol = GetDriverColumn(ws, cfg, "allowed_col", "allowed_header")
     If dayCol > 0 Then ws.Cells(2, dayCol).Value = trendDay
     If windowCol > 0 Then ws.Cells(2, windowCol).Value = trendWindow
     If sideCol > 0 Then ws.Cells(2, sideCol).Value = allowedSide
-    If allowedSide <> gLastOrderAllowedSide Then
+
+    Dim prevAllowed As String
+    On Error Resume Next
+    prevAllowed = CStr(state("last_allowed_side"))
+    On Error GoTo 0
+    If StrComp(prevAllowed, allowedSide, vbTextCompare) <> 0 Then
+        state("last_allowed_side") = allowedSide
         CancelOppositeOrders allowedSide
-        gLastOrderAllowedSide = allowedSide
     End If
+
+    state("trend_day") = trendDay
+    state("trend_window") = trendWindow
+    state("allowed_side") = allowedSide
 End Sub
 
 Private Sub CancelOppositeOrders(ByVal allowedSide As String)
@@ -793,7 +939,7 @@ Public Sub InstallRealtimeFormulasV2()
     If ws Is Nothing Then Exit Sub
 
     EnsureDashboardWatcher
-    UpdateNkyTrend ws
+    UpdateAllDriverTrends ws
 
     Dim gapCol As Long: gapCol = FindColumn(ws, DASH2_HEADER_ROW, "Gap_bp")
 
@@ -1016,7 +1162,7 @@ Public Sub ApplyDynamicSignalsV2()
 
     EnsureParamFormulas ws
     EnsureDashboardWatcher
-    UpdateNkyTrend ws
+    UpdateAllDriverTrends ws
     Set gJStats = Nothing
     EnsureJStatsLoaded
 
@@ -1055,6 +1201,10 @@ Public Sub ApplyDynamicSignalsV2()
     Dim batchKindCol As Long: batchKindCol = FindColumn(ws, DASH2_HEADER_ROW, "BatchKind")
     Dim volTagCol As Long: volTagCol = FindColumn(ws, DASH2_HEADER_ROW, "VolatilityTag")
     Dim trendWindowCol As Long: trendWindowCol = FindColumn(ws, DASH2_HEADER_ROW, "trend_window")
+    Dim trendDriverCol As Long: trendDriverCol = FindColumn(ws, DASH2_HEADER_ROW, "trend_driver")
+    Dim driverDayCol As Long: driverDayCol = FindColumn(ws, DASH2_HEADER_ROW, "driver_day_trend")
+    Dim driverWindowCol2 As Long: driverWindowCol2 = FindColumn(ws, DASH2_HEADER_ROW, "driver_window_trend")
+    Dim driverAllowedCol As Long: driverAllowedCol = FindColumn(ws, DASH2_HEADER_ROW, "driver_allowed_side")
 
     If tickerCol = 0 Or jCol = 0 Or jthCol = 0 Or jthBaseCol = 0 Then Exit Sub
 
@@ -1165,11 +1315,24 @@ Public Sub ApplyDynamicSignalsV2()
         If tickerCol > 0 Then tickerVal = Trim$(CStr(ws.Cells(r, tickerCol).Value))
         Dim sessionVal As String
         If colSession > 0 Then sessionVal = Trim$(CStr(ws.Cells(r, colSession).Value))
+        Dim driverVal As String
+        If trendDriverCol > 0 Then
+            driverVal = NormalizeDriverName(CStr(ws.Cells(r, trendDriverCol).Value))
+        Else
+            driverVal = DRIVER_NKY
+        End If
+        Dim driverDayState As String: driverDayState = GetDriverTrendDay(driverVal)
+        Dim driverWindowState As String: driverWindowState = GetDriverTrendWindow(driverVal)
+        Dim allowedSideState As String: allowedSideState = GetDriverAllowedSide(driverVal)
+        If driverDayCol > 0 Then ws.Cells(r, driverDayCol).Value = driverDayState
+        If driverWindowCol2 > 0 Then ws.Cells(r, driverWindowCol2).Value = driverWindowState
+        If driverAllowedCol > 0 Then ws.Cells(r, driverAllowedCol).Value = allowedSideState
         Dim trendWindowVal As String
         If trendWindowCol > 0 Then
             trendWindowVal = Trim$(CStr(ws.Cells(r, trendWindowCol).Value))
-        Else
-            trendWindowVal = gNkyTrendWindow
+        End If
+        If Len(trendWindowVal) = 0 Then
+            trendWindowVal = driverWindowState
         End If
         Dim bbBlocked As Boolean
         bbBlocked = ShouldBlockByBollinger(tickerVal, sessionVal, trendWindowVal, ratioVal)
@@ -1180,11 +1343,11 @@ Public Sub ApplyDynamicSignalsV2()
         Dim signalModeVal As String
         If colMode > 0 Then signalModeVal = Trim$(CStr(ws.Cells(r, colMode).Value))
         Dim filterSide As String
-        filterSide = gNkyAllowedSide
+        filterSide = allowedSideState
         If Len(filterSide) = 0 Then filterSide = "BOTH"
         If entrySide <> "" And filterSide <> "BOTH" Then
             If StrComp(entrySide, filterSide, vbTextCompare) <> 0 Then
-                blockReason = "BLOCKED_NKY_" & UCase$(filterSide)
+                blockReason = "BLOCKED_DIR_" & driverVal & "_" & UCase$(filterSide)
             End If
         End If
         Dim isWeekend As Boolean
@@ -1194,8 +1357,8 @@ Public Sub ApplyDynamicSignalsV2()
         End If
         If blockReason = "" And entrySide = "SELL" And StrComp(signalModeVal, "j-cross", vbTextCompare) = 0 Then
             If jcrossRequireDown Then
-                If StrComp(gNkyTrendDay, "down", vbTextCompare) <> 0 And StrComp(gNkyTrendWindow, "down", vbTextCompare) <> 0 Then
-                    blockReason = "BLOCKED_JCROSS_NKY"
+                If Not DriverHasDownTrend(driverVal) Then
+                    blockReason = "BLOCKED_JCROSS_TREND_" & driverVal
                 End If
             End If
             If blockReason = "" Then
@@ -1212,7 +1375,7 @@ Public Sub ApplyDynamicSignalsV2()
         If blockReason <> "" Then
             If entryStatusCol > 0 Then ws.Cells(r, entryStatusCol).Value = blockReason
             Dim shouldDeselect As Boolean: shouldDeselect = True
-            If Left$(blockReason, 11) = "BLOCKED_NKY" Or blockReason = "BLOCKED_BB" Then
+            If Left$(blockReason, 12) = "BLOCKED_DIR_" Or Left$(blockReason, 21) = "BLOCKED_JCROSS_TREND_" Or blockReason = "BLOCKED_BB" Then
                 shouldDeselect = False
             End If
             If shouldDeselect And selCol > 0 Then ws.Cells(r, selCol).Value = 0

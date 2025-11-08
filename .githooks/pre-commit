@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+set -eu
+
+# Guard against reintroducing openpyxl-based writes to SHINSOKU.xlsm
+python scripts/guard_no_openpyxl_xlsm.py

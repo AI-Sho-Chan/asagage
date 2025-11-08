@@ -1,0 +1,240 @@
+#!/usr/bin/env python3
+"""Compute per-ticker dashboard coefficients (Bias/GAP/Corr slopes)."""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+from pathlib import Path
+from typing import Dict, Iterable, List, Optional, Tuple
+
+import numpy as np
+import pandas as pd
+import yfinance as yf
+
+
+def to_float(value: object, default: float = 0.0) -> float:
+    try:
+        if isinstance(value, pd.Series):
+            return float(value.iloc[0])
+        return float(value)
+    except Exception:
+        return default
+
+
+def recent_trading_days(count: int, end_date: Optional[dt.date] = None) -> List[dt.date]:
+    days: List[dt.date] = []
+    current = end_date or dt.date.today()
+    while len(days) < count:
+        if current.weekday() < 5:
+            days.append(current)
+        current -= dt.timedelta(days=1)
+    return list(reversed(days))
+
+
+def load_ticker_minutes(ticker: str, days: Iterable[dt.date], root: Path) -> pd.DataFrame:
+    frames: List[pd.DataFrame] = []
+    for day in days:
+        path = root / ticker / f"{day:%Y-%m-%d}.parquet"
+        if not path.exists():
+            continue
+        try:
+            df = pd.read_parquet(path)
+        except Exception:
+            continue
+        if df.empty:
+            continue
+        df = df.copy()
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = [str(c[0]).lower() for c in df.columns]
+        else:
+            df.columns = [str(c).lower() for c in df.columns]
+        ts = pd.to_datetime(df.index)
+        try:
+            if getattr(ts, "tz", None) is None:
+                ts = ts.tz_localize("UTC").tz_convert("Asia/Tokyo")
+            else:
+                ts = ts.tz_convert("Asia/Tokyo")
+        except Exception:
+            pass
+        df["ts"] = ts
+        df["date"] = day
+        frames.append(df)
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)
+
+
+def fetch_index_minutes(symbol: str, start: dt.date, end: dt.date) -> pd.DataFrame:
+    df = yf.download(
+        symbol,
+        start=start,
+        end=end + dt.timedelta(days=1),
+        interval="1m",
+        auto_adjust=False,
+        prepost=False,
+        progress=False,
+    )
+    if df.empty:
+        return df
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [str(c[0]).lower() for c in df.columns]
+    else:
+        df.columns = [str(c).lower() for c in df.columns]
+    if df.index.tz is None:
+        df.index = df.index.tz_localize("UTC").tz_convert("Asia/Tokyo")
+    else:
+        df.index = df.index.tz_convert("Asia/Tokyo")
+    df = df.reset_index()[["Datetime", "close"]].rename(columns={"Datetime": "ts"})
+    df["date"] = df["ts"].dt.date
+    return df
+
+
+def compute_day_stats(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    if df.empty:
+        return pd.DataFrame(), pd.DataFrame()
+    df = df.sort_values("ts").copy()
+    df["ret"] = df["close"].pct_change().fillna(0.0)
+    df["minute"] = df["ts"]
+    grouped = df.groupby("date")
+    rows = []
+    prev_close = None
+    for day, g in grouped:
+        first_close = to_float(g["close"].iloc[0], 0.0)
+        last_close = to_float(g["close"].iloc[-1], first_close)
+        if "volume" in g.columns:
+            vol = g["volume"]
+            vol_sum = vol.sum()
+            if vol_sum > 0:
+                vwap = (g["close"] * vol).sum() / vol_sum
+            else:
+                vwap = g["close"].mean()
+        else:
+            vwap = g["close"].mean()
+        vwap = to_float(vwap, last_close)
+        if prev_close is None:
+            prev_close = first_close
+        gap_pct = 0.0
+        if prev_close is not None and prev_close > 0:
+            gap_pct = (first_close - prev_close) / prev_close * 100.0
+        j_proxy = 0.0
+        if vwap and vwap != 0:
+            j_proxy = (last_close - vwap) / vwap
+        prev_close = last_close
+        rows.append(
+            {
+                "date": day,
+                "gap_abs": abs(gap_pct),
+                "j_proxy": j_proxy,
+            }
+        )
+    minute_frame = df[["ts", "ret"]].reset_index(drop=True)
+    return minute_frame, pd.DataFrame(rows)
+
+
+def slope(x: np.ndarray, y: np.ndarray) -> float:
+    if len(x) < 10:
+        return 0.0
+    if np.allclose(x.std(), 0) or np.allclose(y.std(), 0):
+        return 0.0
+    try:
+        return float(np.polyfit(x, y, 1)[0])
+    except Exception:
+        return 0.0
+
+
+def corrcoef(x: np.ndarray, y: np.ndarray) -> float:
+    if len(x) < 10:
+        return 0.0
+    if np.allclose(x.std(), 0) or np.allclose(y.std(), 0):
+        return 0.0
+    try:
+        return float(np.corrcoef(x, y)[0, 1])
+    except Exception:
+        return 0.0
+
+
+def compute_coefficients(tickers: List[str], root: Path, history_days: int, nky_symbol: str) -> pd.DataFrame:
+    days = recent_trading_days(history_days)
+    start = days[0]
+    end = days[-1]
+    nky_df = fetch_index_minutes(nky_symbol, start, end)
+    nky_minute, nky_daily = compute_day_stats(nky_df)
+    nky_ret = nky_minute.rename(columns={"ret": "nk_ret"}).reset_index(drop=True)
+
+    records: List[Dict[str, float]] = []
+    for ticker in tickers:
+        data = load_ticker_minutes(ticker, days, root)
+        if data.empty:
+            continue
+        minute_df, daily_df = compute_day_stats(data)
+        if minute_df.empty:
+            continue
+        merged = minute_df.merge(nky_ret, on="ts", how="inner")
+        bias_slope = slope(merged["nk_ret"].to_numpy(), merged["ret"].to_numpy())
+        corr_slope = corrcoef(merged["nk_ret"].to_numpy(), merged["ret"].to_numpy())
+        gap_slope = 0.0
+        if not daily_df.empty and not nky_daily.empty:
+            merged_day = daily_df.merge(nky_daily, on="date", suffixes=("", "_nky"))
+            if not merged_day.empty:
+                gap_slope = slope(merged_day["gap_abs"].to_numpy(), merged_day["j_proxy"].to_numpy())
+
+        records.append(
+            {
+                "Ticker": ticker,
+                "bias_slope": round(bias_slope, 6),
+                "gap_slope": round(gap_slope, 6),
+                "corr_slope": round(corr_slope, 6),
+                "samples": int(len(merged)),
+            }
+        )
+    return pd.DataFrame(records)
+
+
+def gather_tickers(paths: List[Path]) -> List[str]:
+    tickers: Dict[str, None] = {}
+    for path in paths:
+        if not path.exists():
+            continue
+        try:
+            df = pd.read_csv(path)
+        except Exception:
+            continue
+        for col in ("Ticker", "ticker", "code", "Code"):
+            if col in df.columns:
+                vals = df[col].dropna().astype(str)
+                for v in vals:
+                    v = v.strip()
+                    if not v:
+                        continue
+                    if v not in tickers:
+                        tickers[v] = None
+                break
+    return sorted(tickers.keys())
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--codes-file", action="append", default=[], help="CSV containing Ticker column")
+    ap.add_argument("--history-days", type=int, default=60)
+    ap.add_argument("--raw-root", default="data/raw/yahoo_1m")
+    ap.add_argument("--nky-symbol", default="^N225")
+    ap.add_argument("--output", type=Path, default=Path("output/excel/dashboard_coeffs_latest.csv"))
+    ap.add_argument("--save-dated", action="store_true", help="Also save with timestamp suffix")
+    args = ap.parse_args()
+
+    tickers = gather_tickers([Path(p) for p in args.codes_file])
+    if not tickers:
+        raise SystemExit("compute_dashboard_coeffs: no tickers found")
+
+    df = compute_coefficients(tickers, Path(args.raw_root), args.history_days, args.nky_symbol)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(args.output, index=False, encoding="utf-8-sig")
+    if args.save_dated:
+        dated = args.output.with_name(f"dashboard_coeffs_{dt.date.today():%Y%m%d}.csv")
+        df.to_csv(dated, index=False, encoding="utf-8-sig")
+    print(f"written={args.output} rows={len(df)}")
+
+
+if __name__ == "__main__":
+    main()

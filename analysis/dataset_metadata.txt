@@ -1,0 +1,8 @@
+trades_total=1053
+coverage_start=2025-09-24
+coverage_end=2025-10-24
+weekly_trades=782
+nightly_trades=271
+nky_symbol=^N225
+nky_daily_range=2025-09-22_to_2025-10-28
+nky_intraday_interval=5m

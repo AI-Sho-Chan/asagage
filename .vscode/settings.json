@@ -1,0 +1,4 @@
+{
+    "chatgpt.openOnStartup": true,
+    "gemini-cli.debug.logging.enabled": true
+}

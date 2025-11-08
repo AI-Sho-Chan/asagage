@@ -1,0 +1,6136 @@
+Attribute VB_Name = "AutoTrader"
+
+Option Explicit
+
+
+
+Private Const SHEET_DASHBOARD As String = "NewDashboard"
+
+Private Const SHEET_CANDIDATES As String = "Candidates"
+
+Private Const SHEET_ORDERS As String = "Orders"
+
+Private Const CANDIDATES_REL_PATH As String = "\output\excel\candidates_nextday.csv"
+
+
+
+Private Const DASH_HEADER_ROW As Long = 5
+
+Private Const DASH_DATA_START As Long = 6
+
+Private Const DASH_STATUS_CELL As String = "B2"
+
+Private Const DASH_MAX_ORDERS_CELL As String = "B3"
+
+Private Const DASH_SESSION_START_CELL As String = "B4"
+
+Private Const DASH_SESSION_END_CELL As String = "B5"
+
+Private Const DASH_SELECTED_DEFAULT_CELL As String = "B6"
+
+Private Const DASH_REENTRY_CELL As String = "B7"
+
+Private Const DASH_HARDSTOP_CELL As String = "B8"
+
+Private Const DASH_LIVE_CELL As String = "B9"
+
+Private Const DASH_ORDERMACRO_CELL As String = "B10"
+
+Private Const DASH_CLOSE_TIME_CELL As String = "B11"
+
+Private Const DASH_QTY_CELL As String = "B12"
+
+Private Const DASH_TIF_CELL As String = "B13"
+
+Private Const DASH_BUDGET_CELL As String = "B14"
+
+Private Const DASH_LOT_STEP_CELL As String = "B15"
+
+Private Const DASH_SLIP_BP_CELL As String = "B16"
+
+' 髫ｴ繝ｻ・ｽE・ｽ・ｽE・ｽ鬮ｫ蜍溯㊥繝ｻ・ｽE・ｽ繝ｻ・ｽE・ｽ髯橸ｽｳ陞｢・ｽE・ｽ邵ｺ譎会ｽｹ譎｢・ｽE・ｽ・ｽE・ｽ
+
+Private Const DASH_TRACE_CELL As String = "B17"
+
+Private Const DASH_CANCEL_AT_END_CELL As String = "B18"
+
+Private Const DASH_ENTRY_GRACE_MIN_CELL As String = "B19"
+
+Private Const DASH_OCO_UPDATE_SEC_CELL As String = "B20"
+Private Const DASH_MARKET_BIAS_CELL As String = "B21"
+Private Const DASH_MARKET_UP_THRESHOLD_CELL As String = "B22"
+Private Const DASH_MARKET_UP_ADJ_CELL As String = "B23"
+Private Const DASH_MARKET_DOWN_THRESHOLD_CELL As String = "B24"
+Private Const DASH_MARKET_DOWN_ADJ_CELL As String = "B25"
+Private Const DASH_GAP120_THRESHOLD_CELL As String = "B26"
+Private Const DASH_GAP120_ADJ_CELL As String = "B27"
+Private Const DASH_GAP200_THRESHOLD_CELL As String = "B28"
+Private Const DASH_GAP200_ADJ_CELL As String = "B29"
+Private Const DASH_TP_PER_J_CELL As String = "B30"
+Private Const DASH_SL_PER_J_CELL As String = "B31"
+
+Private Const ENTRY_STATUS_WAIT_STRADDLE As String = "WAIT_STRADDLE"
+Private Const ENTRY_STATUS_IN_BUY As String = "IN_POS_BUY"
+Private Const ENTRY_STATUS_IN_SELL As String = "IN_POS_SELL"
+Private Const ENTRY_STATUS_DONE As String = "DONE"
+Private Const ENTRY_STATUS_CANCELLED As String = "CANCELLED"
+
+Private Const DEFAULT_MAX_ORDERS As Long = 20
+
+Private Const DEFAULT_SESSION_START As String = "09:00"
+
+Private Const DEFAULT_SESSION_END As String = "09:15"
+
+Private Const DEFAULT_SELECTED_DEFAULT As Long = 1
+
+Private Const DEFAULT_REENTRY As Long = 0
+
+Private Const DEFAULT_HARDSTOP As Long = 0
+
+Private Const DEFAULT_LIVE As Long = 0
+
+Private Const DEFAULT_CLOSE_TIME As String = "14:59:30"
+
+Private Const DEFAULT_ORDER_QTY As Long = 100
+
+Private Const DEFAULT_MAX_BUDGET As Double = 10000000#
+
+Private Const DEFAULT_LOT_STEP As Long = 100
+
+Private Const DEFAULT_SLIP_BP As Double = 30#
+
+Private Const DASH_FORMULA_ROWS As Long = 400
+
+Private Const DASH_MIN_JTH As Double = 0.6
+
+Private Const RISK_PER_TICKER_FRAC As Double = 0.06
+
+Private Const RISK_TOTAL_FRAC As Double = 0.3
+
+Private Const SESSION_MODE_JONLY_RATIO As Double = 0.6
+
+Private Const SESSION_MODE_JCROSS_RATIO As Double = 0.4
+
+Private Const ROW_SCORE_TRADE_TARGET As Double = 40#
+
+Private Const ROW_SCORE_EXP_TARGET As Double = 15#
+
+Private Const ROW_SCORE_DD_K As Double = 2#
+
+Private Const ROW_SCORE_PF_CAP_GROWTH As Double = 2#
+
+
+
+Private prevJ As Object
+
+Private AutoTimer As Date
+
+Private isRunning As Boolean
+
+Private tradeDate As Date
+
+Private orderCount As Long
+
+Private setupInitialized As Boolean
+
+Private sessionRiskUsed As Object
+
+Private tickerRiskUsed As Object
+
+Private totalRiskUsed As Double
+
+Private closeTimer As Date
+
+Private closeTimerScheduled As Boolean
+Private pendingStraddles As Object
+
+Private activeStraddles As Object
+
+
+
+
+Private Function RealTimeHeaderList() As Variant
+
+    RealTimeHeaderList = Array("Ticker", HeaderNameJP(), HeaderJValueJP(), HeaderJGapJP(), HeaderSignalStatusJP(), HeaderSignalKindJP(), HeaderLastJP(), HeaderVwapJP(), HeaderPrevCloseJP(), HeaderPreopenBidJP(), HeaderPreopenAskJP(), HeaderPreopenMidJP(), HeaderLiveGapBpJP(), HeaderLiveGapBucketJP(), HeaderLiveGapActionJP())
+
+End Function
+
+
+
+Private Function CandidateHeaderList() As Variant
+
+    CandidateHeaderList = Array("TickerSrc", "Selected", "SignalMode", "Session", "ATR_n", "TPk", "SLk", "J_th", "ForwardPF", "ForwardTrades", "ForwardWin", "MaxDD", "WinCI_L", "WinCI_H", "ExpBootMean", "ExpBootLow", "ExpBootHigh", "ForwardAvgBars", "GapBucket", "GapRule", "GapSummary", "DynamicQty", "PlanTag", "EntryBuyPx", "EntrySellPx", "TP_price", "SL_price", "EntryStatus", "EntrySide")
+
+End Function
+Private Function EnsurePendingInfo(ByVal ticker As String) As Object
+
+    If pendingStraddles Is Nothing Then Set pendingStraddles = CreateObject("Scripting.Dictionary")
+
+    If pendingStraddles.Exists(ticker) Then
+
+        Set EnsurePendingInfo = pendingStraddles(ticker)
+
+    Else
+
+        Dim info As Object: Set info = CreateObject("Scripting.Dictionary")
+
+        pendingStraddles(ticker) = info
+
+        Set EnsurePendingInfo = info
+
+    End If
+
+End Function
+
+
+
+Private Sub RemovePendingInfo(ByVal ticker As String)
+
+    If Not pendingStraddles Is Nothing Then
+
+        If pendingStraddles.Exists(ticker) Then pendingStraddles.Remove ticker
+
+    End If
+
+End Sub
+
+
+
+Private Function EnsureActiveInfo(ByVal ticker As String) As Object
+
+    If activeStraddles Is Nothing Then Set activeStraddles = CreateObject("Scripting.Dictionary")
+
+    If activeStraddles.Exists(ticker) Then
+
+        Set EnsureActiveInfo = activeStraddles(ticker)
+
+    Else
+
+        Dim info As Object: Set info = CreateObject("Scripting.Dictionary")
+
+        activeStraddles(ticker) = info
+
+        Set EnsureActiveInfo = info
+
+    End If
+
+End Function
+
+
+
+Private Sub RemoveActiveInfo(ByVal ticker As String)
+
+    If Not activeStraddles Is Nothing Then
+
+        If activeStraddles.Exists(ticker) Then activeStraddles.Remove ticker
+
+    End If
+
+End Sub
+
+
+
+Private Function GetTickSize(ByVal price As Double) As Double
+
+    If price <= 0 Then
+
+        GetTickSize = 0.1
+
+        Exit Function
+
+    End If
+
+    Select Case price
+
+        Case Is < 3000
+
+            GetTickSize = 1
+
+        Case Is < 5000
+
+            GetTickSize = 5
+
+        Case Is < 30000
+
+            GetTickSize = 10
+
+        Case Is < 50000
+
+            GetTickSize = 50
+
+        Case Is < 300000
+
+            GetTickSize = 100
+
+        Case Is < 500000
+
+            GetTickSize = 500
+
+        Case Is < 3000000
+
+            GetTickSize = 1000
+
+        Case Is < 5000000
+
+            GetTickSize = 5000
+
+        Case Else
+
+            GetTickSize = 10000
+
+    End Select
+
+End Function
+
+Private Function AlignToTick(ByVal price As Double, ByVal tick As Double) As Double
+
+    If tick <= 0 Then
+
+        AlignToTick = price
+
+        Exit Function
+
+    End If
+
+    On Error GoTo fallback
+
+    Dim ratio As Double
+
+    ratio = price / tick
+
+    AlignToTick = Application.WorksheetFunction.Round(ratio, 0) * tick
+
+    Exit Function
+
+fallback:
+
+    AlignToTick = Round(price / tick, 0) * tick
+
+End Function
+
+
+
+Private Function DashboardHeaderList() As Variant
+
+    Dim rt As Variant: rt = RealTimeHeaderList()
+
+    Dim cand As Variant: cand = CandidateHeaderList()
+
+    Dim total() As Variant
+
+    Dim i As Long, offset As Long
+
+    ReDim total(0 To UBound(rt) + UBound(cand) + 1)
+
+    For i = 0 To UBound(rt)
+
+        total(offset) = rt(i)
+
+        offset = offset + 1
+
+    Next i
+
+    Dim j As Long
+
+    For j = 0 To UBound(cand)
+
+        total(offset) = cand(j)
+
+        offset = offset + 1
+
+    Next j
+
+    DashboardHeaderList = total
+
+End Function
+
+
+
+
+
+Private Function HeaderNameJP() As String
+
+    HeaderNameJP = ChrW(&H9298) & ChrW(&H67C4) & ChrW(&H540D)
+
+End Function
+
+
+
+Private Function HeaderLastJP() As String
+
+    HeaderLastJP = ChrW(&H73FE) & ChrW(&H5728) & ChrW(&H5024)
+
+End Function
+
+
+
+Private Function HeaderJValueJP() As String
+
+    HeaderJValueJP = ChrW(&H73FE) & ChrW(&H5728) & ChrW(&H306E) & "J" & ChrW(&H5024)
+
+End Function
+
+
+
+Private Function HeaderJGapJP() As String
+
+    HeaderJGapJP = ChrW(&H95BE) & ChrW(&H5024) & ChrW(&H4E56) & ChrW(&H96E2) & ChrW(&H7387) & ChrW(&HFF08) & "%" & ChrW(&HFF09)
+
+End Function
+
+
+
+Private Function HeaderVwapJP() As String
+
+    HeaderVwapJP = ChrW(&H51FA) & ChrW(&H6765) & ChrW(&H9AD8) & ChrW(&H52A0) & ChrW(&H91CD) & ChrW(&H5E73) & ChrW(&H5747)
+
+End Function
+
+
+
+Private Function HeaderSignalStatusJP() As String
+
+    HeaderSignalStatusJP = ChrW(&H30B7) & ChrW(&H30B0) & ChrW(&H30CA) & ChrW(&H30EB) & ChrW(&H70B9) & ChrW(&H706F)
+
+End Function
+
+
+
+Private Function HeaderSignalKindJP() As String
+
+    HeaderSignalKindJP = ChrW(&H30B7) & ChrW(&H30B0) & ChrW(&H30CA) & ChrW(&H30EB) & ChrW(&H7A2E) & ChrW(&H5225)
+
+End Function
+
+
+
+Private Function HeaderPrevCloseJP() As String
+
+    HeaderPrevCloseJP = ChrW(&H524D) & ChrW(&H65E5) & ChrW(&H7D42) & ChrW(&H5024)
+
+End Function
+
+
+
+Private Function HeaderPreopenBidJP() As String
+
+    HeaderPreopenBidJP = ChrW(&H6700) & ChrW(&H826F) & ChrW(&H8CB7) & ChrW(&H6C17) & ChrW(&H914D) & ChrW(&H5024)
+
+End Function
+
+
+
+Private Function HeaderPreopenAskJP() As String
+
+    HeaderPreopenAskJP = ChrW(&H6700) & ChrW(&H826F) & ChrW(&H58F2) & ChrW(&H6C17) & ChrW(&H914D) & ChrW(&H5024)
+
+End Function
+
+
+
+Private Function HeaderPreopenMidJP() As String
+
+    HeaderPreopenMidJP = ChrW(&H6C17) & ChrW(&H914D) & ChrW(&H5024) & ChrW(&HFF08) & ChrW(&H4E2D) & ChrW(&H592E) & ChrW(&HFF09)
+
+End Function
+
+
+
+Private Function RssFieldPreopenBidCode() As String
+
+    RssFieldPreopenBidCode = "56"
+
+End Function
+
+
+
+Private Function RssFieldPreopenAskCode() As String
+
+    RssFieldPreopenAskCode = "55"
+
+End Function
+
+
+
+Private Function HeaderLiveGapBpJP() As String
+
+    HeaderLiveGapBpJP = ChrW(&H30E9) & ChrW(&H30A4) & ChrW(&H30D6) & ChrW(&H30AE) & ChrW(&H30E3) & ChrW(&H30C3) & ChrW(&H30D7) & "(bp)"
+
+End Function
+
+
+
+Private Function HeaderLiveGapBucketJP() As String
+
+    HeaderLiveGapBucketJP = ChrW(&H30E9) & ChrW(&H30A4) & ChrW(&H30D6) & ChrW(&H30AE) & ChrW(&H30E3) & ChrW(&H30C3) & ChrW(&H30D7) & ChrW(&H5E2F)
+
+End Function
+
+
+
+Private Function HeaderLiveGapActionJP() As String
+
+    HeaderLiveGapActionJP = ChrW(&H30E9) & ChrW(&H30A4) & ChrW(&H30D6) & ChrW(&H30A2) & ChrW(&H30AF) & ChrW(&H30B7) & ChrW(&H30E7) & ChrW(&H30F3)
+
+End Function
+
+
+
+Private Function ExecHeaderDateJP() As String
+    ExecHeaderDateJP = ChrW(&H7D04) & ChrW(&H5B9A) & ChrW(&H65E5) & ChrW(&H6642)
+End Function
+
+Private Function ExecHeaderDateAltJP() As String
+    ExecHeaderDateAltJP = ChrW(&H7D04) & ChrW(&H5B9A) & ChrW(&H65E5) & ChrW(&H4ED8)
+End Function
+
+Private Function ExecHeaderDateShortJP() As String
+    ExecHeaderDateShortJP = ChrW(&H7D04) & ChrW(&H5B9A) & ChrW(&H65E5)
+End Function
+
+Private Function ExecHeaderTickerJP() As String
+    ExecHeaderTickerJP = ChrW(&H9298) & ChrW(&H67C4) & ChrW(&H30B3) & ChrW(&H30FC) & ChrW(&H30C9)
+End Function
+
+Private Function ExecHeaderTickerShortJP() As String
+    ExecHeaderTickerShortJP = ChrW(&H9298) & ChrW(&H67C4)
+End Function
+
+Private Function ExecHeaderSideJP() As String
+    ExecHeaderSideJP = ChrW(&H58F2) & ChrW(&H8CB7) & ChrW(&H533A) & ChrW(&H5206)
+End Function
+
+Private Function ExecHeaderSideShortJP() As String
+    ExecHeaderSideShortJP = ChrW(&H58F2) & ChrW(&H8CB7)
+End Function
+
+Private Function ExecHeaderSideAltJP() As String
+    ExecHeaderSideAltJP = ChrW(&H533A) & ChrW(&H5206)
+End Function
+
+Private Function ExecHeaderQtyJP() As String
+    ExecHeaderQtyJP = ChrW(&H7D04) & ChrW(&H5B9A) & ChrW(&H6570) & ChrW(&H91CF)
+End Function
+
+Private Function ExecHeaderQtyShortJP() As String
+    ExecHeaderQtyShortJP = ChrW(&H6570) & ChrW(&H91CF)
+End Function
+
+Private Function ExecHeaderQtyAltJP() As String
+    ExecHeaderQtyAltJP = ChrW(&H682A) & ChrW(&H6570)
+End Function
+
+Private Function ExecHeaderPriceJP() As String
+    ExecHeaderPriceJP = ChrW(&H7D04) & ChrW(&H5B9A) & ChrW(&H5358) & ChrW(&H4FA1)
+End Function
+
+Private Function ExecHeaderPriceAltJP() As String
+    ExecHeaderPriceAltJP = ChrW(&H7D04) & ChrW(&H5B9A) & ChrW(&H4FA1) & ChrW(&H683C)
+End Function
+
+Private Function ExecHeaderPriceShortJP() As String
+    ExecHeaderPriceShortJP = ChrW(&H5358) & ChrW(&H4FA1)
+End Function
+
+Private Function RssFieldNameFullJP() As String
+
+    RssFieldNameFullJP = ChrW(&H9298) & ChrW(&H67C4) & ChrW(&H540D) & ChrW(&H79F0)
+
+End Function
+
+
+
+Private Function RssFieldVwapFullJP() As String
+
+    RssFieldVwapFullJP = ChrW(&H51FA) & ChrW(&H6765) & ChrW(&H9AD8) & ChrW(&H52A0) & ChrW(&H91CD) & ChrW(&H5E73) & ChrW(&H5747)
+
+End Function
+
+
+
+Private Function RssFieldLastJP() As String
+
+    RssFieldLastJP = HeaderLastJP()
+
+End Function
+
+
+
+Private Function RssFieldBestAskJP() As String
+
+    RssFieldBestAskJP = ChrW(&H6700) & ChrW(&H826F) & ChrW(&H58F2) & ChrW(&H6C17) & ChrW(&H914D) & ChrW(&H5024)
+
+End Function
+
+
+
+Private Function RssFieldBestBidJP() As String
+
+    RssFieldBestBidJP = ChrW(&H6700) & ChrW(&H826F) & ChrW(&H8CB7) & ChrW(&H6C17) & ChrW(&H914D) & ChrW(&H5024)
+
+End Function
+
+
+
+
+
+Public Sub ButtonLoadCandidates()
+
+    On Error GoTo Fail
+
+    EnsureRuntimeReady False
+
+    LoadCandidates
+
+    Exit Sub
+
+Fail:
+
+    Dim errNum As Long: errNum = Err.Number
+
+    Dim errDesc As String: errDesc = Err.Description
+
+    LogDebug "ButtonLoadCandidates error err=" & errNum & " desc=" & errDesc
+
+    Err.Clear
+
+    If errNum <> 0 Then Err.Raise errNum, "AutoTrader.ButtonLoadCandidates", errDesc
+
+End Sub
+
+
+
+Private Sub ApplyRealtimeColumns(ByVal ws As Worksheet, Optional ByVal fillLastOverride As Long = 0)
+
+
+
+    Dim wasProtected As Boolean
+
+    On Error Resume Next
+
+    wasProtected = ws.ProtectContents
+
+    If wasProtected Then ws.Unprotect Password:=""
+
+    On Error GoTo 0
+
+
+
+
+
+    Dim tickerCol As Long
+
+
+
+    tickerCol = FindColumn(ws, DASH_HEADER_ROW, "Ticker")
+
+
+
+    If tickerCol = 0 Then Exit Sub
+
+
+
+
+
+
+
+    Dim lastDataRow As Long
+
+
+
+    lastDataRow = ws.Cells(ws.Rows.Count, tickerCol).End(xlUp).ROW
+
+
+
+    If lastDataRow < DASH_DATA_START Then lastDataRow = DASH_DATA_START
+
+
+
+
+
+
+
+    Dim fillLast As Long
+
+
+
+    fillLast = lastDataRow
+
+
+
+    If fillLast < DASH_DATA_START + DASH_FORMULA_ROWS Then
+
+
+
+        fillLast = DASH_DATA_START + DASH_FORMULA_ROWS
+
+
+
+    End If
+
+
+
+    If fillLastOverride >= DASH_DATA_START Then
+
+
+
+        fillLast = fillLastOverride
+
+
+
+    End If
+
+
+
+
+
+
+
+    Dim tickerSrcCol As Long
+
+    tickerSrcCol = FindColumn(ws, DASH_HEADER_ROW, "TickerSrc")
+
+    If tickerSrcCol > 0 Then
+
+        Dim tickerRef As String
+
+        tickerRef = BuildR1C1Ref(tickerSrcCol, tickerCol)
+
+        SetColumnFormula ws, tickerCol, fillLast, "=IF(" & tickerRef & "="""",""""," & tickerRef & ")"
+
+    Else
+
+        ws.Range(ws.Cells(DASH_DATA_START, tickerCol), ws.Cells(fillLast, tickerCol)).ClearContents
+
+    End If
+
+
+
+
+
+
+
+    Dim signalStatusCol As Long
+
+
+
+    signalStatusCol = FindColumn(ws, DASH_HEADER_ROW, HeaderSignalStatusJP())
+
+    If signalStatusCol = 0 And tickerCol > 0 Then signalStatusCol = tickerCol + 4
+
+
+
+    Dim signalKindCol As Long
+
+
+
+    signalKindCol = FindColumn(ws, DASH_HEADER_ROW, HeaderSignalKindJP())
+
+    If signalKindCol = 0 And tickerCol > 0 Then signalKindCol = tickerCol + 5
+
+
+
+    Dim selectedCol As Long
+
+    selectedCol = FindColumn(ws, DASH_HEADER_ROW, "Selected")
+
+
+
+    Dim signalModeCol As Long
+
+    signalModeCol = FindColumn(ws, DASH_HEADER_ROW, "SignalMode")
+
+
+
+    Dim currentJCol As Long
+
+
+
+    currentJCol = FindColumn(ws, DASH_HEADER_ROW, HeaderJValueJP())
+
+    If currentJCol = 0 And tickerCol > 0 Then currentJCol = tickerCol + 2
+
+
+
+
+
+
+
+    Dim gapPctCol As Long
+
+
+
+    gapPctCol = FindColumn(ws, DASH_HEADER_ROW, HeaderJGapJP())
+
+    If gapPctCol = 0 And tickerCol > 0 Then gapPctCol = tickerCol + 3
+
+
+
+
+
+
+
+    Dim nameCol As Long
+
+
+
+    nameCol = FindColumn(ws, DASH_HEADER_ROW, HeaderNameJP())
+
+    If nameCol = 0 And tickerCol > 0 Then nameCol = tickerCol + 1
+
+
+
+    If nameCol > 0 Then
+
+
+
+        Dim nameRef As String
+
+
+
+        nameRef = BuildR1C1Ref(tickerCol, nameCol)
+
+
+
+        SetColumnFormula ws, nameCol, fillLast, "=IF(" & nameRef & "="","",IFERROR(RssMarket(" & nameRef & "," & QuoteForFormula(RssFieldNameFullJP()) & "),""))"
+
+
+
+    End If
+
+
+
+
+
+
+
+    Dim lastCol As Long
+
+
+
+    lastCol = FindColumn(ws, DASH_HEADER_ROW, HeaderLastJP())
+
+    If lastCol = 0 And tickerCol > 0 Then lastCol = tickerCol + 6
+
+
+
+    If lastCol > 0 Then
+
+
+
+        Dim lastRef As String
+
+
+
+        lastRef = BuildR1C1Ref(tickerCol, lastCol)
+
+
+
+        SetColumnFormula ws, lastCol, fillLast, "=IF(" & lastRef & "="","",IFERROR(RssMarket(" & lastRef & "," & QuoteForFormula(HeaderLastJP()) & "),""))"
+
+
+
+    End If
+
+
+
+
+
+
+
+    Dim vwapCol As Long
+
+
+
+    vwapCol = FindColumn(ws, DASH_HEADER_ROW, HeaderVwapJP())
+
+    If vwapCol = 0 And tickerCol > 0 Then vwapCol = tickerCol + 7
+
+
+
+    If vwapCol > 0 Then
+
+
+
+        Dim vwapRef As String
+
+
+
+        vwapRef = BuildR1C1Ref(tickerCol, vwapCol)
+
+
+
+        SetColumnFormula ws, vwapCol, fillLast, "=IF(" & vwapRef & "="","",IFERROR(RssMarket(" & vwapRef & "," & QuoteForFormula(RssFieldVwapFullJP()) & "),""))"
+
+
+
+    End If
+
+
+
+
+
+
+
+    Dim atrCol As Long
+
+
+
+    atrCol = FindColumn(ws, DASH_HEADER_ROW, "ATR_n")
+
+
+
+    If currentJCol > 0 And lastCol > 0 And vwapCol > 0 And atrCol > 0 Then
+
+
+
+        Dim lastRefJ As String
+
+
+
+        Dim vwapRefJ As String
+
+
+
+        Dim atrRefJ As String
+
+
+
+        lastRefJ = BuildR1C1Ref(lastCol, currentJCol)
+
+
+
+        vwapRefJ = BuildR1C1Ref(vwapCol, currentJCol)
+
+
+
+        atrRefJ = BuildR1C1Ref(atrCol, currentJCol)
+
+
+
+        SetColumnFormula ws, currentJCol, fillLast, "=IF(OR(" & lastRefJ & "=""," & vwapRefJ & "=""," & atrRefJ & "=0),"",((" & lastRefJ & "-" & vwapRefJ & ")/" & atrRefJ & ")/100)"
+
+
+
+    ElseIf currentJCol > 0 Then
+
+
+
+        SetColumnFormula ws, currentJCol, fillLast, "="""
+
+
+
+    End If
+
+
+
+
+
+
+
+    Dim prevCloseCol As Long
+
+
+
+    prevCloseCol = FindColumn(ws, DASH_HEADER_ROW, HeaderPrevCloseJP())
+
+    If prevCloseCol = 0 And tickerCol > 0 Then prevCloseCol = tickerCol + 8
+
+
+
+    If prevCloseCol > 0 Then
+
+
+
+        Dim prevRef As String
+
+
+
+        prevRef = BuildR1C1Ref(tickerCol, prevCloseCol)
+
+
+
+        SetColumnFormula ws, prevCloseCol, fillLast, "=IF(" & prevRef & "="","",IFERROR(RssMarket(" & prevRef & "," & QuoteForFormula(HeaderPrevCloseJP()) & "),""))"
+
+
+
+    End If
+
+
+
+
+
+
+
+    Dim bidCol As Long
+
+
+
+    bidCol = FindColumn(ws, DASH_HEADER_ROW, HeaderPreopenBidJP())
+
+    If bidCol = 0 And tickerCol > 0 Then bidCol = tickerCol + 9
+
+
+
+    If bidCol > 0 Then
+
+
+
+        Dim bidRef As String
+
+
+
+        bidRef = BuildR1C1Ref(tickerCol, bidCol)
+
+
+
+        ' Bid/Ask 驍ｵ・ｽE・ｽ繝ｻ・ｽE・ｽ鬯ｩ・ｽE・ｽ闖ｫ・ｽE・ｽ雎悟ｸｷ・ｽE・ｽ・ｽE・ｽ繝ｻ・ｽE・ｽ驛｢譎｢・ｽE・ｽ・ｽE・ｽ驛｢譎牙愛隴ｫ螟頑ｰ幄ｫ､諛奇ｿｽE驛｢・ｽE・ｽ陋幢ｽｵ隨ｳ螳茨ｽｸ・ｽE・ｽ繝ｻ・ｽE・ｽ驍ｵ・ｽE・ｽ繝ｻ・ｽE・ｽ驍ｵ・ｽE・ｽ繝ｻ・ｽE・ｽ髮九ｑ・ｽE・ｽ・ｽE・ｽ驍ｵ・ｽE・ｽ陷ｻ・ｽE・ｽ繝ｻ・ｽE・ｽ郢晢ｽｻ85A.T 鬩包ｽｲ陝ｲ・ｽE・ｽ郢晢ｽｻ驛｢・ｽE・ｽ繝ｻ・ｽE・ｽ驛｢譎｢・ｽE・ｽ・ｽE・ｽ驛｢譎・・ｽ・ｽ譁撰ｼ憺Δ譎冗函郢晢ｽ｣驛｢譎冗樟繝ｻ螳夲ｿｽE繝ｻ・ｽE・ｽ驛｢・ｽE・ｽ・ｽE・ｽﾂ驛｢・ｽE・ｽ繝ｻ・ｽE・ｽ驛｢譎｢・ｽE・ｽ・ｽE・ｽ驛｢譎臥櫨繝ｻ・ｽE・ｽ繝ｻ・ｽE・ｽ髯滂ｽ｢隲幢ｽｶ繝ｻ・ｽE・ｽ郢晢ｽｻ        SetColumnFormula ws, bidCol, fillLast, "=IF(" & bidRef & "="","",IFERROR(RssMarket(" & bidRef & "," & QuoteForFormula(RssFieldBestBidJP()) & "),""))"
+
+
+
+    End If
+
+
+
+
+
+
+
+    Dim askCol As Long
+
+
+
+    askCol = FindColumn(ws, DASH_HEADER_ROW, HeaderPreopenAskJP())
+
+    If askCol = 0 And tickerCol > 0 Then askCol = tickerCol + 10
+
+
+
+    If askCol > 0 Then
+
+
+
+        Dim askRef As String
+
+
+
+        askRef = BuildR1C1Ref(tickerCol, askCol)
+
+
+
+        SetColumnFormula ws, askCol, fillLast, "=IF(" & askRef & "="","",IFERROR(RssMarket(" & askRef & "," & QuoteForFormula(RssFieldBestAskJP()) & "),""))"
+
+
+
+    End If
+
+
+
+
+
+
+
+    Dim midCol As Long
+
+
+
+    midCol = FindColumn(ws, DASH_HEADER_ROW, HeaderPreopenMidJP())
+
+    If midCol = 0 And tickerCol > 0 Then midCol = tickerCol + 11
+
+
+
+    If midCol > 0 And bidCol > 0 And askCol > 0 Then
+
+
+
+        Dim bidRefForMid As String
+
+
+
+        Dim askRefForMid As String
+
+
+
+        bidRefForMid = BuildR1C1Ref(bidCol, midCol)
+
+
+
+        askRefForMid = BuildR1C1Ref(askCol, midCol)
+
+
+
+        SetColumnFormula ws, midCol, fillLast, "=IF(OR(" & bidRefForMid & "=""," & askRefForMid & "=""),"",(" & bidRefForMid & "+" & askRefForMid & ")/2)"
+
+
+
+    End If
+
+
+
+
+
+
+
+    Dim gapBpCol As Long
+
+
+
+    gapBpCol = FindColumn(ws, DASH_HEADER_ROW, HeaderLiveGapBpJP())
+
+    If gapBpCol = 0 And tickerCol > 0 Then gapBpCol = tickerCol + 12
+
+
+
+    If gapBpCol > 0 And midCol > 0 And prevCloseCol > 0 Then
+
+
+
+        Dim midRefForGap As String
+
+
+
+        Dim prevRefForGap As String
+
+
+
+        midRefForGap = BuildR1C1Ref(midCol, gapBpCol)
+
+
+
+        prevRefForGap = BuildR1C1Ref(prevCloseCol, gapBpCol)
+
+
+
+        SetColumnFormula ws, gapBpCol, fillLast, "=IF(OR(" & midRefForGap & "=""," & prevRefForGap & "=""),"",(" & midRefForGap & "-" & prevRefForGap & ")/" & prevRefForGap & "*10000)"
+
+
+
+    End If
+
+
+
+
+
+
+
+    Dim jthCol As Long
+
+
+
+    jthCol = FindColumn(ws, DASH_HEADER_ROW, "J_th")
+
+
+
+    If gapPctCol > 0 Then
+
+
+
+        If currentJCol > 0 And jthCol > 0 Then
+
+
+
+            Dim currentRefGap As String
+
+            Dim jthRef As String
+
+            currentRefGap = BuildR1C1Ref(currentJCol, gapPctCol)
+
+            jthRef = BuildR1C1Ref(jthCol, gapPctCol)
+
+
+
+            ' 鬯ｮ・ｽE・ｽ陋ｹ繝ｻ・ｽE・ｽ・ｽE・ｽ繝ｻ・ｽE・ｽ鬮ｯ讓奇ｽｻ阮呻ｿｽE郢晢ｽｻ繝ｻ・ｽE・ｽ郢晢ｽｻ繝ｻ・ｽE・ｽ鬯ｯ・ｽE・ｽ鬮ｦ・ｽE・ｽ郢晢ｽｻ驛｢譎｢・ｽE・ｽ・ｽE・ｽ驛｢譎｢・ｽE・ｽ・ｽE・ｽ郢晢ｽｻ繝ｻ・ｽE・ｽ鬮ｯ讓奇ｽｺ蛛・・ｽ・ｽ莉｣繝ｻ繝ｻ・ｽE・ｽ郢晢ｽｻ繝ｻ・ｽE・ｽ驛｢譎｢・ｽE・ｽ・ｽE・ｽ郢晢ｽｻ繝ｻ・ｽE・ｽ: |J - J_th| / |J_th| * 100
+
+            SetColumnFormula ws, gapPctCol, fillLast, "=IF(OR(" & jthRef & "=""," & currentRefGap & "=""," & jthRef & "=0),"",ABS(" & currentRefGap & "-" & jthRef & ")/ABS(" & jthRef & ")*100)"
+
+
+
+            Dim rngGap As Range
+
+            Set rngGap = ws.Range(ws.Cells(DASH_DATA_START, gapPctCol), ws.Cells(fillLast, gapPctCol))
+
+
+
+            On Error Resume Next
+
+            rngGap.FormatConditions.Delete
+
+            On Error GoTo 0
+
+
+
+            ' 鬯ｮ・ｽE・ｽ繝ｻ・ｽE・ｽ髯樊ｻゑｽｽ・ｽE・ｽ郢晢ｽｻ繝ｻ・ｽE・ｽ郢晢ｽｻ繝ｻ・ｽE・ｽ鬯ｮ・ｽE・ｽ雎郁ｲｻ・ｽE・ｽ・ｽE・ｽ陞滂ｽｲ繝ｻ・ｽE・ｽ繝ｻ・ｽE・ｽ郢晢ｽｻ繝ｻ・ｽE・ｽ鬯ｮ・ｽE・ｽ騾ｧ・ｽE・ｽ騾包ｽ･繝ｻ縺､ﾂ郢晢ｽｻ繝ｻ・ｽE・ｽ鬩包ｽｯ繝ｻ・ｽE・ｽ郢晢ｽｻ繝ｻ・ｽE・ｽ鬯ｮ・ｽE・ｽ繝ｻ・ｽE・ｽ髯ｷ・ｽE・ｽ郢晢ｽｻ繝ｻ・ｽE・ｽ繝ｻ・ｽE・ｽ郢晢ｽｻ繝ｻ・ｽE・ｽ鬯ｮ・ｽE・ｽ雋贋ｼ夲ｽｽ・ｽE・ｽ繝ｻ・ｽE・ｽ驛｢譎｢・ｽE・ｽ・ｽE・ｽ 0% 鬯ｩ謳ｾ・ｽE・ｽ・ｽE・ｽ郢晢ｽｻ繝ｻ・ｽE・ｽ驛｢譎｢・ｽE・ｽ・ｽE・ｽ郢晢ｽｻ繝ｻ・ｽE・ｽ鬯ｮ・ｽE・ｽ髮懶ｽ｣繝ｻ・ｽE・ｽ繝ｻ・ｽE・ｽ鬩幢ｽ｢隴趣ｽ｢繝ｻ・ｽE・ｽ繝ｻ・ｽE・ｽ驛｢譎｢・ｽE・ｽ・ｽE・ｽ髫ｶ髮｣・ｽE・ｽ・ｽE・ｽ驍ｵ・ｽE・ｽ隶鯉ｽ｢髢ｼ繧・・ｽE繝ｻ・ｽE・ｽ郢晢ｽｻ邵ｺ・ｽE・ｽ・ｽE・ｽﾂ鬩幢ｽ｢隴趣ｽ｢繝ｻ・ｽE・ｽ繝ｻ・ｽE・ｽ0%鬯ｮ・ｽE・ｽ雎郁ｲｻ・ｽE・ｽ・ｽE・ｽ陞滂ｽｲ繝ｻ・ｽE・ｽ繝ｻ・ｽE・ｽ郢晢ｽｻ繝ｻ・ｽE・ｽ鬯ｮ・ｽE・ｽ陋ｹ繝ｻ・ｽE・ｽ・ｽE・ｽ繝ｻ・ｽE・ｽ鬮｣蛹・・ｽ・ｽ・ｽE・ｽ髫ｴ謫ｾ・ｽE・ｽ・ｽE・ｽ驛｢譎｢・ｽE・ｽ・ｽE・ｽ鬯ｯ・ｽE・ｽ繝ｻ・ｽE・ｽ郢晢ｽｻ繝ｻ・ｽE・ｽ鬩幢ｽ｢隴趣ｽ｢繝ｻ・ｽE・ｽ繝ｻ・ｽE・ｽ驛｢譎｢・ｽE・ｽ・ｽE・ｽ髫ｶ髮｣・ｽE・ｽ・ｽE・ｽ驍ｵ・ｽE・ｽ鬪ｰ蜈ｷ・ｽE・ｽ・ｽE・ｽ隴趣ｽ｢繝ｻ・ｽE・ｽ繝ｻ・ｽE・ｽ
+
+            Dim fc0 As FormatCondition
+
+            Set fc0 = rngGap.FormatConditions.Add(Type:=xlCellValue, Operator:=xlEqual, Formula1:="0")
+
+            fc0.Interior.Color = RGB(0, 176, 80)
+
+            On Error Resume Next: fc0.StopIfTrue = True: On Error GoTo 0
+
+
+
+            Dim fc1 As FormatCondition
+
+            Set fc1 = rngGap.FormatConditions.Add(Type:=xlCellValue, Operator:=xlLessEqual, Formula1:="30")
+
+            fc1.Interior.Color = RGB(146, 208, 80)
+
+
+
+        Else
+
+            SetColumnFormula ws, gapPctCol, fillLast, "="""
+
+        End If
+
+
+
+    End If
+
+
+
+
+
+
+
+    Dim gapBucketCol As Long
+
+
+
+    gapBucketCol = FindColumn(ws, DASH_HEADER_ROW, HeaderLiveGapBucketJP())
+
+    If gapBucketCol = 0 And tickerCol > 0 Then gapBucketCol = tickerCol + 13
+
+
+
+    If gapBucketCol > 0 And gapBpCol > 0 Then
+
+
+
+        Dim gapRef As String
+
+
+
+        gapRef = BuildR1C1Ref(gapBpCol, gapBucketCol)
+
+
+
+        SetColumnFormula ws, gapBucketCol, fillLast, "=IF(" & gapRef & "="""","""",IF(ABS(" & gapRef & ")>=120," & QuoteForFormula(">=120bp") & ",IF(ABS(" & gapRef & ")>=80," & QuoteForFormula("80-120bp") & ",IF(ABS(" & gapRef & ")>=50," & QuoteForFormula("50-80bp") & "," & QuoteForFormula("<50bp") & "))))"
+
+
+
+    End If
+
+
+
+
+
+
+
+    Dim actionCol As Long
+
+
+
+    actionCol = FindColumn(ws, DASH_HEADER_ROW, HeaderLiveGapActionJP())
+
+    If actionCol = 0 And tickerCol > 0 Then actionCol = tickerCol + 14
+
+
+
+    If actionCol > 0 And gapBucketCol > 0 Then
+
+
+
+        Dim bucketRef As String
+
+
+
+        bucketRef = BuildR1C1Ref(gapBucketCol, actionCol)
+
+
+
+        SetColumnFormula ws, actionCol, fillLast, "=IF(" & bucketRef & "="""","""",IF(" & bucketRef & "=" & QuoteForFormula(">=120bp") & "," & QuoteForFormula("j-cross only; TP-0.2; SL+0.2") & ",IF(" & bucketRef & "=" & QuoteForFormula("80-120bp") & "," & QuoteForFormula("Skip opposite; J_th+0.2") & ",IF(" & bucketRef & "=" & QuoteForFormula("50-80bp") & "," & QuoteForFormula("J_th+0.1") & "," & QuoteForFormula("Baseline") & "))))"
+
+
+
+    End If
+
+
+
+    If signalStatusCol > 0 And selectedCol > 0 And currentJCol > 0 And jthCol > 0 Then
+
+        Dim selRef As String
+
+        Dim jRef As String
+
+        Dim jthStatusRef As String
+
+        Dim bidRefStatus As String
+
+        Dim askRefStatus As String
+
+        Dim midRefStatus As String
+
+        Dim prevRefStatus As String
+
+        selRef = BuildR1C1Ref(selectedCol, signalStatusCol)
+
+        jRef = BuildR1C1Ref(currentJCol, signalStatusCol)
+
+        jthStatusRef = BuildR1C1Ref(jthCol, signalStatusCol)
+
+        bidRefStatus = "0"
+
+        If bidCol > 0 Then bidRefStatus = BuildR1C1Ref(bidCol, signalStatusCol)
+
+        askRefStatus = "0"
+
+        If askCol > 0 Then askRefStatus = BuildR1C1Ref(askCol, signalStatusCol)
+
+        midRefStatus = "0"
+
+        If midCol > 0 Then midRefStatus = BuildR1C1Ref(midCol, signalStatusCol)
+
+        prevRefStatus = "0"
+
+        If prevCloseCol > 0 Then prevRefStatus = BuildR1C1Ref(prevCloseCol, signalStatusCol)
+
+        Dim statusFormula As String
+        Dim emptyLit As String: emptyLit = QuoteForFormula("")
+        Dim noPriceLit As String: noPriceLit = QuoteForFormula("NO_PRICE")
+        Dim buyLit As String: buyLit = QuoteForFormula("BUY")
+        Dim sellLit As String: sellLit = QuoteForFormula("SELL")
+
+        statusFormula = "=IF(" & selRef & "<>1," & emptyLit & ","
+        statusFormula = statusFormula & "IF(OR(" & jRef & "=" & emptyLit & "," & jthStatusRef & "=" & emptyLit & "," & jthStatusRef & "=0)," & emptyLit & ","
+        statusFormula = statusFormula & "IF(" & jRef & "<0,"
+        statusFormula = statusFormula & "IF(IF(" & askRefStatus & ">0," & askRefStatus & ",IF(" & midRefStatus & ">0," & midRefStatus & "," & prevRefStatus & "))<=0," & noPriceLit & ",IF(ABS(" & jRef & ")>=ABS(" & jthStatusRef & ")," & buyLit & "," & emptyLit & ")),"
+        statusFormula = statusFormula & "IF(IF(" & bidRefStatus & ">0," & bidRefStatus & ",IF(" & midRefStatus & ">0," & midRefStatus & "," & prevRefStatus & "))<=0," & noPriceLit & ",IF(ABS(" & jRef & ")>=ABS(" & jthStatusRef & ")," & sellLit & "," & emptyLit & ")))))"
+        SetColumnFormula ws, signalStatusCol, fillLast, statusFormula
+
+    End If
+
+
+
+    If signalKindCol > 0 And signalStatusCol > 0 And signalModeCol > 0 Then
+
+        Dim statusRef As String
+
+        Dim modeRef As String
+
+
+
+        statusRef = BuildR1C1Ref(signalStatusCol, signalKindCol)
+
+        modeRef = BuildR1C1Ref(signalModeCol, signalKindCol)
+
+
+
+        Dim kindFormula As String
+        Dim emptyKindLit As String: emptyKindLit = QuoteForFormula("")
+        Dim noPriceKindLit As String: noPriceKindLit = QuoteForFormula("NO_PRICE")
+        Dim slashKindLit As String: slashKindLit = QuoteForFormula(" / ")
+        Dim buyKindLit As String: buyKindLit = QuoteForFormula("BUY")
+        Dim sellKindLit As String: sellKindLit = QuoteForFormula("SELL")
+
+        kindFormula = "=IF(" & statusRef & "=" & emptyKindLit & "," & emptyKindLit & ","
+        kindFormula = kindFormula & "IF(" & statusRef & "=" & noPriceKindLit & "," & noPriceKindLit & ","
+        kindFormula = kindFormula & "IF(OR(" & statusRef & "=" & buyKindLit & "," & statusRef & "=" & sellKindLit & "),"
+        kindFormula = kindFormula & "IF(" & modeRef & "=" & emptyKindLit & "," & statusRef & ","
+        kindFormula = kindFormula & statusRef & " & " & slashKindLit & " & " & modeRef & ","
+        kindFormula = kindFormula & statusRef & "))))"
+        SetColumnFormula ws, signalKindCol, fillLast, kindFormula
+
+    End If
+
+
+
+    ' Entry/TP/SL display columns
+
+    Dim entryBuyCol As Long: entryBuyCol = FindColumn(ws, DASH_HEADER_ROW, "EntryBuyPx")
+
+    Dim entrySellCol As Long: entrySellCol = FindColumn(ws, DASH_HEADER_ROW, "EntrySellPx")
+
+    Dim tpPriceCol As Long: tpPriceCol = FindColumn(ws, DASH_HEADER_ROW, "TP_price")
+
+    Dim slPriceCol As Long: slPriceCol = FindColumn(ws, DASH_HEADER_ROW, "SL_price")
+
+    Dim entrySideCol As Long: entrySideCol = FindColumn(ws, DASH_HEADER_ROW, "EntrySide")
+    Dim entryStatusCol As Long: entryStatusCol = FindColumn(ws, DASH_HEADER_ROW, "EntryStatus")
+
+    Dim atrColEntry As Long: atrColEntry = FindColumn(ws, DASH_HEADER_ROW, "ATR")
+
+    Dim tpKColEntry As Long: tpKColEntry = FindColumn(ws, DASH_HEADER_ROW, "TPk")
+
+    Dim slKColEntry As Long: slKColEntry = FindColumn(ws, DASH_HEADER_ROW, "SLk")
+
+    Dim jValCol As Long: jValCol = FindColumn(ws, DASH_HEADER_ROW, HeaderJValueJP())
+
+
+
+    If entryBuyCol > 0 And vwapCol > 0 And jthCol > 0 And atrColEntry > 0 Then
+        Dim vwapRefEB As String: vwapRefEB = BuildR1C1Ref(vwapCol, entryBuyCol)
+        Dim midRefEB As String: midRefEB = ""
+        If midCol > 0 Then midRefEB = BuildR1C1Ref(midCol, entryBuyCol)
+        Dim jthRefEB As String: jthRefEB = BuildR1C1Ref(jthCol, entryBuyCol)
+        Dim atrRefEB As String: atrRefEB = BuildR1C1Ref(atrColEntry, entryBuyCol)
+        Dim adjJExprEB As String
+        adjJExprEB = BuildAdjustedJExpression(ws, entryBuyCol, jthRefEB, gapBpCol)
+        Dim entryEmptyLit As String: entryEmptyLit = QuoteForFormula("")
+        Dim entryZeroLit As String: entryZeroLit = "0"
+        Dim entryFormula As String
+        Dim basePriceEB As String
+        If Len(midRefEB) > 0 Then
+            basePriceEB = "IF(" & vwapRefEB & "=" & entryEmptyLit & "," & midRefEB & "," & vwapRefEB & ")"
+        Else
+            basePriceEB = vwapRefEB
+        End If
+        entryFormula = "=IF(OR((" & basePriceEB & ")=" & entryEmptyLit & "," & jthRefEB & "=" & entryEmptyLit & "," & atrRefEB & "=" & entryZeroLit & ")," & entryEmptyLit & "," & basePriceEB & "-ABS(" & adjJExprEB & ")*" & atrRefEB & ")"
+        SetColumnFormula ws, entryBuyCol, fillLast, entryFormula
+    End If
+
+
+    If entrySellCol > 0 And vwapCol > 0 And jthCol > 0 And atrColEntry > 0 Then
+        Dim vwapRefES As String: vwapRefES = BuildR1C1Ref(vwapCol, entrySellCol)
+        Dim midRefES As String: midRefES = ""
+        If midCol > 0 Then midRefES = BuildR1C1Ref(midCol, entrySellCol)
+        Dim jthRefES As String: jthRefES = BuildR1C1Ref(jthCol, entrySellCol)
+        Dim atrRefES As String: atrRefES = BuildR1C1Ref(atrColEntry, entrySellCol)
+        Dim adjJExprES As String
+        adjJExprES = BuildAdjustedJExpression(ws, entrySellCol, jthRefES, gapBpCol)
+        Dim entrySellEmptyLit As String: entrySellEmptyLit = QuoteForFormula("")
+        Dim entrySellZeroLit As String: entrySellZeroLit = "0"
+        Dim entrySellFormula As String
+        Dim basePriceES As String
+        If Len(midRefES) > 0 Then
+            basePriceES = "IF(" & vwapRefES & "=" & entrySellEmptyLit & "," & midRefES & "," & vwapRefES & ")"
+        Else
+            basePriceES = vwapRefES
+        End If
+        entrySellFormula = "=IF(OR((" & basePriceES & ")=" & entrySellEmptyLit & "," & jthRefES & "=" & entrySellEmptyLit & "," & atrRefES & "=" & entrySellZeroLit & ")," & entrySellEmptyLit & "," & basePriceES & "+ABS(" & adjJExprES & ")*" & atrRefES & ")"
+        SetColumnFormula ws, entrySellCol, fillLast, entrySellFormula
+    End If
+
+
+    If entrySideCol > 0 And jValCol > 0 Then
+        Dim jRefESide As String: jRefESide = BuildR1C1Ref(jValCol, entrySideCol)
+        Dim entrySideEmptyLit As String: entrySideEmptyLit = QuoteForFormula("")
+        Dim entrySideBuyLit As String: entrySideBuyLit = QuoteForFormula("BUY")
+        Dim entrySideSellLit As String: entrySideSellLit = QuoteForFormula("SELL")
+        Dim entrySideFormula As String
+        entrySideFormula = "=IF(" & jRefESide & "=" & entrySideEmptyLit & "," & entrySideEmptyLit & ",IF(" & jRefESide & "<0," & entrySideBuyLit & "," & entrySideSellLit & "))"
+        SetColumnFormula ws, entrySideCol, fillLast, entrySideFormula
+    End If
+
+    If tpPriceCol > 0 And slPriceCol > 0 And atrColEntry > 0 And tpKColEntry > 0 And slKColEntry > 0 And jValCol > 0 And jthCol > 0 And entryBuyCol > 0 And entrySellCol > 0 Then
+        Dim jRefTP As String: jRefTP = BuildR1C1Ref(jValCol, tpPriceCol)
+        Dim atrRefTP As String: atrRefTP = BuildR1C1Ref(atrColEntry, tpPriceCol)
+        Dim tpKRef As String: tpKRef = BuildR1C1Ref(tpKColEntry, tpPriceCol)
+        Dim eBuyRef As String: eBuyRef = BuildR1C1Ref(entryBuyCol, tpPriceCol)
+        Dim eSellRef As String: eSellRef = BuildR1C1Ref(entrySellCol, tpPriceCol)
+        Dim jThRefTP As String: jThRefTP = BuildR1C1Ref(jthCol, tpPriceCol)
+        Dim tpPerJRef As String: tpPerJRef = ws.Range(DASH_TP_PER_J_CELL).Address(False, False, xlR1C1)
+        Dim tpPerJExpr As String: tpPerJExpr = "IF(" & tpPerJRef & "=\"\",0," & tpPerJRef & ")"
+        Dim jExcessExprTP As String: jExcessExprTP = "MAX(0,ABS(" & jRefTP & ")-ABS(" & jThRefTP & "))"
+        Dim tpMultiplierExpr As String: tpMultiplierExpr = "(" & tpKRef & "+" & tpPerJExpr & "*" & jExcessExprTP & ")"
+        Dim tpEmptyLit As String: tpEmptyLit = QuoteForFormula("")
+        Dim tpFormula As String
+        tpFormula = "=IF(OR(" & atrRefTP & "=0," & tpKRef & "=" & tpEmptyLit & "," & jThRefTP & "=" & tpEmptyLit & ")," & tpEmptyLit & ",IF(" & jRefTP & "<0," & eBuyRef & "+" & tpMultiplierExpr & "*" & atrRefTP & "," & eSellRef & "-" & tpMultiplierExpr & "*" & atrRefTP & "))"
+        SetColumnFormula ws, tpPriceCol, fillLast, tpFormula
+
+        Dim jRefSL As String: jRefSL = BuildR1C1Ref(jValCol, slPriceCol)
+        Dim atrRefSL As String: atrRefSL = BuildR1C1Ref(atrColEntry, slPriceCol)
+        Dim slKRef As String: slKRef = BuildR1C1Ref(slKColEntry, slPriceCol)
+        Dim eBuyRef2 As String: eBuyRef2 = BuildR1C1Ref(entryBuyCol, slPriceCol)
+        Dim eSellRef2 As String: eSellRef2 = BuildR1C1Ref(entrySellCol, slPriceCol)
+        Dim jThRefSL As String: jThRefSL = BuildR1C1Ref(jthCol, slPriceCol)
+        Dim slPerJRef As String: slPerJRef = ws.Range(DASH_SL_PER_J_CELL).Address(False, False, xlR1C1)
+        Dim slPerJExpr As String: slPerJExpr = "IF(" & slPerJRef & "=\"\",0," & slPerJRef & ")"
+        Dim jExcessExprSL As String: jExcessExprSL = "MAX(0,ABS(" & jRefSL & ")-ABS(" & jThRefSL & "))"
+        Dim slMultiplierExpr As String: slMultiplierExpr = "(" & slKRef & "+" & slPerJExpr & "*" & jExcessExprSL & ")"
+        Dim slEmptyLit As String: slEmptyLit = QuoteForFormula("")
+        Dim slFormula As String
+        slFormula = "=IF(OR(" & atrRefSL & "=0," & slKRef & "=" & slEmptyLit & "," & jThRefSL & "=" & slEmptyLit & ")," & slEmptyLit & ",IF(" & jRefSL & "<0," & eBuyRef2 & "-" & slMultiplierExpr & "*" & atrRefSL & "," & eSellRef2 & "+" & slMultiplierExpr & "*" & atrRefSL & "))"
+        SetColumnFormula ws, slPriceCol, fillLast, slFormula
+    End If
+
+
+
+    If wasProtected Then
+
+        ProtectRealtimeColumns ws
+
+    End If
+
+
+
+End Sub
+
+
+
+
+
+
+
+Private Sub EnsureRealtimeFirstRow(ByVal ws As Worksheet)
+
+
+
+    If ws Is Nothing Then Exit Sub
+
+
+
+    Dim tickerCol As Long
+
+    tickerCol = FindColumn(ws, DASH_HEADER_ROW, "Ticker")
+
+    If tickerCol = 0 Then Exit Sub
+
+
+
+    Dim hasFormula As Boolean
+
+    On Error Resume Next
+
+    hasFormula = ws.Cells(DASH_DATA_START, tickerCol).HasFormula
+
+    On Error GoTo 0
+
+    If hasFormula Then Exit Sub
+
+
+
+    Dim wasProtected As Boolean
+
+    On Error Resume Next
+
+    wasProtected = ws.ProtectContents
+
+    If wasProtected Then ws.Unprotect Password:=""
+
+    On Error GoTo 0
+
+
+
+    ApplyRealtimeColumns ws
+
+
+
+    If wasProtected Then
+
+        ProtectRealtimeColumns ws
+
+    End If
+
+
+
+End Sub
+
+
+
+
+
+
+
+Private Sub SetColumnFormula(ByVal ws As Worksheet, ByVal col As Long, ByVal fillLast As Long, ByVal formulaR1C1 As String)
+
+
+
+    If col <= 0 Then Exit Sub
+
+
+
+    Dim rngTarget As Range
+
+    Set rngTarget = ws.Range(ws.Cells(DASH_DATA_START, col), ws.Cells(fillLast, col))
+
+
+
+    Dim firstCell As Range
+
+    Set firstCell = rngTarget.Cells(1, 1)
+
+
+
+    Dim hasExisting As Boolean
+
+    Dim existingFormula As String
+
+    On Error Resume Next
+
+    hasExisting = firstCell.HasFormula
+
+    If hasExisting Then existingFormula = firstCell.FormulaR1C1
+
+    On Error GoTo 0
+
+
+
+    If hasExisting Then
+
+        If StrComp(existingFormula, formulaR1C1, vbBinaryCompare) = 0 Then
+
+            Exit Sub
+
+        End If
+
+    End If
+
+
+
+    On Error GoTo UseLocal
+
+
+
+    firstCell.FormulaR1C1 = formulaR1C1
+
+    GoTo AfterApply
+
+
+
+UseLocal:
+
+    Err.Clear
+
+    On Error GoTo ApplyFailed
+
+    Dim localFormula As String
+    localFormula = Replace(formulaR1C1, ",", Application.International(xlListSeparator))
+    firstCell.FormulaR1C1Local = localFormula
+
+
+
+AfterApply:
+
+    If rngTarget.Rows.Count > 1 Then
+
+        firstCell.AutoFill Destination:=rngTarget
+
+    End If
+
+
+
+    If Not firstCell.HasFormula Then
+
+        LogDebug "SetColumnFormula missing formula col=" & col & " after apply formulaR1C1=" & formulaR1C1
+
+    End If
+
+
+
+    On Error GoTo 0
+
+    Exit Sub
+
+
+
+ApplyFailed:
+
+    LogDebug "SetColumnFormula error col=" & col & " err=" & Err.Number & " desc=" & Err.Description & " formulaR1C1=" & formulaR1C1
+
+    Err.Clear
+
+    On Error GoTo 0
+
+End Sub
+
+
+
+Private Sub LogDebug(ByVal message As String)
+
+    Dim folder As String
+
+    folder = ThisWorkbook.path & "\logs"
+
+    On Error Resume Next
+
+    If Len(Dir$(folder, vbDirectory)) = 0 Then MkDir folder
+
+    If Err.Number <> 0 Then Err.Clear
+
+    On Error GoTo 0
+
+
+
+    Dim path As String
+
+    path = folder & "\autotrader_debug.log"
+
+
+
+    Dim f As Integer
+
+    f = FreeFile
+
+
+
+    On Error Resume Next
+
+    Open path For Append As #f
+
+    If Err.Number = 0 Then
+
+        Print #f, Format$(Now, "yyyy-mm-dd hh:nn:ss"), message
+
+        Close #f
+
+    Else
+
+        Err.Clear
+
+    End If
+
+    On Error GoTo 0
+
+End Sub
+
+
+
+Private Function IsHeadless() As Boolean
+
+
+
+    On Error Resume Next
+
+
+
+    IsHeadless = (Application.Interactive = False)
+
+
+
+    On Error GoTo 0
+
+
+
+End Function
+
+
+
+
+
+
+
+
+
+Private Function BuildR1C1Ref(ByVal sourceCol As Long, ByVal targetCol As Long) As String
+
+
+
+    Dim offset As Long
+
+
+
+    offset = sourceCol - targetCol
+
+
+
+    If offset = 0 Then
+
+
+
+        BuildR1C1Ref = "RC"
+
+
+
+    Else
+
+
+
+        BuildR1C1Ref = "RC[" & CStr(offset) & "]"
+
+
+
+    End If
+
+
+
+End Function
+
+
+
+
+
+
+
+Private Function ResolveHeaderAliases(ByVal name As String) As Variant
+
+
+
+    Dim key As String
+
+
+
+    key = LCase$(name)
+
+
+
+
+
+
+
+    Dim headerNameKey As String
+
+
+
+    headerNameKey = LCase$(HeaderNameJP())
+
+
+
+    Dim rssNameKey As String
+
+
+
+    rssNameKey = LCase$(RssFieldNameFullJP())
+
+
+
+    Dim headerLastKey As String
+
+
+
+    headerLastKey = LCase$(HeaderLastJP())
+
+
+
+    Dim headerVwapKey As String
+
+
+
+    headerVwapKey = LCase$(HeaderVwapJP())
+
+
+
+    Dim rssVwapKey As String
+
+
+
+    rssVwapKey = LCase$(RssFieldVwapFullJP())
+
+
+
+
+
+
+
+    Select Case key
+
+
+
+        Case "ticker"
+
+
+
+            ResolveHeaderAliases = Array("Ticker")
+
+
+
+        Case "j", LCase$(HeaderJValueJP()), "current_j"
+
+
+
+            ResolveHeaderAliases = Array(HeaderJValueJP(), "J", "current_j")
+
+
+
+        Case headerNameKey, rssNameKey, "name"
+
+
+
+            ResolveHeaderAliases = Array(HeaderNameJP(), RssFieldNameFullJP(), "Name")
+
+
+
+        Case LCase$(HeaderJGapJP()), "jgap", "gap_pct"
+
+
+
+            ResolveHeaderAliases = Array(HeaderJGapJP(), "JGap", "gap_pct")
+
+
+
+        Case LCase$(HeaderSignalStatusJP()), "signalstatus"
+
+
+
+            ResolveHeaderAliases = Array(HeaderSignalStatusJP(), "SignalStatus")
+
+
+
+        Case LCase$(HeaderSignalKindJP()), "signalkind"
+
+
+
+            ResolveHeaderAliases = Array(HeaderSignalKindJP(), "SignalKind")
+
+
+
+        Case headerLastKey, "last"
+
+
+
+            ResolveHeaderAliases = Array(HeaderLastJP(), RssFieldLastJP(), "Last")
+
+
+
+        Case headerVwapKey, rssVwapKey, "vwap"
+
+
+
+            ResolveHeaderAliases = Array(HeaderVwapJP(), RssFieldVwapFullJP(), "VWAP")
+
+
+
+        Case "forwardpf", "forward_pf_eff"
+
+
+
+            ResolveHeaderAliases = Array("ForwardPF", "forward_pf_eff")
+
+
+
+        Case "forwardtrades", "forward_trades"
+
+
+
+            ResolveHeaderAliases = Array("ForwardTrades", "forward_trades")
+
+
+
+        Case "forwardwin", "forward_winrate"
+
+
+
+            ResolveHeaderAliases = Array("ForwardWin", "forward_winrate")
+
+
+
+        Case "prevclose"
+
+
+
+            ResolveHeaderAliases = Array("PrevClose", HeaderPrevCloseJP())
+
+
+
+        Case "preopenbid"
+
+
+
+            ResolveHeaderAliases = Array("PreOpenBid", HeaderPreopenBidJP())
+
+
+
+        Case "preopenask"
+
+
+
+            ResolveHeaderAliases = Array("PreOpenAsk", HeaderPreopenAskJP())
+
+
+
+        Case "preopenmid"
+
+
+
+            ResolveHeaderAliases = Array("PreOpenMid", HeaderPreopenMidJP())
+
+
+
+        Case "livegapbp"
+
+
+
+            ResolveHeaderAliases = Array("LiveGapBp", HeaderLiveGapBpJP())
+
+
+
+        Case "livegapbucket"
+
+
+
+            ResolveHeaderAliases = Array("LiveGapBucket", HeaderLiveGapBucketJP())
+
+
+
+        Case "livegapaction"
+
+
+
+            ResolveHeaderAliases = Array("LiveGapAction", HeaderLiveGapActionJP())
+
+
+
+        Case Else
+
+
+
+            ResolveHeaderAliases = Array(name)
+
+
+
+    End Select
+
+
+
+End Function
+
+
+
+
+
+
+
+
+
+
+
+
+
+Public Sub ButtonPushCandidates()
+
+    EnsureRuntimeReady True
+
+    PushCandidatesToDashboard
+
+End Sub
+
+
+
+Public Sub ButtonStartAuto()
+
+    EnsureRuntimeReady True
+
+    StartAutoTrading
+
+End Sub
+
+
+
+Public Sub ButtonStopAuto()
+
+    StopAutoTrading
+
+End Sub
+
+
+
+Public Sub ResetDashboardHeaders()
+
+    ' Rebuild header labels only; keep existing formulas intact.
+
+    setupInitialized = False
+
+    EnsureSetup
+
+    Dim ws As Worksheet
+
+    Set ws = EnsureSheet(SHEET_DASHBOARD)
+
+    WriteHeaderTexts ws
+
+End Sub
+
+
+
+Private Sub ClearDashboardRealtime(ByVal ws As Worksheet)
+
+    Dim baseCol As Long: baseCol = 8
+
+    Dim rtHeaders As Variant: rtHeaders = RealTimeHeaderList()
+
+    Dim lastCol As Long: lastCol = baseCol + UBound(rtHeaders)
+
+    ws.Range(ws.Cells(DASH_DATA_START, baseCol), ws.Cells(DASH_DATA_START + DASH_FORMULA_ROWS, lastCol)).ClearContents
+
+End Sub
+
+
+
+Public Sub ButtonRefreshNow()
+
+    EnsureRuntimeReady True
+
+    EvaluateAndQueueOrders
+
+End Sub
+
+
+
+Public Sub ButtonQueueNow()
+
+    On Error GoTo Fail
+
+    EnsureRuntimeReady True
+
+    QueueNowDryRun
+
+    Exit Sub
+
+Fail:
+
+    LogDebug "ButtonQueueNow error err=" & Err.Number & " desc=" & Err.Description
+
+    Err.Clear
+
+End Sub
+
+
+
+Private Sub QueueNowDryRun()
+
+    Dim ws As Worksheet
+
+    Set ws = EnsureSheet(SHEET_DASHBOARD)
+
+    Dim tCol As Long: tCol = FindColumn(ws, DASH_HEADER_ROW, "Ticker")
+    Dim selCol As Long: selCol = FindColumn(ws, DASH_HEADER_ROW, "Selected")
+    Dim eBuyCol As Long: eBuyCol = FindColumn(ws, DASH_HEADER_ROW, "EntryBuyPx")
+    Dim eSellCol As Long: eSellCol = FindColumn(ws, DASH_HEADER_ROW, "EntrySellPx")
+    Dim entryStatusCol As Long: entryStatusCol = FindColumn(ws, DASH_HEADER_ROW, "EntryStatus")
+    Dim entrySideCol As Long: entrySideCol = FindColumn(ws, DASH_HEADER_ROW, "EntrySide")
+    Dim signalStatusCol As Long: signalStatusCol = FindColumn(ws, DASH_HEADER_ROW, HeaderSignalStatusJP())
+    Dim signalKindCol As Long: signalKindCol = FindColumn(ws, DASH_HEADER_ROW, HeaderSignalKindJP())
+    Dim modeCol As Long: modeCol = FindColumn(ws, DASH_HEADER_ROW, "SignalMode")
+
+    If tCol = 0 Or selCol = 0 Or eBuyCol = 0 Or eSellCol = 0 Then Exit Sub
+
+    Dim r As Long, lastRow As Long
+
+    lastRow = ws.Cells(ws.Rows.Count, tCol).End(xlUp).ROW
+
+    For r = DASH_DATA_START To lastRow
+
+        If CStr(ws.Cells(r, tCol).value) <> "" And CLng(IfZero(ws.Cells(r, selCol).value, 0)) = 1 Then
+
+            Dim t As String: t = CStr(ws.Cells(r, tCol).value)
+
+            Dim pxSell As Double: pxSell = CDbl(IfZero(ws.Cells(r, eSellCol).value, 0))
+            Dim pxBuy As Double: pxBuy = CDbl(IfZero(ws.Cells(r, eBuyCol).value, 0))
+            Dim qty As Long: qty = CLng(IfZero(ws.Range(DASH_QTY_CELL).value, DEFAULT_ORDER_QTY))
+            Dim modeLabel As String
+            If modeCol > 0 Then modeLabel = CStr(ws.Cells(r, modeCol).value) Else modeLabel = ""
+
+            If pxSell > 0 Then PlaceOrderDryRun t, "SELL", pxSell, qty, "QUEUE_NOW:ENTRY_SELL"
+            If pxBuy > 0 Then PlaceOrderDryRun t, "BUY", pxBuy, qty, "QUEUE_NOW:ENTRY_BUY"
+
+            If entryStatusCol > 0 Then ws.Cells(r, entryStatusCol).value = ENTRY_STATUS_WAIT_STRADDLE
+            If entrySideCol > 0 Then ws.Cells(r, entrySideCol).value = "STRADDLE(DRY)"
+            If signalStatusCol > 0 Then ws.Cells(r, signalStatusCol).value = ENTRY_STATUS_WAIT_STRADDLE
+            If signalKindCol > 0 Then
+                If Len(modeLabel) > 0 Then
+                    ws.Cells(r, signalKindCol).value = "STRADDLE / " & modeLabel
+                Else
+                    ws.Cells(r, signalKindCol).value = "STRADDLE"
+                End If
+            End If
+
+            Exit For
+
+        End If
+
+    Next r
+
+End Sub
+
+
+
+Public Sub AttachFormulasFromDashboardTemplate()
+
+    Dim wsSrc As Worksheet, wsDst As Worksheet
+
+    On Error Resume Next
+
+    Set wsSrc = ThisWorkbook.Worksheets("Dashboard")
+
+    On Error GoTo 0
+
+    If wsSrc Is Nothing Then
+
+        MsgBox "Template sheet 'Dashboard' not found. Skipping attach.", vbInformation
+
+        Exit Sub
+
+    End If
+
+    Set wsDst = EnsureSheet(SHEET_DASHBOARD)
+
+    Dim headers As Variant
+
+    headers = Array(HeaderLastJP(), HeaderVwapJP(), "ATR")
+
+    Dim i As Long
+
+    For i = LBound(headers) To UBound(headers)
+
+        Dim h As String: h = CStr(headers(i))
+
+        Dim cSrc As Long: cSrc = FindColumn(wsSrc, DASH_HEADER_ROW, h)
+
+        Dim cDst As Long: cDst = FindColumn(wsDst, DASH_HEADER_ROW, h)
+
+        If cSrc > 0 And cDst > 0 Then
+
+            Dim f As String
+
+            f = wsSrc.Cells(DASH_DATA_START, cSrc).Formula
+
+            If Len(f) > 0 Then
+
+                Dim lastRow As Long
+
+                lastRow = wsDst.Cells(wsDst.Rows.Count, 1).End(xlUp).ROW
+
+                If lastRow >= DASH_DATA_START Then
+
+                    wsDst.Range(wsDst.Cells(DASH_DATA_START, cDst), wsDst.Cells(lastRow, cDst)).Formula = f
+
+                End If
+
+            End If
+
+        End If
+
+    Next i
+
+    wsDst.Columns.AutoFit
+
+    MsgBox "Formulas attached from Dashboard template.", vbInformation
+
+End Sub
+
+
+
+Public Sub ButtonCatchUp()
+
+    On Error Resume Next
+
+    Dim sh As Object
+
+    Set sh = CreateObject("WScript.Shell")
+
+    Dim root As String
+
+    root = ThisWorkbook.path
+
+    Dim cmd As String
+
+    cmd = "cmd /c """ & root & "\scripts\run_nightly_now.cmd"""
+
+    sh.Run cmd, 0, False
+
+    MsgBox "Catch-up launched.", vbInformation
+
+End Sub
+
+
+
+Public Sub CancelNightlyStatusRefresh()
+
+    On Error Resume Next
+
+    NightlyStatus.StopNightlyMonitor
+
+    On Error GoTo 0
+
+End Sub
+
+
+
+Public Sub Auto_Open()
+
+    On Error Resume Next
+
+    EnsureSetup
+
+    Dim ws As Worksheet
+
+    Set ws = EnsureSheet(SHEET_DASHBOARD)
+
+    ws.Range(DASH_STATUS_CELL).value = 0
+
+End Sub
+
+
+
+Private Sub EnsureSetup()
+
+    Dim wsDash As Worksheet
+
+    Set wsDash = EnsureSheet(SHEET_DASHBOARD)
+
+    If setupInitialized Then Exit Sub
+
+    If wsDash.Range(DASH_MAX_ORDERS_CELL).value = "" Then
+
+        wsDash.Range(DASH_MAX_ORDERS_CELL).value = DEFAULT_MAX_ORDERS
+
+    End If
+
+    If wsDash.Range(DASH_SESSION_START_CELL).value = "" Then
+
+        wsDash.Range(DASH_SESSION_START_CELL).value = DEFAULT_SESSION_START
+
+    End If
+
+    If wsDash.Range(DASH_SESSION_END_CELL).value = "" Then
+
+        wsDash.Range(DASH_SESSION_END_CELL).value = DEFAULT_SESSION_END
+
+    End If
+
+    If wsDash.Range(DASH_SELECTED_DEFAULT_CELL).value = "" Then
+
+        wsDash.Range(DASH_SELECTED_DEFAULT_CELL).value = DEFAULT_SELECTED_DEFAULT
+
+    End If
+
+    If wsDash.Range(DASH_REENTRY_CELL).value = "" Then
+
+        wsDash.Range(DASH_REENTRY_CELL).value = DEFAULT_REENTRY
+
+    End If
+
+    If wsDash.Range(DASH_HARDSTOP_CELL).value = "" Then
+
+        wsDash.Range(DASH_HARDSTOP_CELL).value = DEFAULT_HARDSTOP
+
+    End If
+
+    If wsDash.Range(DASH_LIVE_CELL).value = "" Then
+
+        wsDash.Range(DASH_LIVE_CELL).value = DEFAULT_LIVE
+
+    End If
+
+    If wsDash.Range(DASH_CLOSE_TIME_CELL).value = "" Then
+
+        wsDash.Range(DASH_CLOSE_TIME_CELL).value = DEFAULT_CLOSE_TIME
+
+    End If
+
+    If wsDash.Range(DASH_QTY_CELL).value = "" Then
+
+        wsDash.Range(DASH_QTY_CELL).value = DEFAULT_ORDER_QTY
+
+    End If
+
+    If wsDash.Range(DASH_BUDGET_CELL).value = "" Then
+
+        wsDash.Range(DASH_BUDGET_CELL).value = DEFAULT_MAX_BUDGET
+
+    End If
+
+    If wsDash.Range(DASH_LOT_STEP_CELL).value = "" Then
+
+        wsDash.Range(DASH_LOT_STEP_CELL).value = DEFAULT_LOT_STEP
+
+    End If
+
+    If wsDash.Range(DASH_SLIP_BP_CELL).value = "" Then
+
+        wsDash.Range(DASH_SLIP_BP_CELL).value = DEFAULT_SLIP_BP
+
+    End If
+
+    ' 髫ｴ繝ｻ・ｽE・ｽ・ｽE・ｽ鬮ｫ蜍溯㊥繝ｻ・ｽE・ｽ繝ｻ・ｽE・ｽ髯橸ｽｳ陞｢・ｽE・ｽ郢晢ｽｻ髫ｴ魃会ｽｽ・ｽE・ｽ髯橸ｽｳ陞｢・ｽE・ｽ・ｽE・ｽﾂ繝ｻ・ｽE・ｽ
+
+    If wsDash.Range(DASH_TRACE_CELL).value = "" Then wsDash.Range(DASH_TRACE_CELL).value = 0
+
+    If wsDash.Range(DASH_CANCEL_AT_END_CELL).value = "" Then wsDash.Range(DASH_CANCEL_AT_END_CELL).value = 0
+
+    If wsDash.Range(DASH_ENTRY_GRACE_MIN_CELL).value = "" Then wsDash.Range(DASH_ENTRY_GRACE_MIN_CELL).value = 15
+
+    If wsDash.Range(DASH_OCO_UPDATE_SEC_CELL).value = "" Then wsDash.Range(DASH_OCO_UPDATE_SEC_CELL).value = 30
+    If wsDash.Range(DASH_MARKET_BIAS_CELL).value = "" Then wsDash.Range(DASH_MARKET_BIAS_CELL).value = 0
+    If wsDash.Range(DASH_MARKET_UP_THRESHOLD_CELL).value = "" Then wsDash.Range(DASH_MARKET_UP_THRESHOLD_CELL).value = 15
+    If wsDash.Range(DASH_MARKET_UP_ADJ_CELL).value = "" Then wsDash.Range(DASH_MARKET_UP_ADJ_CELL).value = 0.1
+    If wsDash.Range(DASH_MARKET_DOWN_THRESHOLD_CELL).value = "" Then wsDash.Range(DASH_MARKET_DOWN_THRESHOLD_CELL).value = 15
+    If wsDash.Range(DASH_MARKET_DOWN_ADJ_CELL).value = "" Then wsDash.Range(DASH_MARKET_DOWN_ADJ_CELL).value = 0.1
+    If wsDash.Range(DASH_GAP120_THRESHOLD_CELL).value = "" Then wsDash.Range(DASH_GAP120_THRESHOLD_CELL).value = 120
+    If wsDash.Range(DASH_GAP120_ADJ_CELL).value = "" Then wsDash.Range(DASH_GAP120_ADJ_CELL).value = 0.2
+    If wsDash.Range(DASH_GAP200_THRESHOLD_CELL).value = "" Then wsDash.Range(DASH_GAP200_THRESHOLD_CELL).value = 200
+    If wsDash.Range(DASH_GAP200_ADJ_CELL).value = "" Then wsDash.Range(DASH_GAP200_ADJ_CELL).value = 0.3
+    If wsDash.Range(DASH_TP_PER_J_CELL).value = "" Then wsDash.Range(DASH_TP_PER_J_CELL).value = 0.15
+    If wsDash.Range(DASH_SL_PER_J_CELL).value = "" Then wsDash.Range(DASH_SL_PER_J_CELL).value = 0.1
+
+    EnsureSheet SHEET_CANDIDATES
+
+    EnsureOrdersSheet
+
+    If Not DashboardHeadersReady(wsDash) Then
+
+        EnsureHeaders wsDash
+
+    End If
+
+    Application.Calculation = xlCalculationAutomatic
+
+    Application.CalculateBeforeSave = True
+
+    wsDash.Range("A2").value = "AutoTrade (0/1)"
+
+    wsDash.Range("A3").value = "Daily Max Orders"
+
+    wsDash.Range("A4").value = "Session Start"
+
+    wsDash.Range("A5").value = "Session End"
+
+    wsDash.Range("A6").value = "Selected Default (0/1)"
+
+    wsDash.Range("A7").value = "Reentry Allowed (0/1)"
+
+    wsDash.Range("A8").value = "Hard Stop (0/1)"
+
+    wsDash.Range("A9").value = "Live Orders (0/1)"
+
+    wsDash.Range("A10").value = "Order Macro Name"
+
+    wsDash.Range("A11").value = "Close-Out Time (HH:MM:SS)"
+
+    wsDash.Range("A12").value = "Order Quantity (Fallback)"
+
+    wsDash.Range("A14").value = "Total Budget (JPY)"
+
+    wsDash.Range("A15").value = "Lot Step Size (shares)"
+
+    wsDash.Range("A16").value = "Max Slippage (bp)"
+
+    wsDash.Range("A17:A40").ClearContents
+
+    wsDash.Range("A17").value = "Trace (0/1)"
+
+    wsDash.Range("A18").value = "Cancel at Session End (0/1)"
+
+    wsDash.Range("A19").value = "Entry Grace Minutes"
+
+    wsDash.Range("A20").value = "OCO Update Seconds"
+    wsDash.Range("A21").value = "Market Bias (bp)"
+    wsDash.Range("A22").value = "Market Up Threshold (bp)"
+    wsDash.Range("A23").value = "Market Up ﾎ寧"
+    wsDash.Range("A24").value = "Market Down Threshold (bp)"
+    wsDash.Range("A25").value = "Market Down ﾎ寧"
+    wsDash.Range("A26").value = "Gap 竕･120 Threshold (bp)"
+    wsDash.Range("A27").value = "Gap 竕･120 ﾎ寧"
+    wsDash.Range("A28").value = "Gap 竕･200 Threshold (bp)"
+    wsDash.Range("A29").value = "Gap 竕･200 ﾎ寧"
+    wsDash.Range("A30").value = "TP ﾎ・per |J|-J_th"
+    wsDash.Range("A31").value = "SL ﾎ・per |J|-J_th"
+
+    If sessionRiskUsed Is Nothing Then Set sessionRiskUsed = CreateObject("Scripting.Dictionary") Else sessionRiskUsed.RemoveAll
+
+    If tickerRiskUsed Is Nothing Then Set tickerRiskUsed = CreateObject("Scripting.Dictionary") Else tickerRiskUsed.RemoveAll
+
+    UpdateRiskUsageFromExecutions
+
+    closeTimerScheduled = False
+
+    closeTimer = 0
+
+    setupInitialized = True
+
+    EnsureQueueNowButton
+
+End Sub
+
+
+
+Public Sub EnsureQueueNowButton()
+
+    Dim ws As Worksheet
+
+    Set ws = EnsureSheet(SHEET_DASHBOARD)
+
+    Dim target As Range
+    Set target = ws.Range("G2")
+
+    On Error Resume Next
+    Dim btn As Object
+    Dim existing As Object
+    For Each btn In ws.Buttons
+        If btn.OnAction = "AutoTrader.ButtonQueueNow" Then
+            Set existing = btn
+            Exit For
+        End If
+    Next
+    On Error GoTo 0
+
+    If Not existing Is Nothing Then
+        existing.Left = target.Left
+        existing.Top = target.Top
+        existing.Width = 140
+        existing.Height = 24
+        existing.Caption = "Queue Now (DryRun)"
+        Exit Sub
+    End If
+
+    On Error Resume Next
+    For Each btn In ws.Buttons
+        If btn.Caption = "Queue Now (DryRun)" Then btn.Delete
+    Next
+    On Error GoTo 0
+
+    Dim newBtn As Object
+    Set newBtn = ws.Buttons.Add(target.Left, target.Top, 140, 24)
+    newBtn.Caption = "Queue Now (DryRun)"
+    newBtn.OnAction = "AutoTrader.ButtonQueueNow"
+
+End Sub
+
+Private Sub EnsureRuntimeReady(Optional ByVal ensureDashHeaders As Boolean = False)
+
+    If Not setupInitialized Then
+
+        EnsureSetup
+
+        Exit Sub
+
+    End If
+
+    EnsureSheet SHEET_CANDIDATES
+
+    EnsureOrdersSheet
+
+    Dim wsDash As Worksheet
+
+    Set wsDash = EnsureSheet(SHEET_DASHBOARD)
+
+    If ensureDashHeaders Then
+
+        If Not DashboardHeadersReady(wsDash) Then
+
+            EnsureHeaders wsDash
+
+        End If
+
+    End If
+
+    EnsureRealtimeFirstRow wsDash
+
+End Sub
+
+
+
+Private Sub RebuildRiskUsageFromOrders()
+
+    On Error GoTo Done
+
+    If sessionRiskUsed Is Nothing Then Set sessionRiskUsed = CreateObject("Scripting.Dictionary") Else sessionRiskUsed.RemoveAll
+
+    If tickerRiskUsed Is Nothing Then Set tickerRiskUsed = CreateObject("Scripting.Dictionary") Else tickerRiskUsed.RemoveAll
+
+    totalRiskUsed = 0
+
+
+
+    Dim wsDash As Worksheet: Set wsDash = EnsureSheet(SHEET_DASHBOARD)
+
+    Dim wsOrders As Worksheet: Set wsOrders = EnsureSheet(SHEET_ORDERS)
+
+    Dim tCol As Long: tCol = FindColumn(wsDash, DASH_HEADER_ROW, "Ticker")
+
+    Dim atrCol As Long: atrCol = FindColumn(wsDash, DASH_HEADER_ROW, "ATR_n")
+
+    Dim slkCol As Long: slkCol = FindColumn(wsDash, DASH_HEADER_ROW, "SLk")
+
+    Dim prevCol As Long: prevCol = FindColumn(wsDash, DASH_HEADER_ROW, HeaderPrevCloseJP())
+
+    Dim midCol As Long: midCol = FindColumn(wsDash, DASH_HEADER_ROW, HeaderPreopenMidJP())
+
+    If tCol = 0 Then GoTo Done
+
+
+
+    Dim slipBp As Double
+
+    slipBp = CDbl(IfZero(wsDash.Range(DASH_SLIP_BP_CELL).value, DEFAULT_SLIP_BP))
+
+
+
+    Dim lastRow As Long
+
+    lastRow = wsOrders.Cells(wsOrders.Rows.Count, 1).End(xlUp).ROW
+
+    Dim r As Long
+
+    For r = 2 To lastRow
+
+        Dim timeVal As Variant: timeVal = wsOrders.Cells(r, 1).value
+
+        If IsDate(timeVal) Then
+
+            If DateValue(timeVal) <> Date Then GoTo NextOrder
+
+        End If
+
+        Dim ticker As String: ticker = CStr(wsOrders.Cells(r, 2).value)
+
+        Dim side As String: side = UCase$(CStr(wsOrders.Cells(r, 3).value))
+
+        Dim price As Double: price = CDbl(IfZero(wsOrders.Cells(r, 4).value, 0))
+
+        Dim qty As Long: qty = CLng(IfZero(wsOrders.Cells(r, 5).value, 0))
+
+        Dim note As String: note = CStr(wsOrders.Cells(r, 6).value)
+
+        If Len(ticker) = 0 Or qty <= 0 Then GoTo NextOrder
+
+        Dim isClose As Boolean
+
+        isClose = (InStr(1, note, "TP", vbTextCompare) > 0) Or (InStr(1, note, "SL", vbTextCompare) > 0) Or (InStr(1, note, "MOC", vbTextCompare) > 0) Or (InStr(1, note, "FLAT", vbTextCompare) > 0)
+
+
+
+        Dim mode As String, sess As String
+
+        mode = "": sess = ""
+
+        If InStr(1, note, ":") > 0 Then
+
+            mode = Split(note, ":")(0)
+
+            If UBound(Split(note, ":")) >= 1 Then sess = Split(note, ":")(1)
+
+        End If
+
+        Dim sessionKey As String: sessionKey = GetSessionKey(sess, mode)
+
+
+
+        ' Map ticker to dashboard row
+
+        Dim dLast As Long: dLast = wsDash.Cells(wsDash.Rows.Count, tCol).End(xlUp).ROW
+
+        Dim dr As Long, found As Long: found = 0
+
+        For dr = DASH_DATA_START To dLast
+
+            If CStr(wsDash.Cells(dr, tCol).value) = ticker Then found = dr: Exit For
+
+        Next dr
+
+        If found = 0 Then GoTo NextOrder
+
+
+
+        Dim atr As Double: atr = CDbl(IfZero(wsDash.Cells(found, atrCol).value, 0))
+
+        Dim slK As Double: slK = CDbl(IfZero(wsDash.Cells(found, slkCol).value, 0))
+
+        Dim px As Double
+
+        If midCol > 0 Then px = CDbl(IfZero(wsDash.Cells(found, midCol).value, 0))
+
+        If px <= 0 And prevCol > 0 Then px = CDbl(IfZero(wsDash.Cells(found, prevCol).value, 0))
+
+        If px <= 0 Then px = price
+
+        Dim risk As Double
+
+        risk = EstimateOrderRisk(qty, atr, slK, px, slipBp)
+
+
+
+        Dim keySess As String: keySess = sessionKey
+
+        Dim usedSess As Double: usedSess = 0
+
+        If sessionRiskUsed.Exists(keySess) Then usedSess = sessionRiskUsed(keySess)
+
+        Dim usedTick As Double: usedTick = 0
+
+        If tickerRiskUsed.Exists(ticker) Then usedTick = tickerRiskUsed(ticker)
+
+
+
+        If isClose Then
+
+            usedSess = Application.Max(0, usedSess - risk)
+
+            usedTick = Application.Max(0, usedTick - risk)
+
+            totalRiskUsed = Application.Max(0, totalRiskUsed - risk)
+
+        Else
+
+            usedSess = usedSess + risk
+
+            usedTick = usedTick + risk
+
+            totalRiskUsed = totalRiskUsed + risk
+
+        End If
+
+        sessionRiskUsed(keySess) = usedSess
+
+        tickerRiskUsed(ticker) = usedTick
+
+NextOrder:
+
+    Next r
+
+Done:
+
+    On Error Resume Next
+
+End Sub
+
+
+
+Private Sub UpdateRiskUsageFromExecutions()
+
+    On Error GoTo fallback
+
+    If sessionRiskUsed Is Nothing Then Set sessionRiskUsed = CreateObject("Scripting.Dictionary") Else sessionRiskUsed.RemoveAll
+
+    If tickerRiskUsed Is Nothing Then Set tickerRiskUsed = CreateObject("Scripting.Dictionary") Else tickerRiskUsed.RemoveAll
+
+    totalRiskUsed = 0
+
+
+
+    Dim wsDash As Worksheet: Set wsDash = EnsureSheet(SHEET_DASHBOARD)
+
+    Dim wsExec As Worksheet: Set wsExec = GetSheet("ExecMon")
+
+    If wsExec Is Nothing Then GoTo fallback
+
+
+
+    Dim lastRow As Long
+
+    lastRow = wsExec.Cells(wsExec.Rows.Count, 1).End(xlUp).ROW
+
+    If lastRow < 2 Then Exit Sub
+
+
+
+    Dim hdrMap As Object: Set hdrMap = CreateObject("Scripting.Dictionary")
+
+    Dim lastCol As Long: lastCol = wsExec.Cells(1, wsExec.Columns.Count).End(xlToLeft).Column
+
+    Dim c As Long
+
+    For c = 1 To lastCol
+
+        Dim key As String
+
+        key = LCase$(Trim$(CStr(wsExec.Cells(1, c).value)))
+
+        If Len(key) > 0 Then hdrMap(key) = c
+
+    Next c
+
+
+
+    Dim colDate As Long
+
+    Dim colTicker As Long
+
+    Dim colSide As Long
+
+    Dim colQty As Long
+
+    Dim colPrice As Long
+
+
+
+    colDate = FindColumnWithAliases(wsExec, 1, ExecHeaderDateJP(), ExecHeaderDateAltJP(), ExecHeaderDateShortJP(), "timestamp", "exec_time")
+
+    colTicker = FindColumnWithAliases(wsExec, 1, ExecHeaderTickerJP(), ExecHeaderTickerShortJP(), "symbol", "ticker")
+
+    colSide = FindColumnWithAliases(wsExec, 1, ExecHeaderSideJP(), ExecHeaderSideShortJP(), ExecHeaderSideAltJP(), "side")
+
+    colQty = FindColumnWithAliases(wsExec, 1, ExecHeaderQtyJP(), ExecHeaderQtyShortJP(), ExecHeaderQtyAltJP(), "qty", "quantity")
+
+    colPrice = FindColumnWithAliases(wsExec, 1, ExecHeaderPriceJP(), ExecHeaderPriceAltJP(), ExecHeaderPriceShortJP(), "price")
+
+
+
+    If colDate = 0 Or colTicker = 0 Or colSide = 0 Or colQty = 0 Or colPrice = 0 Then GoTo fallback
+
+
+
+    Dim sessionCol As Long: sessionCol = FindColumn(wsDash, DASH_HEADER_ROW, "Session")
+
+    Dim modeCol As Long: modeCol = FindColumn(wsDash, DASH_HEADER_ROW, "SignalMode")
+
+    Dim tCol As Long: tCol = FindColumn(wsDash, DASH_HEADER_ROW, "Ticker")
+
+    Dim atrCol As Long: atrCol = FindColumn(wsDash, DASH_HEADER_ROW, "ATR_n")
+
+    Dim slkCol As Long: slkCol = FindColumn(wsDash, DASH_HEADER_ROW, "SLk")
+
+    Dim entryStatusColDash As Long: entryStatusColDash = FindColumn(wsDash, DASH_HEADER_ROW, "EntryStatus")
+
+    Dim entrySideColDash As Long: entrySideColDash = FindColumn(wsDash, DASH_HEADER_ROW, "EntrySide")
+
+    Dim signalStatusColDash As Long: signalStatusColDash = FindColumn(wsDash, DASH_HEADER_ROW, HeaderSignalStatusJP())
+
+    Dim tpPriceColDash As Long: tpPriceColDash = FindColumn(wsDash, DASH_HEADER_ROW, "TP_price")
+
+    Dim slPriceColDash As Long: slPriceColDash = FindColumn(wsDash, DASH_HEADER_ROW, "SL_price")
+
+    Dim entryBuyColDash As Long: entryBuyColDash = FindColumn(wsDash, DASH_HEADER_ROW, "EntryBuyPx")
+
+    Dim entrySellColDash As Long: entrySellColDash = FindColumn(wsDash, DASH_HEADER_ROW, "EntrySellPx")
+
+    If tCol = 0 Or sessionCol = 0 Or modeCol = 0 Or atrCol = 0 Or slkCol = 0 Then GoTo fallback
+
+
+
+    Dim slipBp As Double
+
+    slipBp = CDbl(IfZero(wsDash.Range(DASH_SLIP_BP_CELL).value, DEFAULT_SLIP_BP))
+
+
+
+    Dim netQty As Object: Set netQty = CreateObject("Scripting.Dictionary")
+
+
+
+    Dim r As Long
+
+    For r = 2 To lastRow
+
+        Dim execDate As Variant: execDate = wsExec.Cells(r, colDate).value
+
+        If Not IsDate(execDate) Then GoTo NextExec
+
+        If DateValue(execDate) <> Date Then GoTo NextExec
+
+
+
+        Dim ticker As String: ticker = Trim$(CStr(wsExec.Cells(r, colTicker).value))
+
+        If Len(ticker) = 0 Then GoTo NextExec
+
+
+
+        Dim qtyVal As Double: qtyVal = CDbl(IfZero(wsExec.Cells(r, colQty).value, 0))
+
+        If qtyVal <= 0 Then GoTo NextExec
+
+        Dim qty As Long: qty = CLng(qtyVal)
+
+
+
+        Dim price As Double: price = CDbl(IfZero(wsExec.Cells(r, colPrice).value, 0))
+
+        If price <= 0 Then GoTo NextExec
+
+
+
+        Dim sideText As String: sideText = CStr(wsExec.Cells(r, colSide).value)
+
+        Dim sideSign As Long: sideSign = ExecSideSign(sideText)
+
+        If sideSign = 0 Then GoTo NextExec
+
+
+
+        Dim dLast As Long: dLast = wsDash.Cells(wsDash.Rows.Count, tCol).End(xlUp).ROW
+
+        Dim dr As Long, found As Long: found = 0
+
+        For dr = DASH_DATA_START To dLast
+
+            If CStr(wsDash.Cells(dr, tCol).value) = ticker Then
+
+                found = dr
+
+                Exit For
+
+            End If
+
+        Next dr
+
+        If found = 0 Then GoTo NextExec
+
+
+
+        Dim currentEntryStatus As String
+
+        If entryStatusColDash > 0 Then currentEntryStatus = Trim$(CStr(wsDash.Cells(found, entryStatusColDash).value))
+
+
+
+        Dim atr As Double: atr = CDbl(IfZero(wsDash.Cells(found, atrCol).value, 0))
+
+        Dim slK As Double: slK = CDbl(IfZero(wsDash.Cells(found, slkCol).value, 0))
+
+        Dim sessionKey As String: sessionKey = GetSessionKey(CStr(wsDash.Cells(found, sessionCol).value), CStr(wsDash.Cells(found, modeCol).value))
+
+
+
+        Dim prevNet As Double
+
+        If netQty.Exists(ticker) Then prevNet = netQty(ticker) Else prevNet = 0
+
+        Dim entryQty As Long, exitQty As Long
+
+        If prevNet = 0 Then
+
+            entryQty = qty
+
+        ElseIf Sgn(prevNet) = sideSign Then
+
+            entryQty = qty
+
+        ElseIf qty <= Abs(prevNet) Then
+
+            exitQty = qty
+
+        Else
+
+            exitQty = CLng(Abs(prevNet))
+
+            entryQty = qty - exitQty
+
+        End If
+
+
+
+        Dim newNet As Double
+
+        newNet = prevNet + sideSign * qty
+
+        netQty(ticker) = newNet
+
+
+
+        Dim usedSess As Double: If sessionRiskUsed.Exists(sessionKey) Then usedSess = sessionRiskUsed(sessionKey) Else usedSess = 0
+
+        Dim usedTick As Double: If tickerRiskUsed.Exists(ticker) Then usedTick = tickerRiskUsed(ticker) Else usedTick = 0
+
+
+
+        If exitQty > 0 Then
+
+            Dim riskExit As Double
+
+            riskExit = EstimateOrderRisk(exitQty, atr, slK, price, slipBp)
+
+            usedSess = Application.Max(0, usedSess - riskExit)
+
+            usedTick = Application.Max(0, usedTick - riskExit)
+
+            totalRiskUsed = Application.Max(0, totalRiskUsed - riskExit)
+
+        End If
+
+
+
+        If entryQty > 0 Then
+
+            RemovePendingInfo ticker
+
+            Dim filledSide As String
+
+            filledSide = IIf(sideSign > 0, "BUY", "SELL")
+
+            Dim initializeStraddle As Boolean
+
+            initializeStraddle = True
+
+            Select Case currentEntryStatus
+
+                Case ENTRY_STATUS_IN_BUY, ENTRY_STATUS_IN_SELL
+
+                    initializeStraddle = False
+
+            End Select
+
+            If initializeStraddle Then
+
+                If entryStatusColDash > 0 Then
+
+                    wsDash.Cells(found, entryStatusColDash).value = IIf(sideSign > 0, ENTRY_STATUS_IN_BUY, ENTRY_STATUS_IN_SELL)
+
+                    currentEntryStatus = wsDash.Cells(found, entryStatusColDash).value
+
+                Else
+
+                    currentEntryStatus = IIf(sideSign > 0, ENTRY_STATUS_IN_BUY, ENTRY_STATUS_IN_SELL)
+
+                End If
+
+                CancelOppositeStraddleOrder wsDash, ticker, filledSide
+
+                PlaceBracketIfAvailable wsDash, found, ticker, filledSide, price, entryQty
+
+                ScheduleCloseExit wsDash, ticker, filledSide
+
+            End If
+
+            Dim actInfo As Object
+            Set actInfo = EnsureActiveInfo(ticker)
+            Dim actSide As String
+            If newNet > 0 Then
+                actSide = "BUY"
+            ElseIf newNet < 0 Then
+                actSide = "SELL"
+            Else
+                actSide = ""
+            End If
+            actInfo("position_side") = actSide
+            actInfo("qty") = Abs(newNet)
+            actInfo("entry_px") = price
+            If tpPriceColDash > 0 Then actInfo("tp_px") = CDbl(IfZero(wsDash.Cells(found, tpPriceColDash).value, 0))
+            If slPriceColDash > 0 Then actInfo("sl_px") = CDbl(IfZero(wsDash.Cells(found, slPriceColDash).value, 0))
+            If entryBuyColDash > 0 Then actInfo("entry_buy_px") = CDbl(IfZero(wsDash.Cells(found, entryBuyColDash).value, 0))
+            If entrySellColDash > 0 Then actInfo("entry_sell_px") = CDbl(IfZero(wsDash.Cells(found, entrySellColDash).value, 0))
+            actInfo("last_update") = Now
+
+            If entrySideColDash > 0 Then wsDash.Cells(found, entrySideColDash).value = filledSide
+
+            If signalStatusColDash > 0 And entryStatusColDash > 0 Then
+
+                wsDash.Cells(found, signalStatusColDash).value = wsDash.Cells(found, entryStatusColDash).value
+
+            End If
+
+            Dim riskEntry As Double
+
+            riskEntry = EstimateOrderRisk(entryQty, atr, slK, price, slipBp)
+
+            usedSess = usedSess + riskEntry
+
+            usedTick = usedTick + riskEntry
+
+            totalRiskUsed = totalRiskUsed + riskEntry
+
+        End If
+
+
+
+        If entryQty > 0 Or exitQty > 0 Then
+
+            If entryStatusColDash > 0 Then
+
+                If newNet = 0 Then
+
+                    wsDash.Cells(found, entryStatusColDash).value = ENTRY_STATUS_DONE
+
+                    currentEntryStatus = ENTRY_STATUS_DONE
+
+                    RemoveActiveInfo ticker
+
+                ElseIf newNet > 0 Then
+
+                    wsDash.Cells(found, entryStatusColDash).value = ENTRY_STATUS_IN_BUY
+
+                    currentEntryStatus = ENTRY_STATUS_IN_BUY
+
+                ElseIf newNet < 0 Then
+
+                    wsDash.Cells(found, entryStatusColDash).value = ENTRY_STATUS_IN_SELL
+
+                    currentEntryStatus = ENTRY_STATUS_IN_SELL
+
+                End If
+
+            Else
+
+                If newNet = 0 Then
+
+                    currentEntryStatus = ENTRY_STATUS_DONE
+
+                    RemoveActiveInfo ticker
+
+                ElseIf newNet > 0 Then
+
+                    currentEntryStatus = ENTRY_STATUS_IN_BUY
+
+                ElseIf newNet < 0 Then
+
+                    currentEntryStatus = ENTRY_STATUS_IN_SELL
+
+                End If
+
+            End If
+
+            If entrySideColDash > 0 Then
+
+                If newNet = 0 Then
+
+                    wsDash.Cells(found, entrySideColDash).value = ""
+
+                ElseIf newNet > 0 Then
+
+                    wsDash.Cells(found, entrySideColDash).value = "BUY"
+
+                Else
+
+                    wsDash.Cells(found, entrySideColDash).value = "SELL"
+
+                End If
+
+            End If
+
+            If signalStatusColDash > 0 And entryStatusColDash > 0 Then
+
+                wsDash.Cells(found, signalStatusColDash).value = wsDash.Cells(found, entryStatusColDash).value
+
+            End If
+
+        End If
+
+
+
+        sessionRiskUsed(sessionKey) = usedSess
+
+        tickerRiskUsed(ticker) = usedTick
+
+NextExec:
+
+    Next r
+
+    Exit Sub
+
+
+
+fallback:
+
+    RebuildRiskUsageFromOrders
+
+End Sub
+
+
+
+Private Sub EnsureOrdersSheet()
+
+    Dim wsOrders As Worksheet
+
+    Set wsOrders = EnsureSheet(SHEET_ORDERS)
+
+    If wsOrders.Cells(1, 1).value = "" Then
+
+        wsOrders.Range("A1:F1").value = Array("Time", "Ticker", "Side", "Price", "Qty", "Note")
+
+    End If
+
+End Sub
+
+
+
+Private Sub WriteHeaderTexts(ByVal ws As Worksheet)
+
+    Dim rtHeaders As Variant: rtHeaders = RealTimeHeaderList()
+
+    Dim candHeaders As Variant: candHeaders = CandidateHeaderList()
+
+    Dim baseCol As Long: baseCol = 8 ' column H
+
+    Dim i As Long
+
+    For i = LBound(rtHeaders) To UBound(rtHeaders)
+
+        ws.Cells(DASH_HEADER_ROW, baseCol + i).value = rtHeaders(i)
+
+    Next i
+
+
+
+    Dim baseCand As Long
+
+    baseCand = baseCol + UBound(rtHeaders) + 1
+
+    For i = LBound(candHeaders) To UBound(candHeaders)
+
+        ws.Cells(DASH_HEADER_ROW, baseCand + i).value = candHeaders(i)
+
+    Next i
+
+End Sub
+
+
+
+Public Sub InstallRealtimeFormulas()
+
+    ' One-time installer to apply formulas safely without clearing existing values.
+
+    EnsureRuntimeReady True
+
+    Dim ws As Worksheet
+
+    Set ws = EnsureSheet(SHEET_DASHBOARD)
+
+    ApplyRealtimeColumns ws
+
+    ProtectRealtimeColumns ws
+
+End Sub
+
+
+
+Private Sub EnsureHeaders(ByVal ws As Worksheet)
+
+    ' Write labels and ensure formulas are applied once.
+
+    Dim wasProtected As Boolean
+
+    On Error Resume Next
+
+    wasProtected = ws.ProtectContents
+
+    If wasProtected Then ws.Unprotect Password:=""
+
+    On Error GoTo 0
+
+
+
+    WriteHeaderTexts ws
+
+    ApplyRealtimeColumns ws
+
+    ProtectRealtimeColumns ws
+
+End Sub
+
+
+
+
+
+Private Function DashboardHeadersReady(ByVal ws As Worksheet) As Boolean
+
+    Dim headers As Variant: headers = DashboardHeaderList()
+
+    Dim baseCol As Long: baseCol = 8
+
+    Dim i As Long
+
+    For i = LBound(headers) To UBound(headers)
+
+        If ws.Cells(DASH_HEADER_ROW, baseCol + i).value <> headers(i) Then
+
+            DashboardHeadersReady = False
+
+            Exit Function
+
+        End If
+
+    Next i
+
+    DashboardHeadersReady = ws.Cells(DASH_DATA_START, baseCol + 1).HasFormula
+
+End Function
+
+
+
+Private Sub LoadCandidates()
+
+    Dim path As String
+
+    path = ThisWorkbook.path & CANDIDATES_REL_PATH
+
+    Dim ws As Worksheet
+
+    Set ws = EnsureSheet(SHEET_CANDIDATES)
+
+    ws.Cells.Clear
+
+    If Len(Dir$(path)) = 0 Then
+
+        If IsHeadless() Then
+
+            LogDebug "LoadCandidates missing path=" & path
+
+        Else
+
+            MsgBox "Candidates not found: " & path, vbExclamation
+
+        End If
+
+        Exit Sub
+
+    End If
+
+    Dim f As Integer: f = FreeFile
+
+    Dim line As String
+
+    Dim r As Long: r = 1
+
+    Dim values As Variant
+
+    Open path For Input As #f
+
+    Do While Not EOF(f)
+
+        Line Input #f, line
+
+        values = ParseCsvLine(line)
+
+        ws.Cells(r, 1).Resize(1, UBound(values) + 1).value = values
+
+        r = r + 1
+
+    Loop
+
+    Close #f
+
+    ws.Columns.AutoFit
+
+    NormalizeCandidateHeaders ws
+
+    Dim headless As Boolean
+
+    headless = IsHeadless()
+
+    If headless Then
+
+        LogDebug "LoadCandidates loaded count=" & (r - 2)
+
+    Else
+
+        MsgBox "Loaded " & (r - 2) & " candidates.", vbInformation
+
+    End If
+
+End Sub
+
+
+
+Private Sub PushCandidatesToDashboard()
+
+    On Error GoTo FailPush
+
+
+
+    Dim wsCand As Worksheet
+
+    Set wsCand = EnsureSheet(SHEET_CANDIDATES)
+
+    Dim lastRow As Long
+
+    lastRow = wsCand.Cells(wsCand.Rows.Count, 1).End(xlUp).ROW
+
+    If lastRow < 2 Then
+
+        If IsHeadless() Then
+
+            LogDebug "PushCandidates empty candidates sheet"
+
+        Else
+
+            MsgBox "Candidates sheet is empty. Load first.", vbExclamation
+
+        End If
+
+        Exit Sub
+
+    End If
+
+
+
+    Dim colTicker As Long: colTicker = FindColumnWithAliases(wsCand, 1, "Ticker", "code", "ticker")
+
+    Dim colSel As Long: colSel = FindColumnWithAliases(wsCand, 1, "Selected", "selected", "sel")
+
+    Dim colSignal As Long: colSignal = FindColumnWithAliases(wsCand, 1, "SignalMode", "signal_mode", "mode")
+
+    Dim colSession As Long: colSession = FindColumnWithAliases(wsCand, 1, "Session", "session", "session_label")
+
+    Dim colPlanTag As Long: colPlanTag = FindColumnWithAliases(wsCand, 1, "PlanTag", "plan_tag", "plan")
+
+    Dim colATR As Long: colATR = FindColumn(wsCand, 1, "ATR_n")
+
+    Dim colTP As Long: colTP = FindColumn(wsCand, 1, "TPk")
+
+    Dim colSL As Long: colSL = FindColumn(wsCand, 1, "SLk")
+
+    Dim colJth As Long: colJth = FindColumn(wsCand, 1, "J_th")
+
+    Dim colFpf As Long: colFpf = FindColumnWithAliases(wsCand, 1, "forward_pf_eff", "ForwardPF")
+
+    Dim colFtr As Long: colFtr = FindColumnWithAliases(wsCand, 1, "forward_trades", "ForwardTrades")
+
+    Dim colWinRate As Long: colWinRate = FindColumnWithAliases(wsCand, 1, "forward_winrate", "ForwardWin")
+
+    Dim colWinLow As Long: colWinLow = FindColumnWithAliases(wsCand, 1, "forward_win_ci_low", "WinCI_L")
+
+    Dim colWinHigh As Long: colWinHigh = FindColumnWithAliases(wsCand, 1, "forward_win_ci_high", "WinCI_H")
+
+    Dim colExpMean As Long: colExpMean = FindColumnWithAliases(wsCand, 1, "forward_exp_boot_mean", "ExpBootMean")
+
+    Dim colExpLow As Long: colExpLow = FindColumnWithAliases(wsCand, 1, "forward_exp_boot_low", "ExpBootLow")
+
+    Dim colExpHigh As Long: colExpHigh = FindColumnWithAliases(wsCand, 1, "forward_exp_boot_high", "ExpBootHigh")
+
+    Dim colMaxDD As Long: colMaxDD = FindColumn(wsCand, 1, "MaxDD")
+
+    If colMaxDD = 0 Then colMaxDD = FindColumn(wsCand, 1, "max_dd")
+
+    Dim colForwardAvgBars As Long: colForwardAvgBars = FindColumn(wsCand, 1, "ForwardAvgBars")
+
+    If colForwardAvgBars = 0 Then colForwardAvgBars = FindColumn(wsCand, 1, "forward_avg_bars")
+
+    Dim colGapBucket As Long: colGapBucket = FindColumn(wsCand, 1, "GapBucket")
+
+    If colGapBucket = 0 Then colGapBucket = FindColumn(wsCand, 1, "forward_gap_best_bucket")
+
+    Dim colGapRule As Long: colGapRule = FindColumn(wsCand, 1, "GapRule")
+
+    If colGapRule = 0 Then colGapRule = FindColumn(wsCand, 1, "forward_gap_rule")
+
+    Dim colGapSummary As Long: colGapSummary = FindColumnWithAliases(wsCand, 1, "GapSummary", "gap_summary")
+
+    If colGapSummary = 0 Then colGapSummary = FindColumn(wsCand, 1, "forward_gap_summary")
+
+    If colTicker = 0 Then
+
+        If IsHeadless() Then
+
+            LogDebug "PushCandidates ticker column missing"
+
+        Else
+
+            MsgBox "Ticker column missing in candidates.", vbCritical
+
+        End If
+
+        Exit Sub
+
+    End If
+
+
+
+    Dim wsDash As Worksheet
+
+    Set wsDash = EnsureSheet(SHEET_DASHBOARD)
+
+    Dim candHeaders As Variant: candHeaders = CandidateHeaderList()
+
+    Dim baseCol As Long: baseCol = FindColumn(wsDash, DASH_HEADER_ROW, "TickerSrc")
+
+    If baseCol = 0 Then baseCol = 8 + UBound(RealTimeHeaderList()) + 1
+
+    Dim clearWidth As Long: clearWidth = UBound(candHeaders)
+
+    wsDash.Range(wsDash.Cells(DASH_DATA_START, baseCol), wsDash.Cells(wsDash.Rows.Count, baseCol + clearWidth)).ClearContents
+
+
+
+    Dim colTickerSrcDash As Long: colTickerSrcDash = FindColumn(wsDash, DASH_HEADER_ROW, "TickerSrc")
+
+    Dim colSelectedDash As Long: colSelectedDash = FindColumn(wsDash, DASH_HEADER_ROW, "Selected")
+
+    Dim colSignalDash As Long: colSignalDash = FindColumn(wsDash, DASH_HEADER_ROW, "SignalMode")
+
+    Dim colSessionDash As Long: colSessionDash = FindColumn(wsDash, DASH_HEADER_ROW, "Session")
+
+    Dim colATRDash As Long: colATRDash = FindColumn(wsDash, DASH_HEADER_ROW, "ATR_n")
+
+    Dim colTPDash As Long: colTPDash = FindColumn(wsDash, DASH_HEADER_ROW, "TPk")
+
+    Dim colSLDash As Long: colSLDash = FindColumn(wsDash, DASH_HEADER_ROW, "SLk")
+
+    Dim colJthDash As Long: colJthDash = FindColumn(wsDash, DASH_HEADER_ROW, "J_th")
+
+    Dim colForwardPFDash As Long: colForwardPFDash = FindColumn(wsDash, DASH_HEADER_ROW, "ForwardPF")
+
+    Dim colForwardTradesDash As Long: colForwardTradesDash = FindColumn(wsDash, DASH_HEADER_ROW, "ForwardTrades")
+
+    Dim colForwardWinDash As Long: colForwardWinDash = FindColumn(wsDash, DASH_HEADER_ROW, "ForwardWin")
+
+    Dim colWinLowDash As Long: colWinLowDash = FindColumn(wsDash, DASH_HEADER_ROW, "WinCI_L")
+
+    Dim colWinHighDash As Long: colWinHighDash = FindColumn(wsDash, DASH_HEADER_ROW, "WinCI_H")
+
+    Dim colExpMeanDash As Long: colExpMeanDash = FindColumn(wsDash, DASH_HEADER_ROW, "ExpBootMean")
+
+    Dim colMaxDDDash As Long: colMaxDDDash = FindColumn(wsDash, DASH_HEADER_ROW, "MaxDD")
+
+    Dim colExpLowDash As Long: colExpLowDash = FindColumn(wsDash, DASH_HEADER_ROW, "ExpBootLow")
+
+    Dim colExpHighDash As Long: colExpHighDash = FindColumn(wsDash, DASH_HEADER_ROW, "ExpBootHigh")
+
+    Dim colForwardAvgDash As Long: colForwardAvgDash = FindColumn(wsDash, DASH_HEADER_ROW, "ForwardAvgBars")
+
+    Dim colGapBucketDash As Long: colGapBucketDash = FindColumn(wsDash, DASH_HEADER_ROW, "GapBucket")
+
+    Dim colGapRuleDash As Long: colGapRuleDash = FindColumn(wsDash, DASH_HEADER_ROW, "GapRule")
+
+    Dim colGapSummaryDash As Long: colGapSummaryDash = FindColumn(wsDash, DASH_HEADER_ROW, "GapSummary")
+
+    Dim colDynamicQtyDash As Long: colDynamicQtyDash = FindColumn(wsDash, DASH_HEADER_ROW, "DynamicQty")
+
+    Dim colPlanTagDash As Long: colPlanTagDash = FindColumn(wsDash, DASH_HEADER_ROW, "PlanTag")
+
+
+
+    Dim r As Long, targetRow As Long
+
+    targetRow = DASH_DATA_START
+
+    Dim selDef As Long: selDef = CLng(IfZero(wsDash.Range(DASH_SELECTED_DEFAULT_CELL).value, DEFAULT_SELECTED_DEFAULT))
+
+
+
+    For r = 2 To lastRow
+
+        Dim ticker As String: ticker = CStr(wsCand.Cells(r, colTicker).value)
+
+        If Len(ticker) = 0 Then GoTo NextCandidate
+
+
+
+        If colTickerSrcDash > 0 Then wsDash.Cells(targetRow, colTickerSrcDash).value = ticker
+
+        Dim selVal As Variant
+
+        If colSel > 0 Then
+
+            selVal = wsCand.Cells(r, colSel).value
+
+        Else
+
+            selVal = ""
+
+        End If
+
+        If selVal = "" Then selVal = selDef
+
+        If colSelectedDash > 0 Then wsDash.Cells(targetRow, colSelectedDash).value = selVal
+
+
+
+        If colSignal > 0 And colSignalDash > 0 Then wsDash.Cells(targetRow, colSignalDash).value = wsCand.Cells(r, colSignal).value
+
+        Dim sessionRaw As String
+
+        If colSession > 0 Then sessionRaw = CStr(wsCand.Cells(r, colSession).value)
+
+        Dim planTagRaw As String
+
+        If colPlanTag > 0 Then planTagRaw = CStr(wsCand.Cells(r, colPlanTag).value)
+
+        Dim sessionLabel As String
+
+        sessionLabel = ResolveSessionLabel(sessionRaw, planTagRaw)
+
+        Dim jthVal As Double
+
+        If colJth > 0 Then jthVal = CDbl(IfZero(wsCand.Cells(r, colJth).value, 0))
+
+        If colJth > 0 Then
+
+            If Abs(jthVal) > 0 And Abs(jthVal) < DASH_MIN_JTH Then GoTo NextCandidate
+
+        End If
+
+        If colSessionDash > 0 Then wsDash.Cells(targetRow, colSessionDash).value = sessionLabel
+
+        If colATR > 0 And colATRDash > 0 Then wsDash.Cells(targetRow, colATRDash).value = wsCand.Cells(r, colATR).value
+
+        If colTP > 0 And colTPDash > 0 Then wsDash.Cells(targetRow, colTPDash).value = wsCand.Cells(r, colTP).value
+
+        If colSL > 0 And colSLDash > 0 Then wsDash.Cells(targetRow, colSLDash).value = wsCand.Cells(r, colSL).value
+
+        If colJth > 0 And colJthDash > 0 Then wsDash.Cells(targetRow, colJthDash).value = wsCand.Cells(r, colJth).value
+
+        If colFpf > 0 And colForwardPFDash > 0 Then wsDash.Cells(targetRow, colForwardPFDash).value = wsCand.Cells(r, colFpf).value
+
+        If colFtr > 0 And colForwardTradesDash > 0 Then wsDash.Cells(targetRow, colForwardTradesDash).value = wsCand.Cells(r, colFtr).value
+
+        If colWinRate > 0 And colForwardWinDash > 0 Then wsDash.Cells(targetRow, colForwardWinDash).value = wsCand.Cells(r, colWinRate).value
+
+        If colWinLow > 0 And colWinLowDash > 0 Then wsDash.Cells(targetRow, colWinLowDash).value = wsCand.Cells(r, colWinLow).value
+
+        If colWinHigh > 0 And colWinHighDash > 0 Then wsDash.Cells(targetRow, colWinHighDash).value = wsCand.Cells(r, colWinHigh).value
+
+        If colExpMean > 0 And colExpMeanDash > 0 Then wsDash.Cells(targetRow, colExpMeanDash).value = wsCand.Cells(r, colExpMean).value
+
+        If colExpLow > 0 And colExpLowDash > 0 Then wsDash.Cells(targetRow, colExpLowDash).value = wsCand.Cells(r, colExpLow).value
+
+        If colExpHigh > 0 And colExpHighDash > 0 Then wsDash.Cells(targetRow, colExpHighDash).value = wsCand.Cells(r, colExpHigh).value
+
+        If colMaxDD > 0 And colMaxDDDash > 0 Then wsDash.Cells(targetRow, colMaxDDDash).value = wsCand.Cells(r, colMaxDD).value
+
+        If colForwardAvgBars > 0 And colForwardAvgDash > 0 Then wsDash.Cells(targetRow, colForwardAvgDash).value = wsCand.Cells(r, colForwardAvgBars).value
+
+        If colGapBucket > 0 And colGapBucketDash > 0 Then wsDash.Cells(targetRow, colGapBucketDash).value = wsCand.Cells(r, colGapBucket).value
+
+        If colGapRule > 0 And colGapRuleDash > 0 Then wsDash.Cells(targetRow, colGapRuleDash).value = wsCand.Cells(r, colGapRule).value
+
+        If colGapSummary > 0 And colGapSummaryDash > 0 Then wsDash.Cells(targetRow, colGapSummaryDash).value = Left$(CStr(wsCand.Cells(r, colGapSummary).value), 255)
+
+        If colDynamicQtyDash > 0 Then wsDash.Cells(targetRow, colDynamicQtyDash).value = ""
+
+        If colPlanTag > 0 And colPlanTagDash > 0 Then wsDash.Cells(targetRow, colPlanTagDash).value = planTagRaw
+
+
+
+        targetRow = targetRow + 1
+
+NextCandidate:
+
+    Next r
+
+    ' As a safety net, ensure forward metrics are attached even if header aliases drifted.
+
+    AttachForwardMetrics wsDash, wsCand, DASH_DATA_START, targetRow - 1
+
+    ResolveTickerSelections wsDash, colTickerSrcDash, colSessionDash, colSignalDash, colSelectedDash, targetRow, selDef
+
+    Application.CalculateFull
+
+    On Error Resume Next
+
+    wsDash.Range(wsDash.Cells(DASH_HEADER_ROW, baseCol), wsDash.Cells(DASH_DATA_START - 1 + (targetRow - DASH_DATA_START), baseCol + clearWidth)).EntireColumn.AutoFit
+
+    If Err.Number <> 0 Then
+
+        LogDebug "PushCandidates autofit skipped err=" & Err.Number & " desc=" & Err.Description
+
+        Err.Clear
+
+    End If
+
+    On Error GoTo FailPush
+
+    If IsHeadless() Then
+
+        LogDebug "PushCandidates completed count=" & (targetRow - DASH_DATA_START)
+
+    Else
+
+        MsgBox "Dashboard updated with " & (targetRow - DASH_DATA_START) & " tickers.", vbInformation
+
+    End If
+
+    Exit Sub
+
+
+
+FailPush:
+
+    LogDebug "PushCandidates error err=" & Err.Number & " desc=" & Err.Description
+
+    If Not IsHeadless() Then
+
+        MsgBox "PushCandidates failed: " & Err.Description, vbCritical
+
+    End If
+
+    Err.Clear
+
+End Sub
+
+
+
+Private Sub ResolveTickerSelections(ByVal ws As Worksheet, ByVal colTicker As Long, ByVal colSession As Long, ByVal colSignal As Long, ByVal colSelected As Long, ByVal targetRow As Long, ByVal selDefault As Long)
+
+    If colTicker = 0 Or colSession = 0 Or colSignal = 0 Or colSelected = 0 Then Exit Sub
+
+    Dim bestRow As Object: Set bestRow = CreateObject("Scripting.Dictionary")
+
+    Dim bestPriority As Object: Set bestPriority = CreateObject("Scripting.Dictionary")
+
+    Dim r As Long
+
+    For r = DASH_DATA_START To targetRow - 1
+
+        Dim ticker As String: ticker = CStr(ws.Cells(r, colTicker).value)
+
+        If Len(ticker) = 0 Then GoTo ContinueLoop
+
+        Dim sess As String: sess = CStr(ws.Cells(r, colSession).value)
+
+        Dim mode As String: mode = CStr(ws.Cells(r, colSignal).value)
+
+        Dim pr As Double: pr = GetSessionPriority(sess, mode)
+
+        If Not bestRow.Exists(ticker) Then
+
+            bestRow(ticker) = r
+
+            bestPriority(ticker) = pr
+
+            ws.Cells(r, colSelected).value = selDefault
+
+        ElseIf pr < bestPriority(ticker) - 0.0001 Then
+
+            ws.Cells(bestRow(ticker), colSelected).value = 0
+
+            bestRow(ticker) = r
+
+            bestPriority(ticker) = pr
+
+            ws.Cells(r, colSelected).value = selDefault
+
+        Else
+
+            ws.Cells(r, colSelected).value = 0
+
+        End If
+
+ContinueLoop:
+
+    Next r
+
+End Sub
+
+
+
+Private Sub StartAutoTrading()
+
+    Dim wsDash As Worksheet
+
+    Set wsDash = EnsureSheet(SHEET_DASHBOARD)
+
+    wsDash.Range(DASH_STATUS_CELL).value = 1
+
+    If prevJ Is Nothing Then Set prevJ = CreateObject("Scripting.Dictionary")
+
+    prevJ.RemoveAll
+
+    tradeDate = Date
+
+    orderCount = 0
+
+    isRunning = True
+
+    ScheduleNextTick 1
+
+    LogDebug "Auto trading loop started (dry-run)."
+
+End Sub
+
+
+
+Private Sub StopAutoTrading()
+
+    On Error GoTo EvalError
+
+    Dim wsDash As Worksheet
+
+    Set wsDash = EnsureSheet(SHEET_DASHBOARD)
+
+    wsDash.Range(DASH_STATUS_CELL).value = 0
+
+    isRunning = False
+
+    On Error Resume Next
+
+    If AutoTimer <> 0 Then Application.OnTime AutoTimer, "AutoTrader.AutoTick", , False
+
+    CancelCloseExit
+
+    On Error GoTo 0
+
+    LogDebug "Auto trading loop stopped."
+
+    Exit Sub
+
+EvalError:
+
+    LogDebug "StopAutoTrading error " & Err.Number & ": " & Err.Description
+
+    Err.Clear
+
+End Sub
+
+
+
+Private Sub ScheduleNextTick(ByVal seconds As Double)
+
+    On Error Resume Next
+
+    AutoTimer = Now + TimeSerial(0, 0, seconds)
+
+    Application.OnTime AutoTimer, "AutoTrader.AutoTick"
+
+    On Error GoTo 0
+
+End Sub
+
+
+
+Public Sub AutoTick()
+
+    On Error GoTo ExitTick
+
+    If Not isRunning Then Exit Sub
+
+    Dim wsDash As Worksheet
+
+    Set wsDash = EnsureSheet(SHEET_DASHBOARD)
+
+    If wsDash.Range(DASH_STATUS_CELL).value <> 1 Then
+
+        StopAutoTrading
+
+        Exit Sub
+
+    End If
+
+    If CLng(IfZero(wsDash.Range(DASH_HARDSTOP_CELL).value, 0)) = 1 Then Exit Sub
+
+    If Date <> tradeDate Then
+
+        orderCount = 0
+
+        tradeDate = Date
+
+        If Not prevJ Is Nothing Then prevJ.RemoveAll
+
+        If Not sessionRiskUsed Is Nothing Then sessionRiskUsed.RemoveAll
+
+        If Not tickerRiskUsed Is Nothing Then tickerRiskUsed.RemoveAll
+
+        totalRiskUsed = 0
+
+        UpdateRiskUsageFromExecutions
+
+        If CLng(IfZero(wsDash.Range(DASH_REENTRY_CELL).value, DEFAULT_REENTRY)) = 1 Then
+
+            ResetSelectedToDefault wsDash
+
+        End If
+
+    End If
+
+
+
+    EvaluateAndQueueOrders
+
+    ScheduleNextTick 1
+
+ExitTick:
+
+End Sub
+
+Private Sub ResetSelectedToDefault(ByVal wsDash As Worksheet)
+
+    Dim selCol As Long: selCol = FindColumn(wsDash, DASH_HEADER_ROW, "Selected")
+
+    Dim tickerCol As Long: tickerCol = FindColumn(wsDash, DASH_HEADER_ROW, "Ticker")
+
+    If selCol = 0 Or tickerCol = 0 Then Exit Sub
+
+    Dim lastRow As Long: lastRow = wsDash.Cells(wsDash.Rows.Count, tickerCol).End(xlUp).ROW
+
+    Dim defVal As Long: defVal = CLng(IfZero(wsDash.Range(DASH_SELECTED_DEFAULT_CELL).value, DEFAULT_SELECTED_DEFAULT))
+
+    Dim r As Long
+
+    For r = DASH_DATA_START To lastRow
+
+        If wsDash.Cells(r, tickerCol).value <> "" Then
+
+            wsDash.Cells(r, selCol).value = defVal
+
+        End If
+
+    Next r
+
+End Sub
+
+
+
+Private Sub EvaluateAndQueueOrders()
+
+    Dim wsDash As Worksheet
+
+    Set wsDash = EnsureSheet(SHEET_DASHBOARD)
+
+    RepairRealtimeIfCorrupted wsDash
+
+    MaintainStraddleOrders wsDash
+
+    Dim startTime As Date, endTime As Date
+
+    startTime = ParseTime(wsDash.Range(DASH_SESSION_START_CELL).value, DEFAULT_SESSION_START)
+
+    endTime = ParseTime(wsDash.Range(DASH_SESSION_END_CELL).value, DEFAULT_SESSION_END)
+
+    Dim tm As Date: tm = Time
+
+    If tm < startTime Or tm > endTime Then Exit Sub
+
+
+
+    Dim maxOrders As Long
+
+    maxOrders = CLng(IfZero(wsDash.Range(DASH_MAX_ORDERS_CELL).value, DEFAULT_MAX_ORDERS))
+
+    If orderCount >= maxOrders Then Exit Sub
+
+
+
+    Dim totalBudget As Double
+
+    totalBudget = CDbl(IfZero(wsDash.Range(DASH_BUDGET_CELL).value, DEFAULT_MAX_BUDGET))
+
+    If totalBudget <= 0 Then totalBudget = DEFAULT_MAX_BUDGET
+
+
+
+    If sessionRiskUsed Is Nothing Then Set sessionRiskUsed = CreateObject("Scripting.Dictionary")
+
+    If tickerRiskUsed Is Nothing Then Set tickerRiskUsed = CreateObject("Scripting.Dictionary")
+
+    UpdateRiskUsageFromExecutions
+
+
+
+    Dim selCol As Long: selCol = FindColumn(wsDash, DASH_HEADER_ROW, "Selected")
+
+    Dim signalCol As Long: signalCol = FindColumn(wsDash, DASH_HEADER_ROW, "SignalMode")
+
+    Dim sessionCol As Long: sessionCol = FindColumn(wsDash, DASH_HEADER_ROW, "Session")
+
+    Dim tickerCol As Long: tickerCol = FindColumn(wsDash, DASH_HEADER_ROW, "Ticker")
+
+    Dim priceCol As Long: priceCol = FindColumn(wsDash, DASH_HEADER_ROW, "PrevClose")
+
+    If priceCol = 0 Then priceCol = FindColumn(wsDash, DASH_HEADER_ROW, "PreOpenMid")
+
+    Dim jCol As Long: jCol = FindColumn(wsDash, DASH_HEADER_ROW, "J")
+
+    Dim jthCol As Long: jthCol = FindColumn(wsDash, DASH_HEADER_ROW, "J_th")
+
+    Dim qtyCol As Long: qtyCol = FindColumn(wsDash, DASH_HEADER_ROW, "DynamicQty")
+
+    Dim signalStatusCol As Long: signalStatusCol = FindColumn(wsDash, DASH_HEADER_ROW, HeaderSignalStatusJP())
+
+    Dim signalKindCol As Long: signalKindCol = FindColumn(wsDash, DASH_HEADER_ROW, HeaderSignalKindJP())
+
+    Dim entryStatusCol As Long: entryStatusCol = FindColumn(wsDash, DASH_HEADER_ROW, "EntryStatus")
+    Dim entrySideCol As Long: entrySideCol = FindColumn(wsDash, DASH_HEADER_ROW, "EntrySide")
+    Dim entryBuyCol As Long: entryBuyCol = FindColumn(wsDash, DASH_HEADER_ROW, "EntryBuyPx")
+    Dim entrySellCol As Long: entrySellCol = FindColumn(wsDash, DASH_HEADER_ROW, "EntrySellPx")
+
+    Dim colForwardPFDash As Long: colForwardPFDash = FindColumn(wsDash, DASH_HEADER_ROW, "ForwardPF")
+
+    Dim colForwardTradesDash As Long: colForwardTradesDash = FindColumn(wsDash, DASH_HEADER_ROW, "ForwardTrades")
+
+    Dim colForwardWinDash As Long: colForwardWinDash = FindColumn(wsDash, DASH_HEADER_ROW, "ForwardWin")
+
+    Dim colExpMeanDash As Long: colExpMeanDash = FindColumn(wsDash, DASH_HEADER_ROW, "ExpBootMean")
+
+    Dim colMaxDDDash As Long: colMaxDDDash = FindColumn(wsDash, DASH_HEADER_ROW, "MaxDD")
+
+    Dim colSLDash As Long: colSLDash = FindColumn(wsDash, DASH_HEADER_ROW, "SLk")
+
+    Dim colATRDash As Long: colATRDash = FindColumn(wsDash, DASH_HEADER_ROW, "ATR_n")
+
+    Dim colAtrValueDash As Long: colAtrValueDash = FindColumn(wsDash, DASH_HEADER_ROW, "ATR")
+
+    If priceCol = 0 Or selCol = 0 Or signalCol = 0 Or sessionCol = 0 Or tickerCol = 0 Or jCol = 0 Then Exit Sub
+
+    If colForwardPFDash = 0 Or colForwardTradesDash = 0 Or colForwardWinDash = 0 Or colExpMeanDash = 0 Then Exit Sub
+
+    If colSLDash = 0 Then Exit Sub
+
+    If colATRDash = 0 Then colATRDash = FindColumn(wsDash, DASH_HEADER_ROW, "ATR_n")
+
+
+
+    Dim defaultQty As Long
+
+    defaultQty = CLng(IfZero(wsDash.Range(DASH_QTY_CELL).value, DEFAULT_ORDER_QTY))
+
+    Dim lotStep As Long
+
+    lotStep = CLng(IfZero(wsDash.Range(DASH_LOT_STEP_CELL).value, DEFAULT_LOT_STEP))
+
+    Dim slipBp As Double
+
+    slipBp = CDbl(IfZero(wsDash.Range(DASH_SLIP_BP_CELL).value, DEFAULT_SLIP_BP))
+
+
+
+    Dim rowScores As Object: Set rowScores = CreateObject("Scripting.Dictionary")
+
+    Dim sessionScores As Object: Set sessionScores = CreateObject("Scripting.Dictionary")
+
+
+
+    Dim ticker As String
+
+    Dim sessionVal As String
+
+    Dim modeVal As String
+
+    Dim sessionKey As String
+
+    Dim weight As Double
+
+    Dim winRate As Double
+
+    Dim pfEff As Double
+
+    Dim tradesVal As Double
+
+    Dim expMean As Double
+
+    Dim scoreVal As Double
+
+    Dim ddVal As Double
+
+    Dim rowScore As Double
+
+    Dim px As Double
+
+    Dim allocBudget As Double
+
+    Dim sessionCap As Double
+
+    Dim sessionUsed As Double
+
+    Dim sessionAvail As Double
+
+    Dim capFraction As Double
+
+    Dim orderCap As Double
+
+    Dim side As String
+
+    Dim qty As Long
+
+    Dim jVal As Double
+
+    Dim mode As String
+
+    Dim sessionScoreSum As Double
+
+    Dim sessionWeight As Double
+
+    Dim atrParam As Double
+
+    Dim atrValue As Double
+
+    Dim slVal As Double
+
+    Dim riskVal As Double
+
+
+
+    Dim lastRow As Long
+
+    lastRow = wsDash.Cells(wsDash.Rows.Count, tickerCol).End(xlUp).ROW
+
+    Dim r As Long
+
+    For r = DASH_DATA_START To lastRow
+
+        rowScores(CStr(r)) = 0#
+
+        Dim selVal As Variant: selVal = wsDash.Cells(r, selCol).value
+
+        If selVal <> 1 Then GoTo NextScore
+
+        ticker = CStr(wsDash.Cells(r, tickerCol).value)
+
+        If Len(ticker) = 0 Then GoTo NextScore
+
+        sessionVal = CStr(wsDash.Cells(r, sessionCol).value)
+
+        modeVal = CStr(wsDash.Cells(r, signalCol).value)
+
+        sessionKey = GetSessionKey(sessionVal, modeVal)
+
+        weight = GetSessionWeight(sessionKey)
+
+        If weight <= 0 Then
+
+            wsDash.Cells(r, selCol).value = 0
+
+            If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = "SKIP_SESSION"
+
+            GoTo NextScore
+
+        End If
+
+        winRate = CDbl(IfZero(wsDash.Cells(r, colForwardWinDash).value, 0))
+
+        pfEff = CDbl(IfZero(wsDash.Cells(r, colForwardPFDash).value, 0))
+
+        tradesVal = CDbl(IfZero(wsDash.Cells(r, colForwardTradesDash).value, 0))
+
+        expMean = CDbl(IfZero(wsDash.Cells(r, colExpMeanDash).value, 0))
+
+        If colMaxDDDash > 0 Then
+
+            ddVal = CDbl(IfZero(wsDash.Cells(r, colMaxDDDash).value, 0))
+
+        Else
+
+            ddVal = 0
+
+        End If
+
+        scoreVal = ComputeRowScore(winRate, pfEff, tradesVal, expMean, ddVal)
+
+        If scoreVal <= 0 Then
+
+            If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = "SKIP_SCORE"
+
+            GoTo NextScore
+
+        End If
+
+        rowScores(CStr(r)) = scoreVal
+
+        If sessionScores.Exists(sessionKey) Then
+
+            sessionScores(sessionKey) = sessionScores(sessionKey) + scoreVal
+
+        Else
+
+            sessionScores(sessionKey) = scoreVal
+
+        End If
+
+NextScore:
+
+    Next r
+
+
+
+    For r = DASH_DATA_START To lastRow
+        ticker = CStr(wsDash.Cells(r, tickerCol).value)
+        jVal = CDbl(IfZero(wsDash.Cells(r, jCol).value, 0))
+        mode = LCase$(CStr(wsDash.Cells(r, signalCol).value))
+        sessionVal = CStr(wsDash.Cells(r, sessionCol).value)
+        Dim entryStatus As String
+        If entryStatusCol > 0 Then entryStatus = Trim$(CStr(wsDash.Cells(r, entryStatusCol).value))
+        If Len(ticker) = 0 Then GoTo UpdatePrev
+
+        Dim isSelected As Boolean
+        isSelected = (wsDash.Cells(r, selCol).value = 1)
+        If Not isSelected Then
+            If entryStatusCol > 0 Then
+                If entryStatus = "" Or entryStatus = ENTRY_STATUS_DONE Or entryStatus = ENTRY_STATUS_CANCELLED Then
+                    If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = ""
+                    If signalKindCol > 0 Then wsDash.Cells(r, signalKindCol).value = ""
+                    If qtyCol > 0 Then wsDash.Cells(r, qtyCol).value = ""
+                End If
+            Else
+                If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = ""
+                If signalKindCol > 0 Then wsDash.Cells(r, signalKindCol).value = ""
+                If qtyCol > 0 Then wsDash.Cells(r, qtyCol).value = ""
+            End If
+            GoTo UpdatePrev
+        End If
+
+        If rowScores.Exists(CStr(r)) Then
+            rowScore = rowScores(CStr(r))
+        Else
+            rowScore = 0
+        End If
+        If rowScore <= 0 Then
+            If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = "SKIP"
+            wsDash.Cells(r, selCol).value = 0
+            If qtyCol > 0 Then wsDash.Cells(r, qtyCol).value = ""
+            GoTo UpdatePrev
+        End If
+
+        sessionKey = GetSessionKey(sessionVal, mode)
+        sessionWeight = GetSessionWeight(sessionKey)
+        If sessionWeight <= 0 Then
+            wsDash.Cells(r, selCol).value = 0
+            If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = "SKIP_SESSION"
+            GoTo UpdatePrev
+        End If
+
+        If sessionScores.Exists(sessionKey) Then
+            sessionScoreSum = sessionScores(sessionKey)
+        Else
+            sessionScoreSum = 0
+        End If
+        If sessionScoreSum <= 0 Then GoTo UpdatePrev
+
+        allocBudget = totalBudget * sessionWeight * (rowScore / sessionScoreSum)
+        sessionCap = totalBudget * sessionWeight
+        If sessionRiskUsed.Exists(sessionKey) Then
+            sessionUsed = sessionRiskUsed(sessionKey)
+        Else
+            sessionUsed = 0
+        End If
+        sessionAvail = sessionCap - sessionUsed
+        If sessionAvail <= 0 Then
+            If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = "SESSION_FULL"
+            wsDash.Cells(r, selCol).value = 0
+            GoTo UpdatePrev
+        End If
+        If allocBudget > sessionAvail Then allocBudget = sessionAvail
+        capFraction = GetOrderCapFraction(sessionKey)
+        If capFraction > 0 Then
+            orderCap = totalBudget * capFraction
+            If allocBudget > orderCap Then allocBudget = orderCap
+        End If
+        If allocBudget <= 0 Then GoTo UpdatePrev
+
+        Dim bidCol As Long: bidCol = FindColumn(wsDash, DASH_HEADER_ROW, HeaderPreopenBidJP())
+        Dim askCol As Long: askCol = FindColumn(wsDash, DASH_HEADER_ROW, HeaderPreopenAskJP())
+        Dim midCol As Long: midCol = FindColumn(wsDash, DASH_HEADER_ROW, HeaderPreopenMidJP())
+        Dim pxBid As Double, pxAsk As Double, pxMid As Double, pxPrev As Double
+        If bidCol > 0 Then pxBid = CDbl(IfZero(wsDash.Cells(r, bidCol).value, 0))
+        If askCol > 0 Then pxAsk = CDbl(IfZero(wsDash.Cells(r, askCol).value, 0))
+        If midCol > 0 Then pxMid = CDbl(IfZero(wsDash.Cells(r, midCol).value, 0))
+        If priceCol > 0 Then pxPrev = CDbl(IfZero(wsDash.Cells(r, priceCol).value, 0))
+        If pxBid <= 0 Then pxBid = pxPrev
+        If pxAsk <= 0 Then pxAsk = pxPrev
+        If pxMid <= 0 Then pxMid = pxPrev
+
+        Dim qtyFromSheet As Long: qtyFromSheet = 0
+        If qtyCol > 0 Then
+            On Error Resume Next
+            qtyFromSheet = CLng(IfZero(wsDash.Cells(r, qtyCol).value, 0))
+            On Error GoTo 0
+        End If
+        If qtyFromSheet > 0 Then
+            qty = qtyFromSheet
+        Else
+            Dim pxRef As Double
+            pxRef = IIf(jVal < 0, IIf(pxAsk > 0, pxAsk, pxPrev), IIf(pxBid > 0, pxBid, pxPrev))
+            qty = ComputeDynamicQty(pxRef, IIf(jVal < 0, "BUY", "SELL"), allocBudget, lotStep, slipBp, defaultQty)
+        End If
+        If qty <= 0 Then
+            If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = "NO_QTY"
+            wsDash.Cells(r, selCol).value = 0
+            GoTo UpdatePrev
+        End If
+        If qtyCol > 0 Then
+            If Not wsDash.Cells(r, qtyCol).HasFormula Then
+                wsDash.Cells(r, qtyCol).value = qty
+            End If
+        End If
+
+        Dim entryBuyPx As Double: entryBuyPx = 0
+        Dim entrySellPx As Double: entrySellPx = 0
+        If entryBuyCol > 0 Then entryBuyPx = CDbl(IfZero(wsDash.Cells(r, entryBuyCol).value, 0))
+        If entrySellCol > 0 Then entrySellPx = CDbl(IfZero(wsDash.Cells(r, entrySellCol).value, 0))
+        Dim canSubmit As Boolean
+        canSubmit = (entryBuyPx > 0 And entrySellPx > 0)
+
+        Select Case entryStatus
+            Case "", ENTRY_STATUS_DONE, ENTRY_STATUS_CANCELLED
+                If Not canSubmit Then
+                    If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = "NO_ENTRY_PX"
+                    wsDash.Cells(r, selCol).value = 0
+                    GoTo UpdatePrev
+                End If
+                If orderCount + 2 > maxOrders Then
+                    If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = "ORDER_LIMIT"
+                    GoTo UpdatePrev
+                End If
+                SubmitEntryStraddle wsDash, r, ticker, entryBuyPx, entrySellPx, qty, modeVal, sessionVal, signalStatusCol, signalKindCol, entryStatusCol, entrySideCol
+                wsDash.Cells(r, selCol).value = 0
+                orderCount = orderCount + 2
+                GoTo UpdatePrev
+            Case ENTRY_STATUS_WAIT_STRADDLE
+                If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = ENTRY_STATUS_WAIT_STRADDLE
+                GoTo UpdatePrev
+            Case ENTRY_STATUS_IN_BUY, ENTRY_STATUS_IN_SELL
+                If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = entryStatus
+                GoTo UpdatePrev
+            Case Else
+                If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = entryStatus
+                GoTo UpdatePrev
+        End Select
+
+UpdatePrev:
+        SetPrevJ ticker, CDbl(IfZero(wsDash.Cells(r, jCol).value, 0))
+    Next r
+
+    Exit Sub
+
+EvalError:
+
+    LogDebug "EvaluateAndQueueOrders error " & Err.Number & ": " & Err.Description
+
+    Err.Clear
+
+End Sub
+Private Sub MaintainStraddleOrders(ByVal wsDash As Worksheet)
+
+    Dim tickerCol As Long: tickerCol = FindColumn(wsDash, DASH_HEADER_ROW, "Ticker")
+    Dim entryStatusCol As Long: entryStatusCol = FindColumn(wsDash, DASH_HEADER_ROW, "EntryStatus")
+    Dim entrySideCol As Long: entrySideCol = FindColumn(wsDash, DASH_HEADER_ROW, "EntrySide")
+    Dim entryBuyCol As Long: entryBuyCol = FindColumn(wsDash, DASH_HEADER_ROW, "EntryBuyPx")
+    Dim entrySellCol As Long: entrySellCol = FindColumn(wsDash, DASH_HEADER_ROW, "EntrySellPx")
+    Dim qtyCol As Long: qtyCol = FindColumn(wsDash, DASH_HEADER_ROW, "DynamicQty")
+    Dim modeCol As Long: modeCol = FindColumn(wsDash, DASH_HEADER_ROW, "SignalMode")
+    Dim sessionCol As Long: sessionCol = FindColumn(wsDash, DASH_HEADER_ROW, "Session")
+    Dim tpCol As Long: tpCol = FindColumn(wsDash, DASH_HEADER_ROW, "TPk")
+    Dim slCol As Long: slCol = FindColumn(wsDash, DASH_HEADER_ROW, "SLk")
+    Dim atrCol As Long: atrCol = FindColumn(wsDash, DASH_HEADER_ROW, "ATR")
+    Dim jCol As Long: jCol = FindColumn(wsDash, DASH_HEADER_ROW, HeaderJValueJP())
+    Dim jthCol As Long: jthCol = FindColumn(wsDash, DASH_HEADER_ROW, "J_th")
+    Dim signalStatusCol As Long: signalStatusCol = FindColumn(wsDash, DASH_HEADER_ROW, HeaderSignalStatusJP())
+    Dim signalKindCol As Long: signalKindCol = FindColumn(wsDash, DASH_HEADER_ROW, HeaderSignalKindJP())
+    Dim tpPriceCol As Long: tpPriceCol = FindColumn(wsDash, DASH_HEADER_ROW, "TP_price")
+    Dim slPriceCol As Long: slPriceCol = FindColumn(wsDash, DASH_HEADER_ROW, "SL_price")
+
+    If tickerCol = 0 Or entryStatusCol = 0 Then Exit Sub
+
+    Dim lastRow As Long: lastRow = wsDash.Cells(wsDash.Rows.Count, tickerCol).End(xlUp).Row
+    Dim r As Long
+    For r = DASH_DATA_START To lastRow
+        Dim ticker As String: ticker = Trim$(CStr(wsDash.Cells(r, tickerCol).Value))
+        If Len(ticker) = 0 Then
+            RemovePendingInfo ticker
+            RemoveActiveInfo ticker
+            GoTo ContinueRow
+        End If
+
+        Dim statusText As String: statusText = Trim$(CStr(wsDash.Cells(r, entryStatusCol).Value))
+
+        Select Case statusText
+            Case ENTRY_STATUS_WAIT_STRADDLE
+                HandlePendingStraddle wsDash, r, ticker, entryBuyCol, entrySellCol, qtyCol, modeCol, sessionCol, signalStatusCol, signalKindCol, entryStatusCol, entrySideCol
+            Case ENTRY_STATUS_IN_BUY, ENTRY_STATUS_IN_SELL
+                RemovePendingInfo ticker
+                HandleActiveStraddle wsDash, r, ticker, statusText, qtyCol, tpCol, slCol, atrCol, jCol, jthCol, tpPriceCol, slPriceCol
+            Case Else
+                RemovePendingInfo ticker
+                RemoveActiveInfo ticker
+        End Select
+ContinueRow:
+    Next r
+
+End Sub
+
+
+
+
+Private Sub HandlePendingStraddle(ByVal wsDash As Worksheet, ByVal rowIndex As Long, ByVal ticker As String, ByVal entryBuyCol As Long, ByVal entrySellCol As Long, ByVal qtyCol As Long, ByVal modeCol As Long, ByVal sessionCol As Long, ByVal signalStatusCol As Long, ByVal signalKindCol As Long, ByVal entryStatusCol As Long, ByVal entrySideCol As Long)
+
+    On Error GoTo ExitPending
+
+    Dim pendInfo As Object
+    Set pendInfo = EnsurePendingInfo(ticker)
+
+    Dim nowTs As Date
+    nowTs = Now
+
+    Dim createdAt As Date
+    If pendInfo.Exists("created_at") Then
+        createdAt = pendInfo("created_at")
+    Else
+        createdAt = nowTs
+        pendInfo("created_at") = createdAt
+    End If
+
+    Dim lastReprice As Date
+    If pendInfo.Exists("last_reprice") Then
+        lastReprice = pendInfo("last_reprice")
+    Else
+        lastReprice = createdAt
+    End If
+
+    Dim graceMinutes As Double
+    graceMinutes = CDbl(IfZero(wsDash.Range(DASH_ENTRY_GRACE_MIN_CELL).value, 0#))
+    If graceMinutes < 0# Then graceMinutes = 0#
+
+    If nowTs < createdAt + graceMinutes / (24# * 60#) Then GoTo UpdateStampPending
+
+    Dim updateSec As Double
+    updateSec = CDbl(IfZero(wsDash.Range(DASH_OCO_UPDATE_SEC_CELL).value, 30#))
+    If updateSec < 5# Then updateSec = 30#
+
+    If (nowTs - lastReprice) * 86400# < updateSec Then GoTo ExitPending
+
+    Dim entryBuyPx As Double: entryBuyPx = 0#
+    If entryBuyCol > 0 Then entryBuyPx = CDbl(IfZero(wsDash.Cells(rowIndex, entryBuyCol).value, 0#))
+    Dim entrySellPx As Double: entrySellPx = 0#
+    If entrySellCol > 0 Then entrySellPx = CDbl(IfZero(wsDash.Cells(rowIndex, entrySellCol).value, 0#))
+
+    If entryBuyPx <= 0# And entrySellPx <= 0# Then GoTo UpdateStampPending
+
+    Dim qty As Long
+    If qtyCol > 0 Then
+        qty = CLng(IfZero(wsDash.Cells(rowIndex, qtyCol).value, 0))
+    Else
+        qty = 0
+    End If
+    If qty <= 0 Then qty = CLng(IfZero(wsDash.Range(DASH_QTY_CELL).value, DEFAULT_ORDER_QTY))
+
+    Dim prevBuy As Double: prevBuy = 0#
+    If pendInfo.Exists("buy") Then prevBuy = CDbl(IfZero(pendInfo("buy"), 0#))
+    Dim prevSell As Double: prevSell = 0#
+    If pendInfo.Exists("sell") Then prevSell = CDbl(IfZero(pendInfo("sell"), 0#))
+
+    Dim tickBuy As Double: tickBuy = 0#
+    If entryBuyPx > 0# Then tickBuy = GetTickSize(entryBuyPx)
+    Dim tickSell As Double: tickSell = 0#
+    If entrySellPx > 0# Then tickSell = GetTickSize(entrySellPx)
+    If tickBuy <= 0# Then tickBuy = 0.1
+    If tickSell <= 0# Then tickSell = 0.1
+
+    If entryBuyPx > 0# Then entryBuyPx = AlignToTick(entryBuyPx, tickBuy)
+    If entrySellPx > 0# Then entrySellPx = AlignToTick(entrySellPx, tickSell)
+
+    Dim changedBuy As Boolean: changedBuy = False
+    If entryBuyPx > 0# Then
+        changedBuy = (prevBuy = 0#) Or (Abs(entryBuyPx - prevBuy) >= (tickBuy / 2#))
+    End If
+
+    Dim changedSell As Boolean: changedSell = False
+    If entrySellPx > 0# Then
+        changedSell = (prevSell = 0#) Or (Abs(entrySellPx - prevSell) >= (tickSell / 2#))
+    End If
+
+    If Not changedBuy And Not changedSell Then GoTo UpdateStampPending
+
+    If modeCol > 0 Then pendInfo("mode") = CStr(wsDash.Cells(rowIndex, modeCol).value)
+    If sessionCol > 0 Then pendInfo("session") = CStr(wsDash.Cells(rowIndex, sessionCol).value)
+    pendInfo("qty") = qty
+
+    If changedBuy Then
+        TraceMessage wsDash, "Reprice BUY leg ticker=" & ticker & " new=" & Format$(entryBuyPx, "0.000")
+        PlaceOrder ticker, "CANCEL", 0, 0, "STRADDLE_REPRICE:BUY_CANCEL"
+        PlaceOrder ticker, "BUY", entryBuyPx, qty, "STRADDLE_REPRICE:BUY"
+    End If
+
+    If changedSell Then
+        TraceMessage wsDash, "Reprice SELL leg ticker=" & ticker & " new=" & Format$(entrySellPx, "0.000")
+        PlaceOrder ticker, "CANCEL", 0, 0, "STRADDLE_REPRICE:SELL_CANCEL"
+        PlaceOrder ticker, "SELL", entrySellPx, qty, "STRADDLE_REPRICE:SELL"
+    End If
+
+    pendInfo("buy") = entryBuyPx
+    pendInfo("sell") = entrySellPx
+
+    If entryStatusCol > 0 Then wsDash.Cells(rowIndex, entryStatusCol).value = ENTRY_STATUS_WAIT_STRADDLE
+    If entrySideCol > 0 Then wsDash.Cells(rowIndex, entrySideCol).value = "STRADDLE"
+    If signalStatusCol > 0 Then wsDash.Cells(rowIndex, signalStatusCol).value = ENTRY_STATUS_WAIT_STRADDLE
+    If signalKindCol > 0 Then
+        Dim modeLabel As String
+        modeLabel = ""
+        If modeCol > 0 Then modeLabel = CStr(wsDash.Cells(rowIndex, modeCol).value)
+        If Len(modeLabel) > 0 Then
+            wsDash.Cells(rowIndex, signalKindCol).value = "STRADDLE / " & modeLabel
+        Else
+            wsDash.Cells(rowIndex, signalKindCol).value = "STRADDLE"
+        End If
+    End If
+
+UpdateStampPending:
+    pendInfo("last_reprice") = nowTs
+
+ExitPending:
+    Exit Sub
+
+End Sub
+
+Private Sub HandleActiveStraddle(ByVal wsDash As Worksheet, ByVal rowIndex As Long, ByVal ticker As String, ByVal statusText As String, ByVal qtyCol As Long, ByVal tpCol As Long, ByVal slCol As Long, ByVal atrCol As Long, ByVal jCol As Long, ByVal jthCol As Long, ByVal tpPriceCol As Long, ByVal slPriceCol As Long)
+
+    On Error GoTo ExitActive
+
+    Dim actInfo As Object
+    Set actInfo = EnsureActiveInfo(ticker)
+
+    Dim nowTs As Date
+    nowTs = Now
+
+    Dim updateSec As Double
+    updateSec = CDbl(IfZero(wsDash.Range(DASH_OCO_UPDATE_SEC_CELL).value, 30#))
+    If updateSec < 5# Then updateSec = 30#
+
+    Dim lastUpdate As Date
+    If actInfo.Exists("last_update") Then
+        lastUpdate = actInfo("last_update")
+    Else
+        lastUpdate = 0
+    End If
+
+    If lastUpdate <> 0 Then
+        If (nowTs - lastUpdate) * 86400# < updateSec Then GoTo ExitActive
+    End If
+
+    Dim tpTarget As Double: tpTarget = 0#
+    If tpPriceCol > 0 Then tpTarget = CDbl(IfZero(wsDash.Cells(rowIndex, tpPriceCol).value, 0#))
+    Dim slTarget As Double: slTarget = 0#
+    If slPriceCol > 0 Then slTarget = CDbl(IfZero(wsDash.Cells(rowIndex, slPriceCol).value, 0#))
+
+    If tpTarget <= 0# Or slTarget <= 0# Then
+        actInfo("last_update") = nowTs
+        Exit Sub
+    End If
+
+    Dim qty As Long
+    If actInfo.Exists("qty") Then qty = CLng(IfZero(actInfo("qty"), 0))
+    If qty <= 0 And qtyCol > 0 Then qty = CLng(IfZero(wsDash.Cells(rowIndex, qtyCol).value, 0))
+    If qty <= 0 Then qty = CLng(IfZero(wsDash.Range(DASH_QTY_CELL).value, DEFAULT_ORDER_QTY))
+
+    Dim positionSide As String
+    If actInfo.Exists("position_side") Then
+        positionSide = CStr(actInfo("position_side"))
+    Else
+        positionSide = IIf(statusText = ENTRY_STATUS_IN_BUY, "BUY", "SELL")
+    End If
+
+    Dim exitSide As String
+    If statusText = ENTRY_STATUS_IN_BUY Then
+        exitSide = "SELL"
+        positionSide = "BUY"
+    Else
+        exitSide = "BUY"
+        positionSide = "SELL"
+    End If
+    actInfo("position_side") = positionSide
+
+    Dim tickTp As Double: tickTp = GetTickSize(tpTarget)
+    If tickTp <= 0# Then tickTp = 0.1
+    Dim tickSl As Double: tickSl = GetTickSize(slTarget)
+    If tickSl <= 0# Then tickSl = 0.1
+
+    tpTarget = AlignToTick(tpTarget, tickTp)
+    slTarget = AlignToTick(slTarget, tickSl)
+
+    Dim prevTp As Double: prevTp = 0#
+    If actInfo.Exists("tp_px") Then prevTp = CDbl(IfZero(actInfo("tp_px"), 0#))
+    Dim prevSl As Double: prevSl = 0#
+    If actInfo.Exists("sl_px") Then prevSl = CDbl(IfZero(actInfo("sl_px"), 0#))
+
+    Dim changedTp As Boolean
+    changedTp = (prevTp = 0#) Or (Abs(tpTarget - prevTp) >= (tickTp / 2#))
+
+    Dim changedSl As Boolean
+    changedSl = (prevSl = 0#) Or (Abs(slTarget - prevSl) >= (tickSl / 2#))
+
+    If changedTp Then
+        TraceMessage wsDash, "Reprice TP ticker=" & ticker & " new=" & Format$(tpTarget, "0.000")
+        PlaceOrder ticker, "CANCEL", 0, 0, "OCO_REPRICE:TP"
+        PlaceOrder ticker, exitSide, tpTarget, qty, "TP_REPRICE"
+    End If
+
+    If changedSl Then
+        TraceMessage wsDash, "Reprice SL ticker=" & ticker & " new=" & Format$(slTarget, "0.000")
+        PlaceOrder ticker, "CANCEL", 0, 0, "OCO_REPRICE:SL"
+        PlaceOrder ticker, exitSide, slTarget, qty, "SL_REPRICE"
+    End If
+
+    actInfo("tp_px") = tpTarget
+    actInfo("sl_px") = slTarget
+    actInfo("qty") = qty
+    actInfo("last_update") = nowTs
+
+ExitActive:
+    Exit Sub
+
+End Sub
+
+Private Function ResolveSessionLabel(ByVal sessionRaw As String, ByVal planTag As String) As String
+
+    Dim token As String
+
+    Dim tagBase As String
+
+    tagBase = Trim$(planTag)
+
+    If InStr(1, tagBase, "_") > 0 Then tagBase = Split(tagBase, "_")(0)
+
+    token = NormalizeSessionToken(tagBase)
+
+    If Len(token) = 0 Then
+
+        token = NormalizeSessionToken(sessionRaw)
+
+    End If
+
+    If Len(token) = 0 Then
+
+        ResolveSessionLabel = ""
+
+    Else
+
+        ResolveSessionLabel = FormatSessionDisplay(token)
+
+    End If
+
+End Function
+
+
+
+Private Function NormalizeSessionToken(ByVal raw As String) As String
+
+    Dim text As String
+
+    text = CStr(raw)
+
+    Dim cleaned As String
+
+    cleaned = Replace(text, ChrW$(&H3000), " ")
+
+    cleaned = Replace(cleaned, ":", "")
+
+    cleaned = Replace(cleaned, "-", "")
+
+    If InStr(cleaned, "_") > 0 Then cleaned = Split(cleaned, "_")(0)
+
+    cleaned = UCase$(Trim$(cleaned))
+
+    Select Case cleaned
+
+        Case "", "N/A", "NA"
+
+            NormalizeSessionToken = ""
+
+            Exit Function
+
+    End Select
+
+    Select Case cleaned
+
+        Case "AM15", "AM0915", "AM915", "AM9", "AM09", "AM09 15"
+
+            NormalizeSessionToken = "AM0915"
+
+            Exit Function
+
+        Case "AM0930", "AM930", "AM9 30"
+
+            NormalizeSessionToken = "AM0930"
+
+            Exit Function
+
+        Case "AM0945", "AM945", "AM9 45"
+
+            NormalizeSessionToken = "AM0945"
+
+            Exit Function
+
+        Case "AM10", "AM1000", "AM100", "AM10 00"
+
+            NormalizeSessionToken = "AM1000"
+
+            Exit Function
+
+        Case "AM1015", "AM10 15"
+
+            NormalizeSessionToken = "AM1015"
+
+            Exit Function
+
+        Case "AM1030", "AM10 30"
+
+            NormalizeSessionToken = "AM1030"
+
+            Exit Function
+
+        Case "PM1430", "PM14 30", "PM143"
+
+            NormalizeSessionToken = "PM1430"
+
+            Exit Function
+
+    End Select
+
+    If Len(cleaned) > 2 Then
+
+        Dim prefix As String: prefix = Left$(cleaned, 2)
+
+        Dim digits As String: digits = Mid$(cleaned, 3)
+
+        digits = Replace(digits, " ", "")
+
+        If Len(digits) = 3 Then digits = "0" & digits
+
+        If Len(digits) = 2 Then digits = "0" & digits & "0"
+
+        If Len(digits) = 4 Then
+
+            NormalizeSessionToken = prefix & digits
+
+            Exit Function
+
+        End If
+
+    End If
+
+    NormalizeSessionToken = ""
+
+End Function
+
+
+
+Private Function FormatSessionDisplay(ByVal token As String) As String
+
+    If Len(token) <> 6 Then
+
+        FormatSessionDisplay = token
+
+    Else
+
+        FormatSessionDisplay = Left$(token, 2) & Mid$(token, 3, 2) & ":" & Right$(token, 2)
+
+    End If
+
+End Function
+
+
+
+Private Function GetSessionKey(ByVal sessionVal As String, ByVal modeVal As String) As String
+
+    Dim token As String
+
+    token = NormalizeSessionToken(sessionVal)
+
+    If Len(token) = 0 Then token = "UNKNOWN"
+
+    Dim modeKey As String
+
+    modeKey = LCase$(Trim$(modeVal))
+
+    If Len(modeKey) = 0 Then modeKey = "unknown"
+
+    GetSessionKey = token & "::" & modeKey
+
+End Function
+
+
+
+Private Function GetSessionWeight(ByVal sessionKey As String) As Double
+
+    Dim parts() As String
+
+    parts = Split(sessionKey, "::")
+
+    Dim token As String: token = parts(0)
+
+    Dim baseWeight As Double
+
+    Select Case token
+
+        Case "AM0915"
+
+            baseWeight = 0
+
+        Case "AM0930"
+
+            baseWeight = 0.2
+
+        Case "AM0945"
+
+            baseWeight = 0.18
+
+        Case "AM1000"
+
+            baseWeight = 0.15
+
+        Case "AM1015"
+
+            baseWeight = 0.14
+
+        Case "AM1030"
+
+            baseWeight = 0.12
+
+        Case "PM1430", "AM15"
+
+            baseWeight = 0
+
+        Case Else
+
+            baseWeight = 0.08
+
+    End Select
+
+    Dim modeRatio As Double
+
+    Dim modeKey As String
+
+    If UBound(parts) >= 1 Then modeKey = parts(1)
+
+    Select Case modeKey
+
+        Case "j-only", "j_only", "jonly"
+
+            modeRatio = SESSION_MODE_JONLY_RATIO
+
+        Case "j-cross", "j_cross", "jcross"
+
+            modeRatio = SESSION_MODE_JCROSS_RATIO
+
+        Case Else
+
+            modeRatio = 0.5
+
+    End Select
+
+    GetSessionWeight = baseWeight * modeRatio
+
+End Function
+
+
+
+Private Function GetSessionPriority(ByVal sessionVal As String, ByVal modeVal As String) As Double
+
+    Dim token As String
+
+    token = NormalizeSessionToken(sessionVal)
+
+    Dim base As Double
+
+    Select Case token
+
+        Case "AM0915"
+
+            base = 1
+
+        Case "AM0930"
+
+            base = 2
+
+        Case "AM0945"
+
+            base = 3
+
+        Case "AM1000"
+
+            base = 4
+
+        Case "AM1015"
+
+            base = 5
+
+        Case "AM1030"
+
+            base = 6
+
+        Case "PM1430"
+
+            base = 7
+
+        Case Else
+
+            base = 50
+
+    End Select
+
+    Dim modeAdj As Double
+
+    Select Case LCase$(Trim$(modeVal))
+
+        Case "j-only", "j_only", "jonly"
+
+            modeAdj = -0.2
+
+        Case "j-cross", "j_cross", "jcross"
+
+            modeAdj = -0.1
+
+        Case Else
+
+            modeAdj = 0
+
+    End Select
+
+    GetSessionPriority = base + modeAdj
+
+End Function
+
+
+
+Private Function GetOrderCapFraction(ByVal sessionKey As String) As Double
+
+    Dim token As String
+
+    token = Split(sessionKey, "::")(0)
+
+    Select Case token
+
+        Case "AM0915"
+
+            GetOrderCapFraction = 0.07
+
+        Case "AM0930"
+
+            GetOrderCapFraction = 0.06
+
+        Case "AM0945"
+
+            GetOrderCapFraction = 0.055
+
+        Case "AM1000"
+
+            GetOrderCapFraction = 0.05
+
+        Case "AM1015"
+
+            GetOrderCapFraction = 0.045
+
+        Case "AM1030"
+
+            GetOrderCapFraction = 0.04
+
+        Case Else
+
+            GetOrderCapFraction = 0.05
+
+    End Select
+
+End Function
+
+
+
+Private Function ComputeRowScore(ByVal winRate As Double, ByVal pfEff As Double, ByVal tradesVal As Double, ByVal expMean As Double, Optional ByVal maxDD As Double = 0) As Double
+
+    If winRate <= 0 Or pfEff <= 0 Or tradesVal <= 0 Then
+
+        ComputeRowScore = 0
+
+        Exit Function
+
+    End If
+
+    Dim tradesFactor As Double
+
+    tradesFactor = tradesVal / ROW_SCORE_TRADE_TARGET
+
+    If tradesFactor > 1 Then tradesFactor = 1
+
+    Dim expFactor As Double
+
+    If expMean <= 0 Then
+
+        expFactor = 0
+
+    Else
+
+        expFactor = expMean / ROW_SCORE_EXP_TARGET
+
+        If expFactor > 1 Then expFactor = 1
+
+    End If
+
+    Dim pfCap As Double
+
+    pfCap = 1# + (tradesVal / ROW_SCORE_TRADE_TARGET) * ROW_SCORE_PF_CAP_GROWTH
+
+    If pfCap < 1.5 Then pfCap = 1.5
+
+    Dim pfFactor As Double
+
+    pfFactor = pfEff
+
+    If pfFactor > pfCap Then pfFactor = pfCap
+
+    If pfFactor < 1 Then pfFactor = 0
+
+    Dim ddNorm As Double
+
+    ddNorm = maxDD
+
+    If ddNorm < 0 Then ddNorm = 0
+
+    If ddNorm > 1 Then ddNorm = ddNorm / 100
+
+    If ddNorm > 1 Then ddNorm = 1
+
+    Dim ddPenalty As Double
+
+    ddPenalty = 1# / (1# + ROW_SCORE_DD_K * ddNorm)
+
+    If ddPenalty < 0.25 Then ddPenalty = 0.25
+
+    ComputeRowScore = winRate * pfFactor * (0.5 + tradesFactor / 2) * (0.5 + expFactor / 2) * ddPenalty
+
+End Function
+
+
+
+Private Function EnsureSheet(ByVal name As String) As Worksheet
+
+    Dim ws As Worksheet
+
+    On Error Resume Next
+
+    Set ws = ThisWorkbook.Worksheets(name)
+
+    On Error GoTo 0
+
+    If ws Is Nothing Then
+
+        Set ws = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
+
+        On Error Resume Next
+
+        ws.name = name
+
+        On Error GoTo 0
+
+    End If
+
+    Set EnsureSheet = ws
+
+End Function
+
+
+
+Private Function GetSheet(ByVal name As String) As Worksheet
+
+    On Error Resume Next
+
+    Set GetSheet = ThisWorkbook.Worksheets(name)
+
+    On Error GoTo 0
+
+End Function
+
+
+
+Private Function QuoteForFormula(ByVal s As String) As String
+
+    QuoteForFormula = """" & Replace(CStr(s), """", """""") & """"
+
+End Function
+
+
+
+Private Function EstimateOrderRisk(ByVal qty As Long, ByVal atrValue As Double, ByVal slVal As Double, ByVal price As Double, ByVal slipBp As Double) As Double
+
+    If qty <= 0 Then
+
+        EstimateOrderRisk = 0
+
+        Exit Function
+
+    End If
+
+
+
+    Dim stopDistance As Double
+
+    stopDistance = atrValue * slVal
+
+    If stopDistance < 0 Then stopDistance = 0
+
+
+
+    Dim slipAmount As Double
+
+    slipAmount = Abs(slipBp) / 10000# * price
+
+
+
+    Dim perShareRisk As Double
+
+    perShareRisk = stopDistance + slipAmount
+
+    If perShareRisk <= 0 Then perShareRisk = Abs(price) * 0.01
+
+
+
+    EstimateOrderRisk = qty * perShareRisk
+
+End Function
+
+
+
+Private Function ExecSideSign(ByVal text As String) As Long
+    Dim raw As String
+    raw = CStr(text)
+    Dim normalized As String
+    normalized = UCase$(Trim$(raw))
+    normalized = Replace(normalized, "・ｽ@", "")
+    normalized = Replace(normalized, " ", "")
+    If Len(normalized) = 0 Then
+        ExecSideSign = 0
+        Exit Function
+    End If
+
+    Dim firstChar As String
+    firstChar = Left$(normalized, 1)
+    If firstChar = "B" Then
+        ExecSideSign = 1
+        Exit Function
+    ElseIf firstChar = "S" Or firstChar = "F" Then
+        ExecSideSign = -1
+        Exit Function
+    End If
+
+    If InStr(raw, ChrW(&H8CB7)) > 0 Then
+        ExecSideSign = 1
+        Exit Function
+    End If
+    If InStr(raw, ChrW(&H8CB7) & ChrW(&H4ED8)) > 0 Then
+        ExecSideSign = 1
+        Exit Function
+    End If
+    If InStr(raw, ChrW(&H58F2)) > 0 Then
+        ExecSideSign = -1
+        Exit Function
+    End If
+    If InStr(raw, ChrW(&H58F2) & ChrW(&H308A)) > 0 Then
+        ExecSideSign = -1
+        Exit Function
+    End If
+
+    ExecSideSign = 0
+End Function
+
+
+
+Private Function IfZero(ByVal value As Variant, ByVal fallback As Variant) As Variant
+
+    If IsError(value) Then
+
+        IfZero = fallback
+
+    ElseIf IsEmpty(value) Then
+
+        IfZero = fallback
+
+    ElseIf value = "" Then
+
+        IfZero = fallback
+
+    Else
+
+        IfZero = value
+
+    End If
+
+End Function
+
+
+
+Private Function FindColumn(ByVal ws As Worksheet, ByVal headerRow As Long, ByVal name As String) As Long
+
+    Dim lastCol As Long
+
+    lastCol = ws.Cells(headerRow, ws.Columns.Count).End(xlToLeft).Column
+
+    Dim target As String
+
+    target = LCase$(Trim$(name))
+
+    Dim c As Long
+
+    For c = 1 To lastCol
+
+        Dim text As String
+
+        text = LCase$(Trim$(CStr(ws.Cells(headerRow, c).value)))
+
+        text = Replace(text, ChrW$(&HFEFF), "")
+
+        If text = target Then
+
+            FindColumn = c
+
+            Exit Function
+
+        End If
+
+    Next c
+
+    FindColumn = 0
+
+End Function
+
+Private Function ParseCsvLine(ByVal line As String) As Variant
+
+    Dim result() As String
+
+    Dim buffer As String
+
+    Dim inQuotes As Boolean
+
+    Dim i As Long
+
+    Dim ch As String
+
+    Dim length As Long
+
+
+
+    buffer = ""
+
+    inQuotes = False
+
+    length = Len(line)
+
+
+
+    If length = 0 Then
+
+        ReDim result(0)
+
+        result(0) = ""
+
+        ParseCsvLine = result
+
+        Exit Function
+
+    End If
+
+
+
+    For i = 1 To length
+
+        ch = Mid$(line, i, 1)
+
+        If ch = """" Then
+
+            If inQuotes And i < length And Mid$(line, i + 1, 1) = """" Then
+
+                buffer = buffer & """"
+
+                i = i + 1
+
+            Else
+
+                inQuotes = Not inQuotes
+
+            End If
+
+        ElseIf ch = "," And Not inQuotes Then
+
+            Call AppendCsvValue(result, buffer)
+
+            buffer = ""
+
+        Else
+
+            buffer = buffer & ch
+
+        End If
+
+    Next i
+
+
+
+    Call AppendCsvValue(result, buffer)
+
+
+
+    ParseCsvLine = result
+
+End Function
+
+
+
+Private Sub AppendCsvValue(ByRef arr() As String, ByVal value As String)
+
+    Dim cleaned As String
+
+    cleaned = CleanCsvValue(value)
+
+    Dim idx As Long
+
+    If Not Not arr Then
+
+        idx = UBound(arr) + 1
+
+        ReDim Preserve arr(idx)
+
+        arr(idx) = cleaned
+
+    Else
+
+        ReDim arr(0)
+
+        arr(0) = cleaned
+
+    End If
+
+End Sub
+
+Private Function CleanCsvValue(ByVal value As String) As String
+
+    Dim cleaned As String
+
+    cleaned = value
+
+    cleaned = Replace(cleaned, ChrW$(&HFEFF), "")
+
+    cleaned = Replace(cleaned, ChrW$(&HFFFD), "")
+
+    cleaned = Replace(cleaned, ChrW$(&H202A), "")
+
+    cleaned = Replace(cleaned, ChrW$(&H202C), "")
+
+    CleanCsvValue = Trim$(cleaned)
+
+End Function
+
+
+
+Private Sub ProtectRealtimeColumns(ByVal ws As Worksheet)
+
+    On Error Resume Next
+
+    Dim firstCol As Long: firstCol = 8  ' H
+
+    Dim lastCol As Long: lastCol = 20   ' T
+
+    Dim firstRow As Long: firstRow = DASH_DATA_START
+
+    Dim lastRow As Long: lastRow = DASH_DATA_START + DASH_FORMULA_ROWS
+
+    ' Lock only realtime block; other cells remain editable
+
+    ws.Cells.Locked = False
+
+    ws.Range(ws.Cells(firstRow, firstCol), ws.Cells(lastRow, lastCol)).Locked = True
+
+    ' Allow VBA edits but block user edits on UI
+
+    ws.Protect Password:="", UserInterfaceOnly:=True, AllowFormattingCells:=True, AllowSorting:=True, AllowFiltering:=True
+
+    On Error GoTo 0
+
+End Sub
+
+
+
+Private Sub RepairRealtimeIfCorrupted(ByVal ws As Worksheet)
+
+    On Error Resume Next
+
+    Dim c As Long
+
+    For c = 9 To 14 ' I..N
+
+        Dim hasF As Boolean
+
+        hasF = ws.Cells(DASH_DATA_START, c).HasFormula
+
+        If Not hasF Then
+
+            ' Reinstall full column formulas for safety
+
+            InstallRealtimeFormulas
+
+            Exit Sub
+
+        End If
+
+    Next c
+
+    On Error GoTo 0
+
+End Sub
+
+
+
+' --- Helpers added to complete module and fix compile/runtime errors ---
+
+
+
+Private Sub NormalizeCandidateHeaders(ByVal ws As Worksheet)
+
+    ' Normalize header row (row 1) to canonical names used by PushCandidatesToDashboard
+
+    Const ROW As Long = 1
+
+    Dim lastCol As Long
+
+    lastCol = ws.Cells(ROW, ws.Columns.Count).End(xlToLeft).Column
+
+    Dim c As Long
+
+    For c = 1 To lastCol
+
+        Dim raw As String
+
+        raw = LCase$(Trim$(CStr(ws.Cells(ROW, c).value)))
+
+        If Len(raw) = 0 Then GoTo NextC
+
+        Select Case raw
+
+            Case "code", "ticker"
+
+                ws.Cells(ROW, c).value = "Ticker"
+
+            Case "selected", "sel"
+
+                ws.Cells(ROW, c).value = "Selected"
+
+            Case "signal_mode", "mode"
+
+                ws.Cells(ROW, c).value = "SignalMode"
+
+            Case "session", "session_label"
+
+                ws.Cells(ROW, c).value = "Session"
+
+            Case "plan_tag", "plan"
+
+                ws.Cells(ROW, c).value = "PlanTag"
+
+            Case "atr_n", "atr"
+
+                ws.Cells(ROW, c).value = "ATR_n"
+
+            Case "tpk", "tp_k"
+
+                ws.Cells(ROW, c).value = "TPk"
+
+            Case "slk", "sl_k"
+
+                ws.Cells(ROW, c).value = "SLk"
+
+            Case "j_th", "jth"
+
+                ws.Cells(ROW, c).value = "J_th"
+
+            Case "forward_pf_eff"
+
+                ws.Cells(ROW, c).value = "ForwardPF"
+
+            Case "forward_trades"
+
+                ws.Cells(ROW, c).value = "ForwardTrades"
+
+            Case "forward_winrate"
+
+                ws.Cells(ROW, c).value = "ForwardWin"
+
+            Case "forward_win_ci_low"
+
+                ws.Cells(ROW, c).value = "WinCI_L"
+
+            Case "forward_win_ci_high"
+
+                ws.Cells(ROW, c).value = "WinCI_H"
+
+            Case "forward_exp_boot_mean"
+
+                ws.Cells(ROW, c).value = "ExpBootMean"
+
+            Case "forward_exp_boot_low"
+
+                ws.Cells(ROW, c).value = "ExpBootLow"
+
+            Case "forward_exp_boot_high"
+
+                ws.Cells(ROW, c).value = "ExpBootHigh"
+
+            Case "maxdd", "max_dd"
+
+                ws.Cells(ROW, c).value = "MaxDD"
+
+            Case "forward_avg_bars"
+
+                ws.Cells(ROW, c).value = "ForwardAvgBars"
+
+            Case "gapbucket", "forward_gap_best_bucket"
+
+                ws.Cells(ROW, c).value = "GapBucket"
+
+            Case "gaprule", "forward_gap_rule"
+
+                ws.Cells(ROW, c).value = "GapRule"
+
+            Case "gapsummary", "gap_summary", "forward_gap_summary"
+
+                ws.Cells(ROW, c).value = "GapSummary"
+
+        End Select
+
+NextC:
+
+    Next c
+
+End Sub
+
+
+
+Private Sub AttachForwardMetrics(ByVal wsDash As Worksheet, ByVal wsCand As Worksheet, ByVal firstRow As Long, ByVal lastRow As Long)
+
+    On Error Resume Next
+
+    If lastRow < firstRow Then Exit Sub
+
+    Dim dTickerCol As Long: dTickerCol = FindColumn(wsDash, DASH_HEADER_ROW, "TickerSrc")
+
+    If dTickerCol = 0 Then dTickerCol = FindColumn(wsDash, DASH_HEADER_ROW, "Ticker")
+
+    If dTickerCol = 0 Then Exit Sub
+
+
+
+    Dim map As Object: Set map = CreateObject("Scripting.Dictionary")
+
+    Dim cTickerCol As Long: cTickerCol = FindColumnWithAliases(wsCand, 1, "Ticker", "code", "ticker")
+
+    If cTickerCol = 0 Then Exit Sub
+
+    Dim cLast As Long: cLast = wsCand.Cells(wsCand.Rows.Count, cTickerCol).End(xlUp).ROW
+
+    Dim cr As Long
+
+    For cr = 2 To cLast
+
+        Dim tk As String: tk = CStr(wsCand.Cells(cr, cTickerCol).value)
+
+        If Len(tk) > 0 Then If Not map.Exists(tk) Then map(tk) = cr
+
+    Next cr
+
+
+
+    Dim dashCols As Object: Set dashCols = CreateObject("Scripting.Dictionary")
+
+    dashCols("ForwardPF") = FindColumn(wsDash, DASH_HEADER_ROW, "ForwardPF")
+
+    dashCols("ForwardTrades") = FindColumn(wsDash, DASH_HEADER_ROW, "ForwardTrades")
+
+    dashCols("ForwardWin") = FindColumn(wsDash, DASH_HEADER_ROW, "ForwardWin")
+
+    dashCols("WinCI_L") = FindColumn(wsDash, DASH_HEADER_ROW, "WinCI_L")
+
+    dashCols("WinCI_H") = FindColumn(wsDash, DASH_HEADER_ROW, "WinCI_H")
+
+    dashCols("ExpBootMean") = FindColumn(wsDash, DASH_HEADER_ROW, "ExpBootMean")
+
+    dashCols("ExpBootLow") = FindColumn(wsDash, DASH_HEADER_ROW, "ExpBootLow")
+
+    dashCols("ExpBootHigh") = FindColumn(wsDash, DASH_HEADER_ROW, "ExpBootHigh")
+
+    dashCols("ForwardAvgBars") = FindColumn(wsDash, DASH_HEADER_ROW, "ForwardAvgBars")
+
+
+
+    Dim candCols As Object: Set candCols = CreateObject("Scripting.Dictionary")
+
+    candCols("ForwardPF") = FindColumnWithAliases(wsCand, 1, "ForwardPF", "forward_pf_eff")
+
+    candCols("ForwardTrades") = FindColumnWithAliases(wsCand, 1, "ForwardTrades", "forward_trades")
+
+    candCols("ForwardWin") = FindColumnWithAliases(wsCand, 1, "ForwardWin", "forward_winrate")
+
+    candCols("WinCI_L") = FindColumnWithAliases(wsCand, 1, "WinCI_L", "forward_win_ci_low")
+
+    candCols("WinCI_H") = FindColumnWithAliases(wsCand, 1, "WinCI_H", "forward_win_ci_high")
+
+    candCols("ExpBootMean") = FindColumnWithAliases(wsCand, 1, "ExpBootMean", "forward_exp_boot_mean")
+
+    candCols("ExpBootLow") = FindColumnWithAliases(wsCand, 1, "ExpBootLow", "forward_exp_boot_low")
+
+    candCols("ExpBootHigh") = FindColumnWithAliases(wsCand, 1, "ExpBootHigh", "forward_exp_boot_high")
+
+    candCols("ForwardAvgBars") = FindColumnWithAliases(wsCand, 1, "ForwardAvgBars", "forward_avg_bars")
+
+
+
+    Dim r As Long
+
+    For r = firstRow To lastRow
+
+        Dim t As String: t = CStr(wsDash.Cells(r, dTickerCol).value)
+
+        If Len(t) = 0 Then GoTo NextAttach
+
+        If Not map.Exists(t) Then GoTo NextAttach
+
+        cr = map(t)
+
+        Dim k As Variant
+
+        For Each k In dashCols.Keys
+
+            Dim dc As Long: dc = dashCols(k)
+
+            Dim cc As Long: cc = candCols(k)
+
+            If dc > 0 And cc > 0 Then
+
+                wsDash.Cells(r, dc).value = wsCand.Cells(cr, cc).value
+
+            End If
+
+        Next k
+
+NextAttach:
+
+    Next r
+
+    On Error GoTo 0
+
+End Sub
+
+
+
+Private Function FindColumnWithAliases(ByVal ws As Worksheet, ByVal headerRow As Long, ParamArray aliases() As Variant) As Long
+
+    ' Try all aliases in order; returns first match or 0
+
+    Dim i As Long
+
+    For i = LBound(aliases) To UBound(aliases)
+
+        Dim name As String
+
+        name = CStr(aliases(i))
+
+        Dim c As Long
+
+        c = FindColumn(ws, headerRow, name)
+
+        If c > 0 Then
+
+            FindColumnWithAliases = c
+
+            Exit Function
+
+        End If
+
+    Next i
+
+    FindColumnWithAliases = 0
+
+End Function
+
+
+
+Private Function ParseTime(ByVal value As Variant, ByVal fallback As String) As Date
+
+    On Error GoTo Fail
+
+    If IsDate(value) Then
+
+        ParseTime = CDate(value)
+
+        Exit Function
+
+    End If
+
+    If IsDate(fallback) Then
+
+        ParseTime = CDate(fallback)
+
+        Exit Function
+
+    End If
+
+Fail:
+
+    ParseTime = TimeValue("09:00")
+
+End Function
+
+
+
+Private Function ComputeDynamicQty(ByVal basePrice As Double, ByVal side As String, ByVal maxBudget As Double, ByVal lotStep As Long, ByVal slipBp As Double, ByVal fallbackQty As Long) As Long
+
+    Dim stepSize As Long: stepSize = IIf(lotStep > 0, lotStep, 1)
+
+    Dim budget As Double: budget = IIf(maxBudget > 0, maxBudget, 0)
+
+    Dim qty As Long
+
+    Dim useQty As Long: useQty = IIf(fallbackQty > 0, fallbackQty, stepSize)
+
+    If basePrice <= 0 Or budget <= 0 Then
+
+        ComputeDynamicQty = useQty
+
+        Exit Function
+
+    End If
+
+    Dim slipFactor As Double: slipFactor = Abs(slipBp) / 10000#
+
+    Dim worstPrice As Double
+
+    If UCase$(side) = "BUY" Then
+
+        worstPrice = basePrice * (1 + slipFactor)
+
+    Else
+
+        worstPrice = basePrice * (1 - slipFactor)
+
+    End If
+
+    If worstPrice <= 0 Then worstPrice = basePrice
+
+    qty = CLng(Fix(budget / worstPrice / stepSize)) * stepSize
+
+    If qty <= 0 Then qty = stepSize
+
+    ComputeDynamicQty = qty
+
+End Function
+
+
+
+Private Sub PlaceBracketIfAvailable(ByVal ws As Worksheet, ByVal r As Long, ByVal ticker As String, ByVal side As String, ByVal entryPx As Variant, ByVal qty As Long)
+
+    On Error Resume Next
+
+    Dim tpCol As Long: tpCol = FindColumn(ws, DASH_HEADER_ROW, "TPk")
+
+    Dim slCol As Long: slCol = FindColumn(ws, DASH_HEADER_ROW, "SLk")
+
+    Dim atrPriceCol As Long: atrPriceCol = FindColumn(ws, DASH_HEADER_ROW, "ATR")
+
+    If tpCol = 0 Or slCol = 0 Or atrPriceCol = 0 Then Exit Sub
+
+    Dim tpK As Double: tpK = CDbl(IfZero(ws.Cells(r, tpCol).value, 0))
+
+    Dim slK As Double: slK = CDbl(IfZero(ws.Cells(r, slCol).value, 0))
+
+    Dim atr As Double: atr = CDbl(IfZero(ws.Cells(r, atrPriceCol).value, 0))
+
+    If atr <= 0 Then Exit Sub
+
+    Dim tpPx As Double, slPx As Double
+
+    If UCase$(side) = "BUY" Then
+
+        tpPx = CDbl(entryPx) + tpK * atr
+
+        slPx = CDbl(entryPx) - slK * atr
+
+    Else
+
+        tpPx = CDbl(entryPx) - tpK * atr
+
+        slPx = CDbl(entryPx) + slK * atr
+
+    End If
+
+    PlaceOrder ticker, IIf(UCase$(side) = "BUY", "SELL", "BUY"), tpPx, qty, "TP"
+
+    PlaceOrder ticker, IIf(UCase$(side) = "BUY", "SELL", "BUY"), slPx, qty, "SL"
+
+End Sub
+
+
+
+Private Sub ScheduleCloseExit(ByVal ws As Worksheet, ByVal ticker As String, ByVal side As String)
+
+    On Error Resume Next
+
+    Dim t As Date
+
+    t = ParseTime(ws.Range(DASH_CLOSE_TIME_CELL).value, DEFAULT_CLOSE_TIME)
+
+    closeTimer = Date + t
+
+    Application.OnTime EarliestTime:=closeTimer, Procedure:="AutoTrader.CloseAtMarket", Schedule:=True
+
+    closeTimerScheduled = True
+
+End Sub
+
+
+
+Private Sub CancelCloseExit()
+
+    On Error Resume Next
+
+    If closeTimerScheduled And closeTimer <> 0 Then
+
+        Application.OnTime EarliestTime:=closeTimer, Procedure:="AutoTrader.CloseAtMarket", Schedule:=False
+
+    End If
+
+    closeTimerScheduled = False
+
+    closeTimer = 0
+
+End Sub
+
+
+
+Public Sub CloseAtMarket()
+
+    On Error Resume Next
+
+    Dim ws As Worksheet
+
+    Set ws = EnsureSheet(SHEET_DASHBOARD)
+
+    Dim tickerCol As Long: tickerCol = FindColumn(ws, DASH_HEADER_ROW, "Ticker")
+
+    Dim priceCol As Long: priceCol = FindColumn(ws, DASH_HEADER_ROW, "PrevClose")
+
+    If priceCol = 0 Then priceCol = FindColumn(ws, DASH_HEADER_ROW, "PreOpenMid")
+
+    Dim qtyCol As Long: qtyCol = FindColumn(ws, DASH_HEADER_ROW, "DynamicQty")
+
+    If tickerCol = 0 Or priceCol = 0 Then Exit Sub
+
+    Dim lastRow As Long: lastRow = ws.Cells(ws.Rows.Count, tickerCol).End(xlUp).ROW
+
+    Dim r As Long
+
+    For r = DASH_DATA_START To lastRow
+
+        Dim tkr As String: tkr = CStr(ws.Cells(r, tickerCol).value)
+
+        If Len(tkr) > 0 Then
+
+            Dim qty As Long
+
+            qty = CLng(IfZero(IIf(qtyCol > 0, ws.Cells(r, qtyCol).value, 0), CLng(IfZero(ws.Range(DASH_QTY_CELL).value, DEFAULT_ORDER_QTY))))
+
+            PlaceOrder tkr, "FLAT", ws.Cells(r, priceCol).value, qty, "MOC"
+
+        End If
+
+    Next r
+
+End Sub
+
+
+
+Private Sub PlaceOrder(ByVal ticker As String, ByVal side As String, ByVal price As Variant, ByVal qty As Long, ByVal info As String)
+
+    Dim ws As Worksheet
+
+    Set ws = EnsureSheet(SHEET_DASHBOARD)
+
+    If qty <= 0 Then
+
+        qty = CLng(IfZero(ws.Range(DASH_QTY_CELL).value, DEFAULT_ORDER_QTY))
+
+    End If
+
+    If CLng(IfZero(ws.Range(DASH_LIVE_CELL).value, 0)) = 1 Then
+
+        PlaceOrderLive ticker, side, price, qty, info
+
+    Else
+
+        PlaceOrderDryRun ticker, side, price, qty, info
+
+    End If
+
+End Sub
+
+
+
+Private Sub PlaceOrderLive(ByVal ticker As String, ByVal side As String, ByVal price As Variant, ByVal qty As Long, ByVal info As String)
+
+    On Error Resume Next
+
+    Dim ws As Worksheet
+
+    Set ws = EnsureSheet(SHEET_DASHBOARD)
+
+    Dim macroName As String: macroName = CStr(IfZero(ws.Range(DASH_ORDERMACRO_CELL).value, ""))
+
+    If Len(macroName) > 0 Then
+
+        Application.Run macroName, ticker, side, price, qty, info
+
+    Else
+
+        ' fallback: dry run if macro not configured
+
+        PlaceOrderDryRun ticker, side, price, qty, "NO_MACRO:" & info
+
+    End If
+
+End Sub
+
+
+
+Private Function GetPrevJ(ByVal ticker As String) As Double
+
+    If prevJ Is Nothing Then Set prevJ = CreateObject("Scripting.Dictionary")
+
+    If prevJ.Exists(ticker) Then
+
+        GetPrevJ = prevJ(ticker)
+
+    Else
+
+        GetPrevJ = 0
+
+    End If
+
+End Function
+
+
+
+Private Sub SetPrevJ(ByVal ticker As String, ByVal value As Double)
+
+    If prevJ Is Nothing Then Set prevJ = CreateObject("Scripting.Dictionary")
+
+    prevJ(ticker) = value
+
+End Sub
+
+
+
+Private Sub PlaceOrderDryRun(ByVal ticker As String, ByVal side As String, ByVal price As Variant, ByVal qty As Long, ByVal info As String)
+
+    Dim ws As Worksheet
+
+    Set ws = EnsureSheet(SHEET_ORDERS)
+
+    Dim r As Long
+
+    r = ws.Cells(ws.Rows.Count, 1).End(xlUp).ROW + 1
+
+    ws.Cells(r, 1).value = Now
+
+    ws.Cells(r, 2).value = ticker
+
+    ws.Cells(r, 3).value = side
+
+    ws.Cells(r, 4).value = price
+
+    ws.Cells(r, 5).value = qty
+
+    ws.Cells(r, 6).value = "DEMO " & info
+
+
+
+    If qty <= 0 Then qty = CLng(IfZero(EnsureSheet(SHEET_DASHBOARD).Range(DASH_QTY_CELL).value, DEFAULT_ORDER_QTY))
+
+
+
+    Dim wsPnl As Worksheet
+
+    Set wsPnl = EnsureSheet("PnL")
+
+    Dim pr As Long
+
+    pr = wsPnl.Cells(wsPnl.Rows.Count, 1).End(xlUp).ROW + 1
+
+    If pr < 5 Then pr = 5
+
+    wsPnl.Cells(pr, 1).value = Now
+
+    wsPnl.Cells(pr, 3).value = "DEMO"
+
+    wsPnl.Cells(pr, 4).value = ticker
+
+    wsPnl.Cells(pr, 5).value = side
+
+    wsPnl.Cells(pr, 6).value = qty
+
+    wsPnl.Cells(pr, 7).value = price
+
+    wsPnl.Cells(pr, 9).value = info
+
+End Sub
+
+
+
+Private Function IsTraceEnabled(ByVal wsDash As Worksheet) As Boolean
+
+    On Error Resume Next
+
+    IsTraceEnabled = (CLng(IfZero(wsDash.Range(DASH_TRACE_CELL).value, 0)) = 1)
+
+    On Error GoTo 0
+
+End Function
+
+
+
+Private Sub TraceMessage(ByVal wsDash As Worksheet, ByVal message As String)
+
+    If wsDash Is Nothing Then Exit Sub
+
+    If IsTraceEnabled(wsDash) Then LogDebug "TRACE " & message
+
+End Sub
+
+
+
+Private Sub SubmitEntryStraddle(ByVal wsDash As Worksheet, ByVal rowIndex As Long, ByVal ticker As String, ByVal entryBuyPx As Double, ByVal entrySellPx As Double, ByVal qty As Long, ByVal modeLabel As String, ByVal sessionLabel As String, ByVal signalStatusCol As Long, ByVal signalKindCol As Long, ByVal entryStatusCol As Long, ByVal entrySideCol As Long)
+
+    Dim noteBase As String
+
+    noteBase = "STRADDLE:" & sessionLabel & ":" & modeLabel
+
+    TraceMessage wsDash, "SubmitEntryStraddle ticker=" & ticker & " qty=" & qty & " buy=" & Format$(entryBuyPx, "0.000") & " sell=" & Format$(entrySellPx, "0.000")
+
+    If entrySellPx > 0 Then
+
+        PlaceOrder ticker, "SELL", entrySellPx, qty, noteBase & ":SELL"
+
+    End If
+
+    If entryBuyPx > 0 Then
+
+        PlaceOrder ticker, "BUY", entryBuyPx, qty, noteBase & ":BUY"
+
+    End If
+
+    If entryStatusCol > 0 Then wsDash.Cells(rowIndex, entryStatusCol).value = ENTRY_STATUS_WAIT_STRADDLE
+
+    If entrySideCol > 0 Then wsDash.Cells(rowIndex, entrySideCol).value = "STRADDLE"
+
+    If signalStatusCol > 0 Then wsDash.Cells(rowIndex, signalStatusCol).value = ENTRY_STATUS_WAIT_STRADDLE
+
+    If signalKindCol > 0 Then
+
+        If Len(modeLabel) > 0 Then
+
+            wsDash.Cells(rowIndex, signalKindCol).value = "STRADDLE / " & modeLabel
+
+        Else
+
+            wsDash.Cells(rowIndex, signalKindCol).value = "STRADDLE"
+
+        End If
+
+    End If
+
+    Dim pendInfo As Object
+    Set pendInfo = EnsurePendingInfo(ticker)
+    pendInfo("buy") = entryBuyPx
+    pendInfo("sell") = entrySellPx
+    pendInfo("qty") = qty
+    pendInfo("mode") = modeLabel
+    pendInfo("session") = sessionLabel
+    pendInfo("created_at") = Now
+    pendInfo("last_reprice") = Now
+
+End Sub
+
+
+
+Private Sub CancelOppositeStraddleOrder(ByVal wsDash As Worksheet, ByVal ticker As String, ByVal filledSide As String)
+
+    Dim cancelSide As String
+
+    Select Case UCase$(filledSide)
+
+        Case "BUY"
+
+            cancelSide = "SELL"
+
+        Case "SELL"
+
+            cancelSide = "BUY"
+
+        Case Else
+
+            cancelSide = ""
+
+    End Select
+
+    If Len(cancelSide) = 0 Then Exit Sub
+
+    TraceMessage wsDash, "CancelOppositeStraddleOrder ticker=" & ticker & " cancel=" & cancelSide
+
+    PlaceOrder ticker, "CANCEL", 0, 0, "STRADDLE_CANCEL:" & cancelSide
+
+End Sub
+
+
+
+Private Function CheckRiskAndBudgetLimits(ByVal ticker As String, ByVal sessionKey As String, ByVal riskVal As Double, ByVal totalBudget As Double) As Boolean
+
+    ' Enforce simple per-ticker and global caps using running usage dictionaries
+
+    If riskVal <= 0 Or totalBudget <= 0 Then
+
+        CheckRiskAndBudgetLimits = False
+
+        Exit Function
+
+    End If
+
+    Dim usedTick As Double: usedTick = 0
+
+    If Not tickerRiskUsed Is Nothing Then
+
+        If tickerRiskUsed.Exists(ticker) Then usedTick = tickerRiskUsed(ticker)
+
+    End If
+
+    Dim capTick As Double
+
+    capTick = totalBudget * RISK_PER_TICKER_FRAC
+
+    Dim availTick As Double
+
+    availTick = capTick - usedTick
+
+    If availTick <= 0 Then
+
+        CheckRiskAndBudgetLimits = False
+
+        Exit Function
+
+    End If
+
+
+
+    Dim capTotal As Double
+
+    capTotal = totalBudget * RISK_TOTAL_FRAC
+
+    Dim availTotal As Double
+
+    availTotal = capTotal - totalRiskUsed
+
+    If availTotal <= 0 Then
+
+        CheckRiskAndBudgetLimits = False
+
+        Exit Function
+
+    End If
+
+
+
+    If riskVal > availTick Or riskVal > availTotal Then
+
+        CheckRiskAndBudgetLimits = False
+
+    Else
+
+        CheckRiskAndBudgetLimits = True
+
+    End If
+
+End Function
+
+Private Function BuildAdjustedJExpression(ByVal ws As Worksheet, ByVal targetCol As Long, ByVal jRef As String, ByVal gapBpCol As Long) As String
+
+    Dim marketBiasRef As String
+    Dim marketUpThreshRef As String
+    Dim marketUpAdjRef As String
+    Dim marketDownThreshRef As String
+    Dim marketDownAdjRef As String
+    Dim gap120ThreshRef As String
+    Dim gap120AdjRef As String
+    Dim gap200ThreshRef As String
+    Dim gap200AdjRef As String
+
+    marketBiasRef = ws.Range(DASH_MARKET_BIAS_CELL).Address(False, False, xlR1C1)
+    marketUpThreshRef = ws.Range(DASH_MARKET_UP_THRESHOLD_CELL).Address(False, False, xlR1C1)
+    marketUpAdjRef = ws.Range(DASH_MARKET_UP_ADJ_CELL).Address(False, False, xlR1C1)
+    marketDownThreshRef = ws.Range(DASH_MARKET_DOWN_THRESHOLD_CELL).Address(False, False, xlR1C1)
+    marketDownAdjRef = ws.Range(DASH_MARKET_DOWN_ADJ_CELL).Address(False, False, xlR1C1)
+    gap120ThreshRef = ws.Range(DASH_GAP120_THRESHOLD_CELL).Address(False, False, xlR1C1)
+    gap120AdjRef = ws.Range(DASH_GAP120_ADJ_CELL).Address(False, False, xlR1C1)
+    gap200ThreshRef = ws.Range(DASH_GAP200_THRESHOLD_CELL).Address(False, False, xlR1C1)
+    gap200AdjRef = ws.Range(DASH_GAP200_ADJ_CELL).Address(False, False, xlR1C1)
+
+    Dim gapRef As String
+    If gapBpCol > 0 Then
+        gapRef = BuildR1C1Ref(gapBpCol, targetCol)
+    Else
+        gapRef = "0"
+    End If
+    Dim absGapExpr As String
+    absGapExpr = "ABS(" & gapRef & ")"
+
+    Dim upExpr As String
+    upExpr = "IF(" & marketUpThreshRef & "="""",0,IF(" & marketBiasRef & ">=" & marketUpThreshRef & "," & marketUpAdjRef & ",0))"
+
+    Dim downExpr As String
+    downExpr = "IF(" & marketDownThreshRef & "="""",0,IF(" & marketBiasRef & "<=-" & marketDownThreshRef & "," & marketDownAdjRef & ",0))"
+
+    Dim gapExpr As String
+    gapExpr = "IF(" & gap200ThreshRef & "="""",0,IF(" & absGapExpr & ">=" & gap200ThreshRef & "," & gap200AdjRef & ",IF(" & gap120ThreshRef & "="""",0,IF(" & absGapExpr & ">=" & gap120ThreshRef & "," & gap120AdjRef & ",0))))"
+
+    BuildAdjustedJExpression = "(" & jRef & "+" & upExpr & "+" & downExpr & "+" & gapExpr & ")"
+
+End Function

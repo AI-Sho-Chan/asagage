@@ -1,0 +1,60 @@
+[2025-11-03 13:20:05] Run started
+[2025-11-03 13:20:05] Run type resolved to weekend
+[2025-11-03 13:20:05] Codes limited via C:\AI\asagake\output\bt30\TIMEPLAN_TEST_20251102\D_FULLDAY_WINDOWS\RUN_coarse_PM_1230_1300_j-cross\_TOP50_codes.csv: 50 tickers (was 20)
+[2025-11-03 13:20:19] Entry window marks set: 57738 rows flagged out of 594865
+[2025-11-03 13:20:20] Liquidity filter q=0.50 kept 50 tickers and 299139 rows
+[2025-11-03 13:20:20] Using 1 rolling slices (train=12, forward=20)
+[2025-11-03 13:20:20] Parameter grid size: 24 (mode=refine, signal=j-cross)
+[2025-11-03 13:20:23] [1/50] 2432.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-03 13:20:23] [2/50] 1911.T: best train_pf_eff=999.000, forward_pf_eff=0.000, trades=1/0
+[2025-11-03 13:20:24] [3/50] 1579.T: best train_pf_eff=0.000, forward_pf_eff=0.963, trades=0/3
+[2025-11-03 13:20:26] [4/50] 247A.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-03 13:20:26] [5/50] 1605.T: best train_pf_eff=0.354, forward_pf_eff=0.000, trades=5/1
+[2025-11-03 13:20:27] [6/50] 2802.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-03 13:20:28] [7/50] 3064.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-03 13:20:30] [8/50] 3350.T: best train_pf_eff=0.000, forward_pf_eff=999.000, trades=0/1
+[2025-11-03 13:20:30] [9/50] 3905.T: best train_pf_eff=0.000, forward_pf_eff=0.910, trades=0/2
+[2025-11-03 13:20:31] [10/50] 4005.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-03 13:20:33] [11/50] 4004.T: best train_pf_eff=0.000, forward_pf_eff=1.420, trades=0/2
+[2025-11-03 13:20:35] [12/50] 4188.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-03 13:20:37] [13/50] 4062.T: best train_pf_eff=999.000, forward_pf_eff=0.000, trades=4/0
+[2025-11-03 13:20:38] [14/50] 4503.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-03 13:20:39] [15/50] 4063.T: best train_pf_eff=0.038, forward_pf_eff=1.348, trades=6/7
+[2025-11-03 13:20:41] [16/50] 4528.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-03 13:20:41] [17/50] 4506.T: best train_pf_eff=0.000, forward_pf_eff=999.000, trades=2/2
+[2025-11-03 13:20:41] [18/50] 4543.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-03 13:20:44] [19/50] 4689.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-03 13:20:45] [20/50] 4661.T: best train_pf_eff=0.299, forward_pf_eff=0.000, trades=6/0
+[2025-11-03 13:20:46] [21/50] 4901.T: best train_pf_eff=0.000, forward_pf_eff=999.000, trades=0/2
+[2025-11-03 13:20:48] [22/50] 5411.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-03 13:20:49] [23/50] 4755.T: best train_pf_eff=999.000, forward_pf_eff=1.917, trades=4/6
+[2025-11-03 13:20:54] [24/50] 5706.T: best train_pf_eff=0.504, forward_pf_eff=0.000, trades=2/1
+[2025-11-03 13:20:55] [25/50] 5713.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=2/0
+[2025-11-03 13:20:56] [26/50] 5802.T: best train_pf_eff=999.000, forward_pf_eff=0.000, trades=2/0
+[2025-11-03 13:20:57] [27/50] 5803.T: best train_pf_eff=999.000, forward_pf_eff=1.603, trades=4/4
+[2025-11-03 13:20:59] [28/50] 6178.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-03 13:21:01] [29/50] 6326.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-03 13:21:02] [30/50] 6098.T: best train_pf_eff=2.310, forward_pf_eff=999.000, trades=5/5
+[2025-11-03 13:21:03] [31/50] 6315.T: best train_pf_eff=0.000, forward_pf_eff=999.000, trades=0/4
+[2025-11-03 13:21:05] [32/50] 6361.T: best train_pf_eff=0.000, forward_pf_eff=0.424, trades=0/2
+[2025-11-03 13:21:11] [33/50] 6526.T: best train_pf_eff=4.371, forward_pf_eff=0.501, trades=14/9
+[2025-11-03 13:21:13] [34/50] 6594.T: best train_pf_eff=0.161, forward_pf_eff=2.391, trades=3/6
+[2025-11-03 13:21:14] [35/50] 6702.T: best train_pf_eff=0.205, forward_pf_eff=1.108, trades=4/2
+[2025-11-03 13:21:15] [36/50] 6920.T: best train_pf_eff=0.493, forward_pf_eff=1.320, trades=2/3
+[2025-11-03 13:21:20] [37/50] 6954.T: best train_pf_eff=0.000, forward_pf_eff=999.000, trades=0/2
+[2025-11-03 13:21:23] [38/50] 6981.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/2
+[2025-11-03 13:21:23] [39/50] 7011.T: best train_pf_eff=0.220, forward_pf_eff=999.000, trades=9/4
+[2025-11-03 13:21:26] [40/50] 7012.T: best train_pf_eff=1.033, forward_pf_eff=0.000, trades=10/1
+[2025-11-03 13:21:29] [41/50] 7201.T: best train_pf_eff=1.884, forward_pf_eff=0.269, trades=8/3
+[2025-11-03 13:21:31] [42/50] 7936.T: best train_pf_eff=999.000, forward_pf_eff=0.000, trades=3/0
+[2025-11-03 13:21:33] [43/50] 7974.T: best train_pf_eff=0.000, forward_pf_eff=1.065, trades=4/3
+[2025-11-03 13:21:36] [44/50] 8001.T: best train_pf_eff=0.436, forward_pf_eff=0.162, trades=7/9
+[2025-11-03 13:21:38] [45/50] 8002.T: best train_pf_eff=0.000, forward_pf_eff=1.459, trades=1/8
+[2025-11-03 13:21:40] [46/50] 8053.T: best train_pf_eff=999.000, forward_pf_eff=0.000, trades=3/0
+[2025-11-03 13:21:42] [47/50] 8473.T: best train_pf_eff=0.119, forward_pf_eff=1.321, trades=7/6
+[2025-11-03 13:21:42] [48/50] 8630.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/1
+[2025-11-03 13:21:44] [49/50] 8729.T: best train_pf_eff=0.000, forward_pf_eff=0.247, trades=1/5
+[2025-11-03 13:21:44] [50/50] 9843.T: best train_pf_eff=0.384, forward_pf_eff=0.000, trades=4/0
+[2025-11-03 13:21:44] Bayesian refine trials executed: 691
+[2025-11-03 13:21:44] Refine candidates exported to output\excel\candidates_20251103.csv
+[2025-11-03 13:21:44] Run completed in 1.7 minutes

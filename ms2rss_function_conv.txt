@@ -1,0 +1,1621 @@
+  RSS
+2025/8/23
+ 
+2021/06/25 
+2022/01/27 
+2022/04/04 
+2022/07/29 
+2023/12/16 NISANISA
+2024/05/24 225225SOR
+2024/08/24 
+2025/01/20 SOR
+2025/06/14 JAX
+2025/08/23 CboePTSSOR
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 2
+ RSS
+
+
+
+ RSS
+ExcelｮExcelMicrosoft ｮ Windows ｮExcelｮMicrosoft Corporation
+
+Excel RSS
+
+3
+ 2025/8/23
+ No     VBA    
+ 1 RssStockOrder  
+RssStockOrder(ID,,,,,SOR,
+,,,,,,,
+,,,,,
+,) - ﾗ - VBA
+RssStockOrder_v
+VBA2
+
+2 RssMarginOpenOrder  
+
+RssMarginOpenOrder(ID,,,,,SOR
+,,,,,,,,
+,,,,,
+,,,) - ﾗ - VBA
+RssMarginOpenOrder_v
+VBA2
+
+3 RssMarginCloseOrder  
+RssMarginCloseOrder(ID,,,,
+,SOR,,,,,,,
+,,,,,,,
+) - ﾗ - VBA
+RssMarginCloseOrder_v
+VBA2
+
+4 RssModifyOrder  
+
+RssModifyOrder(ID,,,,,,
+,,,,,
+,,,,,
+) - ﾗ - VBA
+RssModifyOrder_v
+VBA2
+
+5 RssCancelOrder  
+RssCancelOrder(ID,,)  - ﾗ - VBA
+RssCancelOrder_v
+VBA2
+
+6 RssFOPOpenOrder OP 
+
+RssFOPOpenOrder(ID,,,,,
+,,,,,,,
+,,,SOR) - ﾗ - VBA
+RssFOPOpenOrder_v
+VBA2
+
+7 RssFOPCloseOrder OP 
+
+RssFOPCloseOrder(ID,,,,,
+,,,,,,,,
+,,,,SOR) - ﾗ - VBA
+RssFOPCloseOrder_v
+VBA2
+
+8 RssFOPMultiOpenOrder OP 2
+
+RssFOPMultiOpenOrder(ID,,1,1,
+1,1,1,,1,1,1,
+2,2,2,2,2,2,
+2,2,2)
+221 - ﾗ - VBA
+RssFOPMultiOpenOrder_v
+VBA2
+
+9 RssFOPMultiCloseOrder OP 2
+
+
+10
+RssFOPMultiCloseOrder(ID,,1,1,
+1,1,1,1,1,1,1,
+1,1,2,2,2,2,2,
+2,2,2,2,2,2)
+221
+
+3241424
+11 - ﾗ - VBA
+RssFOPMultiCloseOrder_v
+VBA2
+
+VBA5
+10 RssFOPModifyOrder OP 
+
+RssFOPModifyOrder(ID,,,,,
+,,,)
+ - ﾗ - VBA
+RssFOPModifyOrder_v
+VBA2
+
+11 RssFOPCancelOrder OP 
+RssFOPCancelOrder(ID,,)  - ﾗ - VBA
+RssFOPCancelOrder_v
+VBA2
+
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 4
+ 2025/8/23
+ No     VBA    
+ 1 RssOrderList  
+
+=RssOrderList(,,,,,,
+,,,)-   
+2 RssExecutionList  
+RssExecutionList(,,,,,) -   
+3 RssFOPOrderList OP 
+RssFOPOrderList(,,,) -   
+4 RssFOPExecutionList OP 
+RssFOPExecutionList(,,) -   
+5 RssPositionList  
+RssPositionList(,,) -   
+6 RssMarginPositionList  
+RssMarginPositionList(,,,,,
+)-   
+7 RssFOPPositionList OP 
+RssFOPPositionList(,,) -   
+8 RssCapacityList  
+RssCapacityList() -  - 
+9 RssBuyingPower  
+RssBuyingPower(,) -  - 
+10 RssMarginPower  
+RssMarginPower(,) -  - 
+11 RssFOPCapacityList OP 
+RssFOPCapacityList() -  - 
+12 RssOrderIDList ID ID
+RssOrderIDList() -   
+13 RssOrderStatus  ID
+RssOrderStatus(ID) -   -
+ 1 RssMarket  
+=RssMarket(,) -   
+2 RssFOPMarket OP 
+=RssFOPMarket("","") -   
+3 RssIndexMarket  
+=RssIndexMarket("","") -   
+4 RssFXMarket  
+=RssFXMarket("","") -   
+5 RssMarketHeader  
+=RssMarketHeader(,) -  ﾗ -
+6 RssTickList  
+=RssTickList(,"",) -   
+7 RssMarginInfo  
+=RssMarginInfo(,"") -  ﾗ 
+8 RssFutInfo  
+=RssFutInfo() -  ﾗ 
+9 RssMarketDes  
+=RssMarketDes(,"") -  ﾗ 
+10 RssFOPMarketDes OP OP
+=RssFOPMarketDes(,"") -  ﾗ 
+ 1 RssChart  
+=RssChart(,,,) -   
+2 RssChartPast  
+=RssChart(,,,,) -  - 
+3 RssTrendSMA  
+=RssTrendSMA(,,,,1,2,3,
+4,5,6,7)-   
+ 1 RssFOPCode OP OP
+=RssFOPCode(,,C/P,) - - ﾗ -
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 5
+ 2025/8/23
+   No   / 
+ RssStockOrder  1ID Excel1  
+2 0False:1True:0False:
+True/False 
+3 ..
+.T:.JAX:JAX.JNX:JNX 
+4 1:3:  
+5 0:1:2:  
+6SOR 0:1:SOR  
+7   
+8 0:1:
+0: or 1:  
+9 
+0: or 1:  
+10 1:2:3:4:5:6:   7:
+ SOR1:SOR3:4: 
+11 5:  
+(YYYYMMDD)
+12 0:1:2:NISA3:NISA  
+13 
+1: or 2: 
+14 1:2:
+1: or 2: 
+15 0:1:
+1: or 2: 
+16 
+1: or 2: 
+17 0:1:
+ 
+18 
+1: 
+19 1:2:3:4:5:6:   7:
+ SOR1:SOR3:4:
+1: 
+20 5:  
+(YYYYMMDD)  
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 6
+ 2025/8/23
+   No   /   
+ RssMarginOpenOrder  1ID Excel1  
+2 0False:1True:0False:
+True/False 
+3 ..
+.T:.JAX:JAX.JNX:JNX 
+4 1:3:  
+5 0:1:2:  
+6SOR 0:1:SOR  
+7 1:62:3:14
+4: 
+8   
+9 0:1:
+0: or 1:  
+10 
+0: or 1:  
+11 1:2:3:4:5:6:   7:
+ SOR1:SOR3:4: 
+12 5:  
+(YYYYMMDD)
+13 0:1:  
+14 
+1: or 2: 
+15 1:2:
+1: or 2: 
+16 0:1:
+1: or 2: 
+17 
+1: or 2: 
+18 0:1:
+ 
+19 1:  2:
+1: 
+20 
+1: 
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 7
+ 2025/8/23
+   No   /   
+ RssMarginOpenOrder  21 1:2:3:4:5:6:   7:
+ SOR1:SOR3:4:
+1: 
+22 5:  
+(YYYYMMDD)
+RssMarginCloseOrder  1ID Excel1  
+2 0False:1True:0False:
+True/False 
+3 ..
+.T:.JAX:JAX.JNX:JNX 
+4 1:3:  
+5 0:1:2:  
+6SOR 0:1:SOR  
+7 1:62:3:14
+4: 
+8   
+9 0:1:
+0: or 1:  
+10 
+0: or 1:  
+11 1:2:3:4:5:6:   7:
+ SOR1:SOR3:4: 
+12 5:  
+(YYYYMMDD)
+13 0:1:  
+14   
+(YYYYMMDD)
+15   
+16 1:4:JNX5:JAX6:Chi-X  
+17 
+1: or 2: 
+18 1:2:
+1: or 2: 
+19 0:1:
+1: or 2: 
+20 
+1: or 2: 
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 8
+ 2025/8/23
+   No   /   
+ RssModifyOrder  1ID Excel1  
+2 0False:1True:0False:
+True/False 
+3   
+4 
+0:1:2:
+
+3:4: 
+5   
+6 0:1:
+0: or 1:  
+7 
+0: or 1:  
+8 2:5:  
+9 5:  
+(YYYYMMDD)
+10 
+1: or 2: 
+11 1:2:
+1: or 2: 
+12 0:1:
+1: or 2: 
+13 
+1: or 2: 
+14 1:  2:  
+15 
+1: 
+16   
+(YYYYMMDD)
+17 5:
+RssCancelOrder  1ID Excel1  
+2 0False:1True:0False:
+True/False 
+3   
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 9
+ 2025/8/23
+   No   /   
+ RssFOPOpenOrder OP 1ID Excel1  
+2 0False:1True:0False:
+True/False 
+3 9  
+4 1:3:  
+5 0:1:2:  
+6   
+7 0:1:
+0: or 1:  
+8 
+0: or 1:  
+9 1:FOK2:FAK3:FAS  
+10 1:4:5:9:  
+11 5:  
+(YYYYMMDD)
+12 
+1: or 2: 
+13 1:2:
+1: or 2: 
+14 0:1:
+1: or 2: 
+15 
+1: or 2: 
+16SOR 0:1:SOR0:  
+RssFOPCloseOrder OP 1ID Excel1  
+2 0False:1True:0False:
+True/False 
+3 9  
+4 1:3:  
+5 0:1:2:  
+6   
+7 0:1:
+0: or 1:  
+8 
+0: or 1:  
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 10
+ 2025/8/23
+   No   /   
+ RssFOPCloseOrder OP 9 1:FOK2:FAK3:FAS  
+10 1:4:5:9:  
+11 5:  
+(YYYYMMDD)
+12   
+(YYYYMMDD)
+13   
+14 
+1: or 2: 
+15 1:2:
+1: or 2: 
+16 0:1:
+1: or 2: 
+17 
+1: or 2: 
+18SOR 0:1:SOR0:  
+RssFOPMultiOpenOrder OP 1ID Excel1  
+2 0False:1True:0False:
+True/False 
+31 9  
+41 1:3:  
+51 0:  
+61   
+71 0:1:  
+8   
+91 1:FOK2:FAK3:FAS  
+101 1:4:5:9:  
+111 5:  
+(YYYYMMDD)
+122 9  
+132 1:3:  
+142 0:  
+152   
+162 0:1:  
+172   
+182 1:FOK2:FAK3:FAS  
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 11
+ 2025/8/23
+   No   /   
+ RssFOPMultiOpenOrder OP 192 1:4:5:9:  
+202 5:  
+(YYYYMMDD)
+RssFOPMultiCloseOrder OP 1ID Excel1  
+2 0False:1True:0False:
+True/False 
+31 9  
+41 1:3:  
+51 0:  
+61   
+71 0:1:  
+81   
+91 1:FOK2:FAK3:FAS  
+101 1:4:5:9:  
+111 5:  
+(YYYYMMDD)
+121   
+(YYYYMMDD)
+131   
+142 9  
+152 1:3:  
+162 0:  
+172   
+182 0:1:  
+192   
+202 1:FOK2:FAK3:FAS  
+212 1:4:5:9:  
+222 5:  
+(YYYYMMDD)
+232   
+(YYYYMMDD)
+242   
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 12
+ 2025/8/23
+   No   /   
+ RssFOPModifyOrder OP 1ID Excel1  
+2 0False:1True:0False:
+True/False 
+3   
+4 
+0:1:2:
+
+3:4: 
+5 
+0: or 1:  
+6 5:  
+(YYYYMMDD)
+7 
+1: or 2: 
+8 1:2:
+1: or 2: 
+9 
+1: or 2: 
+RssFOPCancelOrder OP 1ID Excel1  
+2 0False:1True:0False:
+True/False 
+3   
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 13
+ 2025/8/23
+   No   /   
+ RssOrderList  1 
+ 
+2 0:1:2:3:4:5:6:
+7:8:9:
+10:11:12:13:-
+
+0 
+3 0:1:2:
+0 
+4 4or 5
+
+ 
+5 A:0:1:2:NISA3:NISA
+A 
+6 0:1:3:
+0 
+7 0:1:2:3:4:
+0 
+8 0:1:62:3:144:1
+0 
+9 0:1:2:
+0 
+10 0:1:2:3:4:5:
+0 
+RssExecutionList  1 
+ 
+2 0:1:2:
+0 
+3 4or 5
+
+ 
+4 A:0:1:2:NISA3:NISA
+A 
+5 0:1:62:3:144:1
+0 
+6 0:1:3:
+0 
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 14
+ 2025/8/23
+   No   /   
+ RssFOPOrderList OP 1 
+ 
+2 0:1:2:3:4:5:6:
+7:8:9:
+10:11:12:13:-
+
+0 
+3 0:F:C:N225F:225N225MF:
+225MOTF:N225OP:225N225C:
+225 N225P:225 GOLDF:GOLDMINIF:
+GOLDSPOTF:PLATINUMF:PLATINUMMINIF:
+PLATINUMSPOTF:SILVERF:PALLADIUMF:RSS3F:
+(RSS3)TSR20F:(TSR20)REDBEANF:SOYBEANF:
+CORNF:
+0 
+4 0:1:2:3:4:5:
+0 
+RssFOPExecutionList OP 1 
+ 
+2 0:F:C:N225F:225N225MF:
+225MOTF:N225OP:225N225C:
+225 N225P:225 GOLDF:GOLDMINIF:
+GOLDSPOTF:PLATINUMF:PLATINUMMINIF:
+PLATINUMSPOTF:SILVERF:PALLADIUMF:RSS3F:
+(RSS3)TSR20F:(TSR20)REDBEANF:SOYBEANF:
+CORNF:
+0 
+3 0:1:2:3:4:5:
+0 
+RssPositionList  1 
+ 
+2 4or 5
+
+ 
+3 A:0:1:2:NISA3:NISA
+A 
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 15
+ 2025/8/23
+   No   /   
+ RssMarginPositionList  1 
+ 
+2 4or 5
+
+ 
+3 A:0:1:
+A 
+4 0:1:62:3:144:1
+0 
+5 0:1:3:
+0 
+6 0:1:2:13:14:35:3
+0 
+RssFOPPositionList OP 1 
+ 
+2 0:F:C:N225F:225N225MF:
+225MOTF:N225OP:225N225C:
+225 N225P:225 GOLDF:GOLDMINIF:
+GOLDSPOTF:PLATINUMF:PLATINUMMINIF:
+PLATINUMSPOTF:SILVERF:PALLADIUMF:RSS3F:
+(RSS3)TSR20F:(TSR20)REDBEANF:SOYBEANF:
+CORNF:
+0 
+3 0:1:3:
+0 
+RssCapacityList  1 
+ 
+RssBuyingPower  1 
+ 
+2 4or 5
+ 
+RssMarginPower  1 
+ 
+2 4or 5
+ 
+RssFOPCapacityList OP 1 
+ 
+RssOrderIDList ID 1 
+ 
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 16
+ 2025/8/23
+   No   /   
+ RssOrderStatus  1ID ID  
+ RssMarket  1 45:
+45.T:
+45.JAX:JAX
+45.JNX:JNX 
+2   
+RssFOPMarket OP 1 9:OP
+N225.YYYYMM.C:225CME
+N225.YYYYMM.S:225SGX
+YYYYMM 
+2   
+RssIndexMarket  1   
+2   
+RssFXMarket  1   
+2   
+RssMarketHeader  1 1:2:OP3:4:  
+2 1:2:
+1 
+RssTickList  1 
+ 
+2 
+45:
+45.T:
+45.JAX:JAX
+45.JNX:JNX
+OP
+9:OP 
+3 1300  
+RssMarginInfo  1 
+ 
+2 45:
+45.T:
+45.JAX:JAX
+45.JNX:JNX 
+RssFutInfo  1 
+ 
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 17
+ 2025/8/23
+   No   /   
+ RssMarketDes  1 
+ 
+2 45:
+45.T:
+45.JAX:JAX
+45.JNX:JNX 
+RssFOPMarketDes OP 1 
+ 
+2 9:OP
+N225.YYYYMM.C:225CME
+N225.YYYYMM.S:225SGX
+YYYYMM 
+ RssChart  1 
+ 
+2 
+4or 5:
+4or 5.T:
+4or 5.JAX:JAX
+4or 5.JNX:JNX
+OP9:
+:
+ 
+3 T:1M:12M:23M:34M:45M:510M:10
+15M:1530M:3060M:602H:24H:4
+8H:8D:W:M:
+ 
+4 13000  
+RssChartPast  1 
+ 
+2 
+4or 5:
+4or 5.T:
+4or 5.JAX:JAX
+4or 5.JNX:JNX
+OP9:
+ 
+3 D:W:M:
+ 
+4   
+(YYYYMMDD)
+5 13000  
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 18
+ 2025/8/23
+   No   /   
+ RssTrendSMA  1 
+ 
+2 
+4or 5:
+4or 5.T:
+4or 5.JAX:JAX
+4or 5.JNX:JNX
+OP9:
+
+ 
+3 1M:12M:23M:34M:45M:510M:10
+15M:1530M:3060M:602H:24H:48H:8
+D:W:M:
+ 
+4 12000  
+51 1999  
+62 0999  
+73 0999  
+84 0999  
+95 0999  
+106 0999  
+117 0999  
+ RssFOPCode OP 1 N225F:225N225MF:225MOTF:
+N225OP:225TOPXF:TOPIXJN400F:JPX400
+GOLDF:GOLDMINIF:GOLDSPOTF:PLATINUMF:
+PLATINUMMINIF:PLATINUMSPOTF:SILVERF:
+PALLADIUMF:RSS3F:(RSS3)TSR20F:(TSR20)
+REDBEANF:SOYBEANF:CORNF: 
+2 213202103
+#n:2134202103#4 
+3C/P 1:2:225  
+4 225  
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 19
+ 2025/8/23
+    No  
+ RssStockOrder  1ID=xxxx  ID
+2 False
+3
+TrueOFF
+4 
+5 
+6 
+7(ID=xxxx) 
+8 
+:ID
+
+9 
+(  ID
+
+RssMarginOpenOrder   
+RssMarginCloseOrder   
+RssModifyOrder   
+RssCancelOrder   
+RssFOPOpenOrder OP  
+RssFOPCloseOrder OP  
+RssFOPMultiOpenOrder OP  
+RssFOPMultiCloseOrder OP  
+RssFOPModifyOrder OP  
+RssFOPCancelOrder OP   
+RSS = > 
+
+
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 20
+ 2025/8/23
+    No   
+ RssOrderList  1 0
+2No No
+3 
+
+
+4 
+5 
+6 505
+
+7 
+8 NISANISA
+9 :SOR:SORJAX:
+JAXJNX:JNX
+10 
+11 6141
+12/ YYYY/MM/DD HH:MM 
+13 
+14 
+15 
+
+16 YYYYMMDD 
+17 
+18 
+19 0
+20 
+21 
+22 
+23 
+24 
+25 YYYY/MM/DD HH:MM 
+26 
+27 
+28 
+29SOR YYYY/MM/DD HH:MM:SS SOR
+30SOR/ SOR
+RssExecutionList  1 YYYY/MM/DD HH:MM:SS 
+2 YYYYMMDD 
+3 505
+
+4 
+5 NISANISA
+6 :JNX:JNXJAX:JAX
+7 
+8 6141
+9 
+10 
+11 
+12 
+13 
+14 
+15()  
+12
+
+
+1
+2
+3
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 21
+ 2025/8/23
+    No    
+ RssFOPOrderList OP 1 
+2No No
+3 
+
+
+4 
+5 
+6 
+7 :
+8 YYYY/MM/DD HH:MM 
+9 
+10 
+11 
+12 FASFAKFOK
+13 
+14 
+15 
+16 
+17 YYYY/MM/DD HH:MM 
+18 
+19 
+20 YYYY/MM/DD HH:MM:SS SOR
+21/ /SOR
+
+22 
+23 
+
+24 1
+25 
+RssFOPExecutionList OP 1 YYYY/MM/DD HH:MM:SS 
+2 
+3 
+4 :
+5 
+6 
+7 
+8 
+9 
+10 
+11 
+12 
+RssPositionList  1 505
+
+2 
+3 NISANISA
+4 
+5 
+6 
+7 
+8 
+9 
+10 
+11 
+12 
+13 
+14JAX JAX
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 22
+ 2025/8/23
+    No    
+ RssPositionList  15JNX JNX
+16PER PER
+17PBR PBR
+18 
+RssMarginPositionList  1 505
+
+2 
+3 
+4 :JNX:JNXJAX:JAXChi-X:Chi-
+X
+5 
+6 6141
+7 
+8 
+9 
+10 
+11 YYYYMMDD 
+12 YYYYMMDD 
+13 
+14 
+15 
+16 
+17 
+18 
+19 
+20 
+RssFOPPositionList OP 1 
+2 
+3 :
+4 
+5 YYYYMMDD 
+6 
+7 
+8 
+9 
+10 
+11 
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 23
+ 2025/8/23
+    No    
+ RssCapacityList  1 
+2_ 
+3_ 
+4_ 
+5_ 
+6_ 
+7_ 
+RssBuyingPower  1 
+RssMarginPower  1 
+2() ()
+3() ()
+4 
+RssFOPCapacityList OP 1 
+2 
+3 
+4 
+5 
+6 
+RssOrderIDList ID 1ID ID
+2 
+3 
+4 
+5 /
+6 
+RssOrderStatus  ID
+ID1 -1 ID
+21 
+32 
+43 
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 24
+ 2025/8/23
+    No    
+ RssMarket  
+1 505
+
+2 T:JAX:JAXJNX:JNX
+3 
+4 :JAX:JAXJNX:JNX
+5 PSGJAXJNX
+6 PSGJAXJNX
+7 YYYY/MM/DD 
+8 
+9 HH:MM 
+10 HH:MM:SS 
+11 ::
+12 C:*:#:/
+/H:L:
+13 
+14 
+15 
+16 YYYY/MM/DD 
+17 C:*:A:
+B:#:/E:
+181 
+192 1
+203 2
+214 3
+221 HH:MM:SS 
+232 HH:MM:SS 1
+243 HH:MM:SS 2
+254 HH:MM:SS 3
+26 
+27 
+28 
+29 
+30 
+31 
+32 
+33 HH:MM 
+34 HH:MM 
+35 HH:MM 
+36 HH:MM:SS 
+37 HH:MM:SS 
+38 HH:MM:SS 
+39 
+40 
+41 
+42 
+43 
+44 
+45 
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 25
+ 2025/8/23
+    No    
+ RssMarket  46 
+47 HH:MM 
+48 HH:MM 
+49 HH:MM 
+50 HH:MM 
+51 HH:MM 
+52 HH:MM 
+53 HH:MM 
+54 HH:MM 
+55 
+56 
+57 
+58 
+59 HH:MM 
+60 HH:MM 
+61 HH:MM:SS 
+62 HH:MM:SS 
+63 S
+64 S
+65 1:2:
+66 
+67 YYYY/MM/DD 
+68 
+69 
+70 
+71 
+72 
+73 YYYY/MM/DD 
+74 
+75 
+76 
+77 
+78 
+79 
+80 
+81 
+82 
+83 
+84 
+85 
+861 1
+872 2
+883 3
+894 4
+905 5
+916 6
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 26
+ 2025/8/23
+    No    
+ RssMarket  927 7
+938 8
+949 9
+9510 10
+961 1
+972 2
+983 3
+994 4
+1005 5
+1016 6
+1027 7
+1038 8
+1049 9
+10510 10
+1061 1
+1072 2
+1083 3
+1094 4
+1105 5
+1116 6
+1127 7
+1138 8
+1149 9
+11510 10
+1161 1
+1172 2
+1183 3
+1194 4
+1205 5
+1216 6
+1227 7
+1238 8
+1249 9
+12510 10
+126 
+127 
+128OVER OVER
+129UNDER UNDER
+130 
+131 
+132 YYYY/MM/DD 
+133 YYYY/MM/DD 
+134 YYYY/MM/DD 
+135 YYYY/MM/DD 
+136PER PER
+137PBR PBR
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 27
+ 2025/8/23
+    No    
+ RssMarket  138 
+139 
+140 
+141 YYYY/MM/DD 
+142 YYYY/MM/DD 
+143 
+144 
+145 YYYY/MM/DD 
+146 YYYY/MM/DD 
+147 
+148 YYYY/MM/DD 
+RssFOPMarket OP 1 
+2 OS:C:CMES:SGX
+3 
+4 YYMM 
+5CP //C :
+P:
+6 /
+7 :XCME:CMEXSIM:SGX
+8 YYYY/MM/DD 
+9 
+10 HH:MM 
+11 HH:MM:SS 
+12 ::
+13 C:*:
+#://H:L:
+
+14 
+15 
+16 
+17 YYYY/MM/DD 
+18 C:*:
+A:B:#:/
+E:
+19 
+20 YYYY/MM/DD 
+21 
+221 HH:MM:SS 
+232 HH:MM:SS 1
+243 HH:MM:SS 2
+254 HH:MM:SS 3
+261 HH:MM 
+272 HH:MM 1
+283 HH:MM 2
+294 HH:MM 3
+301 HH:MM:SS 
+312 HH:MM:SS 1
+323 HH:MM:SS 2
+334 HH:MM:SS 3
+34 
+35 
+
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 28
+ 2025/8/23
+    No    
+ RssFOPMarket OP 36 
+37 
+38 1
+
+39 1
+
+40 IV1
+
+41 
+/
+42 1/
+
+43 
+44 
+45 
+46 HH:MM 
+47 HH:MM 
+48 HH:MM 
+49 HH:MM:SS 
+50 HH:MM:SS 
+51 HH:MM:SS 
+52 
+53 
+54 
+55 HH:MM 
+56 HH:MM 
+57 HH:MM 
+58 
+59 
+60 
+61 
+62 
+63 HH:MM 
+64 HH:MM 
+65 HH:MM 
+66 HH:MM 
+67 HH:MM 
+681 1
+692 2
+703 3
+714 4
+725 5
+736 6
+747 7
+758 8
+769 9
+7710 10
+781 1
+792 2
+803 3
+814 4
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 29
+ 2025/8/23
+    No    
+ RssFOPMarket OP 825 5
+836 6
+847 7
+858 8
+869 9
+8710 10
+881 1
+892 2
+903 3
+914 4
+925 5
+936 6
+947 7
+958 8
+969 9
+9710 10
+981 1
+992 2
+1003 3
+1014 4
+1025 5
+1036 6
+1047 7
+1058 8
+1069 9
+10710 10
+108 YYYY/MM/DD 
+109 
+110 YYYY/MM/DD 
+111 
+112 
+113SQ SQ/
+114 
+115 
+116 YYYY/MM/DD 
+117 YYYY/MM/DD 
+118 
+0:1:DCB
+2:SCB
+RssIndexMarket  1 
+2 
+3 YYYY/MM/DD 
+4 HH:MM 
+5 
+6 :: ::
+7 
+8 
+9 
+
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 30
+ 2025/8/23
+    No    
+ RssIndexMarket  10 YYYY/MM/DD 
+11 
+12 
+13 
+14 HH:MM 
+15 HH:MM 
+16 HH:MM 
+17 
+18 
+19 
+20 
+21 
+22 
+23 
+24 
+25 
+26 YYYY/MM/DD 
+27 YYYY/MM/DD 
+RssFXMarket  11 
+22 
+31 
+42 
+5(Bid) 
+6(Ask) 
+7 YY/MM/DD HH:MM 
+8(Bid) 
+9(Bid) 
+10(Bid) 
+11(Bid) 
+12(Bid) HH:MM 
+13(Bid) 
+14(Bid) HH:MM 
+15(Ask) 
+16(Ask) 
+17(Ask) 
+18(Ask) 
+19(Ask) HH:MM 
+20(Ask) 
+21(Ask) HH:MM 
+
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 31
+ 2025/8/23
+    No    
+ RssMarketHeader  
+
+1 
+RssTickList   1 HH:MM:SS 
+2 
+3 
+RssMarginInfo  
+1 
+2 
+3 YYYY/MM/DD 
+4_ 1:0:
+5_ 1:0:
+6_1_ 11:0:
+7_1_ 11:0:
+8__ 141:0:
+9__ 141:0:
+10__ 1:0:
+11__ 1:0:
+12 
+13 YYYY/MM/DD 
+RssFutInfo   1 
+2SPAN SPAN
+3SPAN SPAN
+4SPAN SPAN
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 32
+ 2025/8/23
+    No    
+ RssChart  1 
+2 :JAX:JAXJNX:JNX:
+3 T:1M:12M:23M:34M:4
+5M:510M:1015M:1530M:30
+60M:602H:24H:48H:8D:
+W:M:
+4 YYYY/MM/DD 
+5 HH:MMHH:MM:SS HH:MM:SS
+6 
+7 
+8 
+9 
+10 
+RssChartPast  1 
+2 :JAX:JAXJNX:JNX:
+3 D:W:M:
+4 YYYY/MM/DD 
+5 
+6 
+7 
+8 
+9 
+10 
+RssTrendSMA  1 
+2 :JAX:JAXJNX:JNX:
+3 T:1M:12M:23M:34M:4
+5M:510M:1015M:1530M:30
+60M:602H:24H:48H:8D:
+W:M:
+4 YYYY/MM/DD 
+5 HH:MM 
+61 1
+72 2
+83 3
+94 4
+105 5
+116 6
+127 7
+ RssFOPCode OP RSS
+:
+166060018
+:RssFOPCode(20,202103)
+1 
+2 12
+
+1
+2
+3
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 33
+ 2025/8/23
+   
+1N225 225 
+2N300 300 
+3TOPX TOPIX 
+4JN400 JPX400 
+5TSPM  
+6TSSM  
+7TSGM  
+8N500 500 
+9TS1EX  
+10TSGMC Core 
+11MTHR  
+12NVI VI 
+13TREIT REIT 
+14JGB:F JPX 
+15JGB:FL JPX 
+16JGB:FI JPX 
+17JGB:FDI JPX 
+18DJIA NY 
+19NQ NASDAQ 
+20NQ100 NASDAQ100 
+21SP100 S&P100 
+22SP500 S&P500 
+23VIX VIX 
+24VVIX VVIX 
+25SIXB S&P 
+26SIXE S&P 
+27SIXM S&P 
+28SIXRE S&P 
+29SIXU S&P 
+30SIXY S&P 
+31SIXC S&P 
+32SIXI S&P 
+33SIXR S&P 
+34SIXT S&P 
+35SIXV S&P 
+36SPESG S&P500 ESG 
+37INDS NASDAQ 
+38BANK NASDAQ 
+39INSR NASDAQ 
+40OFIN NASDAQ 
+41TRAN NASDAQ 
+42IXTC NASDAQ 
+43IXCO NASDAQ 
+44IXF NASDAQ100 
+45NBI NASDAQ 
+46IXHC NASDAQ 
+47NDXT NASDAQ100  
+48XAU PHLX/ 
+49SOX PHLX 
+50HGX PHLX 
+51OSX PHLX 
+52UTY PHLX 
+53HXC NASDAQ 
+54NQUSLT NASDAQ 
+55NQUSMT NASDAQ 
+56NQUSST NASDAQ 
+57NQCYBR NASDAQ CTA 
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 34
+ 2025/8/23
+   
+58CPQ ISE CTA 
+59NQROBO NASDAQ CTA AI& 
+60EMCLOUD BVP NASDAQ 
+61NGX NASDAQ100 
+62VOLQ NASDAQ100 
+63HSI  
+64HSCEI H 
+65HSCCI  
+66SSEC  
+67SSEA A 
+68SHKSC  
+69CSI300 CSI300 
+70N225.FUT01.OS 225 
+71N225.FUT02.OS 225 
+72N225.FUT03.OS 2253 
+73N225.FUT04.OS 2254 
+74N225.FUT05.OS 2255 
+75N225M.FUT01.OS 225 
+76N225M.FUT02.OS 225 
+77N225M.FUT03.OS 2253 
+78N225M.FUT04.OS 2254 
+79N225M.FUT05.OS 2255 
+80TOPX.FUT01.OS TOPIX 
+81TOPX.FUT02.OS TOPIX 
+82TOPX.FUT03.OS TOPIX3 
+83TOPX.FUT04.OS TOPIX4 
+84TOPX.FUT05.OS TOPIX5 
+85MOT.FUT01.OS  
+86MOT.FUT02.OS  
+87MOT.FUT03.OS 3 
+88MOT.FUT04.OS 4 
+89MOT.FUT05.OS 5 
+90JN400.FUT01.OS JPX400 
+91JN400.FUT02.OS JPX400 
+92JN400.FUT03.OS JPX4003 
+93JN400.FUT04.OS JPX4004 
+94JN400.FUT05.OS JPX4005 
+95TCWSI  
+96FTSECA50 FTSE50 
+97GOLD.FUT01.OS  
+98GOLD.FUT02.OS 2 
+99GOLD.FUT03.OS 3 
+100GOLD.FUT04.OS 4 
+101GOLD.FUT05.OS 5 
+102GOLD.FUT06.OS  
+103GOLDMINI.FUT01.OS  
+104GOLDMINI.FUT02.OS 2 
+105GOLDMINI.FUT03.OS 3 
+106GOLDMINI.FUT04.OS 4 
+107GOLDMINI.FUT05.OS 5 
+108GOLDMINI.FUT06.OS  
+109GOLD.SPOT.OS  
+110PLATINUM.FUT01.OS  
+111PLATINUM.FUT02.OS 2 
+112PLATINUM.FUT03.OS 3 
+113PLATINUM.FUT04.OS 4 
+114PLATINUM.FUT05.OS 5 
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 35
+ 2025/8/23
+   
+115PLATINUM.FUT06.OS  
+116PLATINUMMINI.FUT01.OS  
+117PLATINUMMINI.FUT02.OS 2 
+118PLATINUMMINI.FUT03.OS 3 
+119PLATINUMMINI.FUT04.OS 4 
+120PLATINUMMINI.FUT05.OS 5 
+121PLATINUMMINI.FUT06.OS  
+122PLATINUM.SPOT.OS  
+123SILVER.FUT01.OS  
+124SILVER.FUT02.OS 2 
+125SILVER.FUT03.OS 3 
+126SILVER.FUT04.OS 4 
+127SILVER.FUT05.OS 5 
+128SILVER.FUT06.OS  
+129PALLADIUM.FUT01.OS  
+130PALLADIUM.FUT02.OS 2 
+131PALLADIUM.FUT03.OS 3 
+132PALLADIUM.FUT04.OS 4 
+133PALLADIUM.FUT05.OS 5 
+134PALLADIUM.FUT06.OS  
+135RSS3.FUT01.OS RSS3 
+136RSS3.FUT02.OS RSS32 
+137RSS3.FUT03.OS RSS33 
+138RSS3.FUT04.OS RSS34 
+139RSS3.FUT05.OS RSS35 
+140RSS3.FUT06.OS RSS3 
+141TSR20.FUT01.OS TSR20 
+142TSR20.FUT02.OS TSR202 
+143TSR20.FUT03.OS TSR203 
+144TSR20.FUT04.OS TSR204 
+145TSR20.FUT05.OS TSR205 
+146TSR20.FUT06.OS TSR20 
+147REDBEAN.FUT01.OS  
+148REDBEAN.FUT02.OS 2 
+149REDBEAN.FUT03.OS 3 
+150REDBEAN.FUT04.OS 4 
+151REDBEAN.FUT05.OS 5 
+152REDBEAN.FUT06.OS  
+153SOYBEAN.FUT01.OS  
+154SOYBEAN.FUT02.OS 2 
+155SOYBEAN.FUT03.OS 3 
+156SOYBEAN.FUT04.OS 4 
+157SOYBEAN.FUT05.OS 5 
+158SOYBEAN.FUT06.OS  
+159CORN.FUT01.OS  
+160CORN.FUT02.OS 2 
+161CORN.FUT03.OS 3 
+162CORN.FUT04.OS 4 
+163CORN.FUT05.OS 5 
+164CORN.FUT06.OS  
+165N225.FUT01.C 225CME 
+166N225.FUT02.C 225CME 
+167N225.FUT01.S 225SGX 
+168N225.FUT02.S 225SGX 
+169USD/JPY / 
+170EUR/JPY / 
+171GBP/JPY / 
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 36
+ 2025/8/23
+   
+172AUD/JPY / 
+173NZD/JPY NZ/ 
+174ZAR/JPY / 
+175CAD/JPY / 
+176CHF/JPY / 
+177HKD/JPY / 
+178SGD/JPY SG/ 
+179EUR/USD / 
+180GBP/USD / 
+181AUD/USD / 
+182NZD/USD NZ/ 
+183USD/CHF / 
+184GBP/CHF / 
+185EUR/GBP / 
+186EUR/CHF / 
+187AUD/CHF / 
+188NZD/CHF NZ/ 
+189AUD/NZD /NZ 
+190NOK/JPY N/ 
+191TRY/JPY / 
+192CNH/JPY / 
+193MXN/JPY / 
+194USD/CAD / 
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 37
+ 2025/8/23
+
+      
+ T         
+1 1M         
+2 2M         
+3 3M         
+4 4M         
+5 5M         
+10 10M         
+15 15M         
+30 30M         
+60 1H         
+2 2H         
+4 4H         
+8 8H         
+ D         
+ W         
+ M         
+
+ JPX 
+ JPX 
+ JPX 
+ JPX
+
+      
+ T         
+1 1M         
+2 2M         
+3 3M         
+4 4M         
+5 5M         
+10 10M         
+15 15M         
+30 30M         
+60 1H         
+2 2H         
+4 4H         
+8 8H         
+ D         
+ W         
+ M         
+
+JPX 
+JPX 
+JPX 
+JPX GUIDE_69202508
+ 
+
+   OP
+   OP 
+Copyrightｩ 1999-2021 Rakuten Securities, Inc. All Rights Reserved. 38

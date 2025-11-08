@@ -22,3 +22,7 @@
 
 ## Communication
 - Whenever Excel/VBA had to be avoided, note the exact steps (copy source, modify XML, replacement) in both `handover_YYYYMMDD.md` and future chat instructions.
+
+## Automation Principles
+- Tradingシステムは「取引開始」「取引終了」以外の工程（候補生成・学習・適用・可視化・アラート・ローテーション）をフル自動で回すことを前提に設計・実装する。手動オペが発生した場合は恒久的な自動化策を直ちに検討し、次回以降は人手不要にする。
+- 週末/ナイトなど長時間ジョブがマーケットオープンに間に合わない兆候を検知した時点で、必ず時間短縮の代替案（停止→時短再実行、グリッド縮小、残時間見積など）を提示し、ユーザー判断を仰ぐ。

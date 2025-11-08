@@ -1,0 +1,8 @@
+[2025-11-07 16:41:15] Run started
+[2025-11-07 16:41:15] Run type resolved to weekday
+[2025-11-07 16:41:16] Low-priority gating removed 11 tickers (remaining 9)
+[2025-11-07 16:41:18] Entry window marks set: 8432 rows flagged out of 103682
+[2025-11-07 16:41:18] Liquidity filter q=0.50 kept 8 tickers and 57949 rows
+[2025-11-07 16:41:18] Using 5 rolling slices (train=12, forward=4)
+[2025-11-07 16:41:18] Parameter grid size: 288 (mode=coarse, signal=j-only)
+[2025-11-07 16:41:18] Ineffective-band mask removed 96 combos for J_th values [0.3, 0.4, 0.6, 0.7, 1.0]

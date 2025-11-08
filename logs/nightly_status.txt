@@ -1,0 +1,16 @@
+started=2025-11-09T03:35:57.550221
+state=running
+step=AM0945_j-cross refine 6/12
+message=Running refine scan
+base_out=('AM1030', '09:00', '10:30')
+date_tag=20251109
+target_date=20251109
+total_plans=12
+run_type=weekend
+updated=2025-11-09T05:14:23.141499
+elapsed_seconds=5905
+completed_plans=5
+universe_base=0
+current_plan=AM0945_j-cross
+plans=AM15_j-only,AM15_j-cross,AM0930_j-only,AM0930_j-cross,AM0945_j-only,AM0945_j-cross
+plan_counts=AM15_j-only:0,AM15_j-cross:0,AM0930_j-only:0,AM0930_j-cross:0,AM0945_j-only:0,AM0945_j-cross:0,AM1015_j-only:0,AM1015_j-cross:0,AM1030_j-only:0,AM1030_j-cross:0,MID1030_j-cross:0,PM1230_j-cross:0

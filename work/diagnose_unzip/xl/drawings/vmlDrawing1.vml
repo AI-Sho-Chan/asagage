@@ -1,0 +1,166 @@
+<xml xmlns:v="urn:schemas-microsoft-com:vml"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel">
+ <o:shapelayout v:ext="edit">
+  <o:idmap v:ext="edit" data="2"/>
+ </o:shapelayout><v:shapetype id="_x0000_t201" coordsize="21600,21600" o:spt="201"
+  path="m,l,21600r21600,l21600,xe">
+  <v:stroke joinstyle="miter"/>
+  <v:path shadowok="f" o:extrusionok="f" strokeok="f" fillok="f" o:connecttype="rect"/>
+  <o:lock v:ext="edit" shapetype="t"/>
+ </v:shapetype><v:shape id="btnResetHeaders" o:spid="_x0000_s2121" type="#_x0000_t201"
+  style='position:absolute;margin-left:324pt;margin-top:202.5pt;width:120pt;
+  height:24pt;z-index:1;mso-wrap-style:tight' o:button="t" filled="f"
+  fillcolor="windowText [64]" stroked="f" strokecolor="window [65]"
+  strokeweight="3e-5mm" o:insetmode="auto">
+  <v:fill color2="window [65]" o:detectmouseclick="t"/>
+  <v:path shadowok="t" strokeok="t" fillok="t"/>
+  <o:lock v:ext="edit" rotation="t"/>
+  <v:textbox style='mso-direction-alt:auto' o:singleclick="f">
+   <div style='text-align:left'><font face="Meiryo UI" size="180"
+   color="#000000">Reset Headers</font></div>
+  </v:textbox>
+  <x:ClientData ObjectType="Checkbox">
+   <x:SizeWithCells/>
+   <x:Anchor>
+    3, 0, 10, 20, 5, 16, 12, 2</x:Anchor>
+   <x:AutoFill>False</x:AutoFill>
+   <x:AutoLine>False</x:AutoLine>
+   <x:FmlaMacro>AutoTrader.ResetDashboardHeaders</x:FmlaMacro>
+   <x:TextVAlign>Center</x:TextVAlign>
+   <x:Checked>1</x:Checked>
+   <x:NoThreeD/>
+  </x:ClientData>
+ </v:shape><v:shape id="btnLoadCandidates" o:spid="_x0000_s2164" type="#_x0000_t201"
+  style='position:absolute;margin-left:324pt;margin-top:18.75pt;width:120pt;
+  height:24pt;z-index:2;mso-wrap-style:tight' o:button="t" fillcolor="buttonFace [67]"
+  o:insetmode="auto">
+  <v:fill color2="buttonFace [67]" o:detectmouseclick="t"/>
+  <o:lock v:ext="edit" rotation="t"/>
+  <v:textbox style='mso-direction-alt:auto' o:singleclick="f">
+   <div style='text-align:center'><font face="游ゴシック" size="220" color="#000000">Load
+   Candidates</font></div>
+  </v:textbox>
+  <x:ClientData ObjectType="Button">
+   <x:Anchor>
+    3, 0, 1, 0, 5, 16, 2, 7</x:Anchor>
+   <x:PrintObject>False</x:PrintObject>
+   <x:AutoFill>False</x:AutoFill>
+   <x:FmlaMacro>AutoTrader.ButtonLoadCandidates</x:FmlaMacro>
+   <x:TextHAlign>Center</x:TextHAlign>
+   <x:TextVAlign>Center</x:TextVAlign>
+  </x:ClientData>
+ </v:shape><v:shape id="btnPushDashboard" o:spid="_x0000_s2165" type="#_x0000_t201"
+  style='position:absolute;margin-left:324pt;margin-top:48.75pt;width:120pt;
+  height:24pt;z-index:3;mso-wrap-style:tight' o:button="t" fillcolor="buttonFace [67]"
+  o:insetmode="auto">
+  <v:fill color2="buttonFace [67]" o:detectmouseclick="t"/>
+  <o:lock v:ext="edit" rotation="t"/>
+  <v:textbox style='mso-direction-alt:auto' o:singleclick="f">
+   <div style='text-align:center'><font face="游ゴシック" size="220" color="#000000">Push
+   Candidates</font></div>
+  </v:textbox>
+  <x:ClientData ObjectType="Button">
+   <x:Anchor>
+    3, 0, 2, 15, 5, 16, 3, 22</x:Anchor>
+   <x:PrintObject>False</x:PrintObject>
+   <x:AutoFill>False</x:AutoFill>
+   <x:FmlaMacro>AutoTrader.ButtonPushCandidates</x:FmlaMacro>
+   <x:TextHAlign>Center</x:TextHAlign>
+   <x:TextVAlign>Center</x:TextVAlign>
+  </x:ClientData>
+ </v:shape><v:shape id="btnStartAuto" o:spid="_x0000_s2166" type="#_x0000_t201"
+  style='position:absolute;margin-left:324pt;margin-top:78.75pt;width:120pt;
+  height:24pt;z-index:4;mso-wrap-style:tight' o:button="t" fillcolor="buttonFace [67]"
+  o:insetmode="auto">
+  <v:fill color2="buttonFace [67]" o:detectmouseclick="t"/>
+  <o:lock v:ext="edit" rotation="t"/>
+  <v:textbox style='mso-direction-alt:auto' o:singleclick="f">
+   <div style='text-align:center'><font face="游ゴシック" size="220" color="#000000">Start
+   Auto</font></div>
+  </v:textbox>
+  <x:ClientData ObjectType="Button">
+   <x:Anchor>
+    3, 0, 4, 5, 5, 16, 5, 12</x:Anchor>
+   <x:PrintObject>False</x:PrintObject>
+   <x:AutoFill>False</x:AutoFill>
+   <x:FmlaMacro>AutoTrader.ButtonStartAuto</x:FmlaMacro>
+   <x:TextHAlign>Center</x:TextHAlign>
+   <x:TextVAlign>Center</x:TextVAlign>
+  </x:ClientData>
+ </v:shape><v:shape id="btnStopAuto" o:spid="_x0000_s2167" type="#_x0000_t201"
+  style='position:absolute;margin-left:324pt;margin-top:108.75pt;width:120pt;
+  height:24pt;z-index:5;mso-wrap-style:tight' o:button="t" fillcolor="buttonFace [67]"
+  o:insetmode="auto">
+  <v:fill color2="buttonFace [67]" o:detectmouseclick="t"/>
+  <o:lock v:ext="edit" rotation="t"/>
+  <v:textbox style='mso-direction-alt:auto' o:singleclick="f">
+   <div style='text-align:center'><font face="游ゴシック" size="220" color="#000000">Stop
+   Auto</font></div>
+  </v:textbox>
+  <x:ClientData ObjectType="Button">
+   <x:Anchor>
+    3, 0, 5, 20, 5, 16, 7, 2</x:Anchor>
+   <x:PrintObject>False</x:PrintObject>
+   <x:AutoFill>False</x:AutoFill>
+   <x:FmlaMacro>AutoTrader.ButtonStopAuto</x:FmlaMacro>
+   <x:TextHAlign>Center</x:TextHAlign>
+   <x:TextVAlign>Center</x:TextVAlign>
+  </x:ClientData>
+ </v:shape><v:shape id="btnRefreshAuto" o:spid="_x0000_s2168" type="#_x0000_t201"
+  style='position:absolute;margin-left:324pt;margin-top:138.75pt;width:120pt;
+  height:24pt;z-index:6;mso-wrap-style:tight' o:button="t" fillcolor="buttonFace [67]"
+  o:insetmode="auto">
+  <v:fill color2="buttonFace [67]" o:detectmouseclick="t"/>
+  <o:lock v:ext="edit" rotation="t"/>
+  <v:textbox style='mso-direction-alt:auto' o:singleclick="f">
+   <div style='text-align:center'><font face="游ゴシック" size="220" color="#000000">Refresh
+   Now</font></div>
+  </v:textbox>
+  <x:ClientData ObjectType="Button">
+   <x:Anchor>
+    3, 0, 7, 10, 5, 16, 8, 17</x:Anchor>
+   <x:PrintObject>False</x:PrintObject>
+   <x:AutoFill>False</x:AutoFill>
+   <x:FmlaMacro>AutoTrader.ButtonRefreshNow</x:FmlaMacro>
+   <x:TextHAlign>Center</x:TextHAlign>
+   <x:TextVAlign>Center</x:TextVAlign>
+  </x:ClientData>
+ </v:shape><v:shape id="btnCatchUp" o:spid="_x0000_s2169" type="#_x0000_t201"
+  style='position:absolute;margin-left:324pt;margin-top:168.75pt;width:120pt;
+  height:24pt;z-index:7;mso-wrap-style:tight' o:button="t" fillcolor="buttonFace [67]"
+  o:insetmode="auto">
+  <v:fill color2="buttonFace [67]" o:detectmouseclick="t"/>
+  <o:lock v:ext="edit" rotation="t"/>
+  <v:textbox style='mso-direction-alt:auto' o:singleclick="f">
+   <div style='text-align:center'><font face="游ゴシック" size="220" color="#000000">Catch
+   Up (Nightly)</font></div>
+  </v:textbox>
+  <x:ClientData ObjectType="Button">
+   <x:Anchor>
+    3, 0, 9, 0, 5, 16, 10, 7</x:Anchor>
+   <x:PrintObject>False</x:PrintObject>
+   <x:AutoFill>False</x:AutoFill>
+   <x:FmlaMacro>AutoTrader.ButtonCatchUp</x:FmlaMacro>
+   <x:TextHAlign>Center</x:TextHAlign>
+   <x:TextVAlign>Center</x:TextVAlign>
+  </x:ClientData>
+ </v:shape><v:shape id="_x0000_s2176" type="#_x0000_t201" style='position:absolute;
+  margin-left:486pt;margin-top:18.75pt;width:139.5pt;height:24pt;z-index:8;
+  mso-wrap-style:tight' o:button="t" fillcolor="buttonFace [67]" o:insetmode="auto">
+  <v:fill color2="buttonFace [67]" o:detectmouseclick="t"/>
+  <o:lock v:ext="edit" rotation="t"/>
+  <v:textbox style='mso-direction-alt:auto' o:singleclick="f">
+   <div style='text-align:center'><font face="游ゴシック" size="220" color="#000000">Queue
+   Now (DryRun)</font></div>
+  </v:textbox>
+  <x:ClientData ObjectType="Button">
+   <x:Anchor>
+    6, 0, 1, 0, 8, 57, 2, 7</x:Anchor>
+   <x:PrintObject>False</x:PrintObject>
+   <x:AutoFill>False</x:AutoFill>
+   <x:FmlaMacro>[0]!AutoTrader.ButtonQueueNow</x:FmlaMacro>
+   <x:TextHAlign>Center</x:TextHAlign>
+   <x:TextVAlign>Center</x:TextVAlign>
+  </x:ClientData>
+ </v:shape></xml>

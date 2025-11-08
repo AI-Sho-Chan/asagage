@@ -1,0 +1,24 @@
+[2025-11-04 00:54:04] Run started
+[2025-11-04 00:54:04] Run type resolved to weekend
+[2025-11-04 00:54:08] Fetching Yahoo Finance 1m bars for 1 tickers (lookback=60, chunk=5)
+[2025-11-04 00:54:35] Entry window marks set: 37672 rows flagged out of 214718
+[2025-11-04 00:54:36] Liquidity filter q=0.50 kept 14 tickers and 112055 rows
+[2025-11-04 00:54:36] Using 5 rolling slices (train=12, forward=4)
+[2025-11-04 00:54:36] Parameter grid size: 240 (mode=coarse, signal=j-only)
+[2025-11-04 00:57:54] [1/14] 5706.T: best train_pf_eff=0.550, forward_pf_eff=0.550, trades=70/35
+[2025-11-04 00:58:33] [2/14] 1357.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=67/41
+[2025-11-04 01:00:17] [3/14] 285A.T: best train_pf_eff=5.942, forward_pf_eff=6.066, trades=22/23
+[2025-11-04 01:01:45] [4/14] 6525.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=79/27
+[2025-11-04 01:02:26] [5/14] 7014.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-04 01:04:40] [6/14] 5801.T: best train_pf_eff=0.773, forward_pf_eff=0.582, trades=274/133
+[2025-11-04 01:04:47] [7/14] 7735.T: best train_pf_eff=0.129, forward_pf_eff=0.129, trades=34/34
+[2025-11-04 01:05:12] [8/14] 6526.T: best train_pf_eff=2.052, forward_pf_eff=36.638, trades=166/43
+[2025-11-04 01:05:19] [9/14] 6857.T: best train_pf_eff=0.906, forward_pf_eff=1.089, trades=418/180
+[2025-11-04 01:05:28] [10/14] 5016.T: best train_pf_eff=1.857, forward_pf_eff=999.000, trades=252/41
+[2025-11-04 01:08:18] [11/14] 7012.T: best train_pf_eff=0.601, forward_pf_eff=999.000, trades=164/8
+[2025-11-04 01:10:41] [12/14] 8035.T: best train_pf_eff=1.679, forward_pf_eff=999.000, trades=137/30
+[2025-11-04 01:11:07] [13/14] 8411.T: best train_pf_eff=1.705, forward_pf_eff=2.990, trades=425/110
+[2025-11-04 01:11:07] [14/14] 8136.T: best train_pf_eff=0.486, forward_pf_eff=0.535, trades=799/117
+[2025-11-04 01:11:07] Cache reuse: 0/1120 combos (0.0%) served from cache
+[2025-11-04 01:11:07] ASHA pruned 2240 parameter combos prior to full evaluation
+[2025-11-04 01:11:07] Run completed in 17.1 minutes

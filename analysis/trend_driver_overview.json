@@ -1,0 +1,25 @@
+{
+  "lookback_days": 30,
+  "top_codes": 14,
+  "sessions": [
+    "AM0930",
+    "AM15",
+    "PM1"
+  ],
+  "dir_threshold_bp": 15.0,
+  "sample_trades": 1053,
+  "driver_counts": {
+    "NKY": {
+      "day_missing": 0,
+      "window_missing": 0
+    },
+    "NKY_F": {
+      "day_missing": 0,
+      "window_missing": 0
+    },
+    "TOPIX": {
+      "day_missing": 3,
+      "window_missing": 0
+    }
+  }
+}

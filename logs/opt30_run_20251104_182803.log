@@ -1,0 +1,12 @@
+[2025-11-04 18:28:03] Run started
+[2025-11-04 18:28:03] Run type resolved to weekday
+[2025-11-04 18:28:04] Codes limited via C:\\AI\\asagake\\output\\bt30\\NIGHTLY_20251104_FAST\RUN_coarse_AM0930_j-only\_TOP_CANDIDATES._TOP20_codes.csv: 9 tickers (was 20)
+[2025-11-04 18:28:10] Fetching Yahoo Finance 1m bars for 1 tickers (lookback=60, chunk=5)
+[2025-11-04 18:28:36] Entry window marks set: 8545 rows flagged out of 103925
+[2025-11-04 18:28:37] Liquidity filter q=0.50 kept 9 tickers and 56180 rows
+[2025-11-04 18:28:37] Using 5 rolling slices (train=12, forward=4)
+[2025-11-04 18:28:37] Parameter grid size: 9072 (mode=refine, signal=j-only)
+[2025-11-04 20:12:43] [1/9] 6869.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-04 20:13:53] [2/9] 1803.T: best train_pf_eff=999.000, forward_pf_eff=3152.798, trades=32/3
+[2025-11-04 20:26:54] [3/9] 8105.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=24/8
+[2025-11-04 22:24:43] [4/9] 7259.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=26/25

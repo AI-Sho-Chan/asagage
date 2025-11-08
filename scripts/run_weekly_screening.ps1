@@ -1,6 +1,6 @@
 param(
   [string]$DateTag = (Get-Date -Format 'yyyyMMdd'),
-  [int]$TopUniverse = 300,
+  [int]$TopUniverse = 200,
   [int]$TargetTop = 50
 )
 
@@ -46,13 +46,14 @@ $args = @(
     'scripts/nightly_build_candidates.py',
     '--excel','SHINSOKU.xlsm',
     '--base-out',$OutRoot,
-    '--run-type','weekend',
+    '--run-type','weekend','--plan-profile','weekend',
     '--target-date',$resolvedTag,
     '--universe-mode','yahoo-top','--universe-size',$TopUniverse,
     '--lookback','60','--chunk-days','5','--train-days','12','--forward-days','4',
     '--min-train-trades','12','--min-forward-trades','5','--forward-pf-min','1.3','--min-forward-ci','0.65',
     '--gap-guard-abs-bp','80.0','--gap-guard-dir-bp','40.0','--slipbp','4.0','--feebp','4.0',
-    '--liquidity-quantile','0.5','--jobs','6','--enable-asha','--enable-bayes','--bayes-trials','24','--bayes-timeout','900',
+    '--liquidity-quantile','0.5','--jobs','6','--enable-asha','--enable-bayes','--bayes-trials','24','--bayes-timeout','600',
+    '--mask-ineffective','--mask-window','20','--mask-threshold','1.05',
     '--enable-market-features','--excel-summary','--analysis-ledger','--refine-quick-grid'
 )
   $p = Start-Process -FilePath $Python -ArgumentList $args -WorkingDirectory $Repo -NoNewWindow -PassThru -Wait

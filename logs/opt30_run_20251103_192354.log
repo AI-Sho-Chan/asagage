@@ -1,0 +1,23 @@
+[2025-11-03 19:23:54] Run started
+[2025-11-03 19:23:54] Run type resolved to weekend
+[2025-11-03 19:23:59] Entry window marks set: 48763 rows flagged out of 219404
+[2025-11-03 19:23:59] Liquidity filter q=0.50 kept 14 tickers and 114628 rows
+[2025-11-03 19:23:59] Using 5 rolling slices (train=12, forward=4)
+[2025-11-03 19:23:59] Parameter grid size: 240 (mode=coarse, signal=j-cross)
+[2025-11-03 19:25:14] [1/14] 5706.T: best train_pf_eff=1.617, forward_pf_eff=1.617, trades=8/4
+[2025-11-03 19:25:39] [2/14] 1357.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=10/7
+[2025-11-03 19:26:06] [3/14] 285A.T: best train_pf_eff=9.583, forward_pf_eff=10.440, trades=23/24
+[2025-11-03 19:26:32] [4/14] 6525.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=36/12
+[2025-11-03 19:27:07] [5/14] 5801.T: best train_pf_eff=999.000, forward_pf_eff=3.173, trades=33/17
+[2025-11-03 19:27:20] [6/14] 5016.T: best train_pf_eff=2.078, forward_pf_eff=999.000, trades=61/14
+[2025-11-03 19:27:21] [7/14] 7014.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-03 19:27:26] [8/14] 6526.T: best train_pf_eff=0.302, forward_pf_eff=3.818, trades=44/6
+[2025-11-03 19:27:29] [9/14] 6857.T: best train_pf_eff=0.762, forward_pf_eff=1.716, trades=43/26
+[2025-11-03 19:27:47] [10/14] 7735.T: best train_pf_eff=3.120, forward_pf_eff=3.120, trades=5/5
+[2025-11-03 19:28:39] [11/14] 7012.T: best train_pf_eff=0.678, forward_pf_eff=3.593, trades=45/9
+[2025-11-03 19:29:15] [12/14] 8136.T: best train_pf_eff=0.878, forward_pf_eff=6.547, trades=114/19
+[2025-11-03 19:29:17] [13/14] 8035.T: best train_pf_eff=0.454, forward_pf_eff=2.268, trades=13/6
+[2025-11-03 19:29:23] [14/14] 8411.T: best train_pf_eff=3.830, forward_pf_eff=4.163, trades=40/9
+[2025-11-03 19:29:23] Cache reuse: 0/1120 combos (0.0%) served from cache
+[2025-11-03 19:29:23] ASHA pruned 2240 parameter combos prior to full evaluation
+[2025-11-03 19:29:23] Run completed in 5.5 minutes

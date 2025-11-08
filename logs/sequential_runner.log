@@ -1,0 +1,48 @@
+﻿[2025-11-03T21:21:08] Sequential runner started
+[2025-11-03T21:21:08] Killing PID 74624: "C:\Python313\python.exe" scripts/nightly_build_candidates.py --universe-mode yahoo-top --universe-size 300 --lookback 60 --chunk-days 5 --train-days 12 --forward-days 4 --min-train-trades 10 --min-forward-trades 2 --forward-pf-min 1.3 --gap-guard-abs-bp 80 --gap-guard-dir-bp 40 --slipbp 4 --feebp 4 --liquidity-quantile 0.5 --jobs 8 --run-type weekend --enable-asha --enable-bayes --bayes-trials 36 --mask-ineffective --mask-window 20 --mask-threshold 1.05 --cache-refresh-weekend --enable-rd-windows --enable-market-features 
+[2025-11-03T21:21:08] Starting WEEKEND batch (10 windows + R&D windows)
+[2025-11-04T03:37:21] WEEKEND batch exit code: 0
+[2025-11-04T03:37:21] Starting NIGHTLY batch (weekday mode)
+[2025-11-04T04:27:29] NIGHTLY batch exit code: 0
+[2025-11-04T04:27:29] Sequential runner completed
+[2025-11-07T16:36:38] Sequential runner started
+[2025-11-07T16:36:39] Starting WEEKEND batch (10 windows + R&D windows)
+[2025-11-07T16:36:45] WEEKEND batch exit code: 2
+[2025-11-07T16:36:45] Starting NIGHTLY batch (weekday mode)
+[2025-11-07T16:36:49] NIGHTLY batch exit code: 2
+[2025-11-07T16:36:49] Sequential runner completed
+[2025-11-07T16:40:52] Sequential runner started
+[2025-11-07T16:40:52] Starting WEEKEND batch (10 windows + R&D windows)
+[2025-11-07T16:41:12] WEEKEND batch exit code: 1
+[2025-11-07T16:41:12] Starting NIGHTLY batch (weekday mode)
+[2025-11-07T16:41:19] NIGHTLY batch exit code: 1
+[2025-11-07T16:41:19] Sequential runner completed
+[2025-11-08T00:21:41] Sequential runner started
+[2025-11-08T00:21:41] Starting WEEKEND batch (10 windows + R&D windows)
+[2025-11-08T20:17:03] Manual kill via Codex: terminated stale bt_opt30_forward run PID 185280 per weekend reset
+[2025-11-08T20:17:18] Sequential runner started
+[2025-11-08T20:17:18] Starting WEEKEND batch (10 windows + R&D windows)
+[2025-11-08T20:17:21] WEEKEND batch exit code: 1
+[2025-11-08T20:17:21] Starting NIGHTLY batch (weekday mode)
+[2025-11-08T20:17:23] NIGHTLY batch exit code: 1
+[2025-11-08T20:17:23] Sequential runner completed
+[2025-11-08T20:18:02] Sequential runner started
+[2025-11-08T20:18:03] Starting WEEKEND batch (10 windows + R&D windows)
+[2025-11-08T20:18:06] WEEKEND batch exit code: 1
+[2025-11-08T20:18:06] Starting NIGHTLY batch (weekday mode)
+[2025-11-08T20:18:08] NIGHTLY batch exit code: 1
+[2025-11-08T20:18:08] Sequential runner completed
+[2025-11-08T20:19:10] Sequential runner started
+[2025-11-08T20:19:11] Starting WEEKEND batch (10 windows + R&D windows)
+[2025-11-08T20:19:14] WEEKEND batch exit code: 1
+[2025-11-08T20:19:14] Starting NIGHTLY batch (weekday mode)
+[2025-11-08T20:19:16] NIGHTLY batch exit code: 1
+[2025-11-08T20:19:16] Sequential runner completed
+[2025-11-08T20:20:16] Sequential runner started
+[2025-11-08T20:20:17] Starting WEEKEND batch (10 windows + R&D windows)
+[2025-11-09T00:23:02] WEEKEND batch exit code: 1
+[2025-11-09T00:23:02] Starting NIGHTLY batch (weekday mode)
+[2025-11-09T00:32:04] NIGHTLY batch exit code: 1
+[2025-11-09T00:32:04] Sequential runner completed
+[2025-11-09T03:35:52] Sequential runner started
+[2025-11-09T03:35:53] Starting WEEKEND batch (10 windows + R&D windows)

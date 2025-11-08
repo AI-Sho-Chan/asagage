@@ -1,0 +1,2973 @@
+import argparse
+import datetime as dt
+import itertools
+import hashlib
+import json
+import math
+import os
+import concurrent.futures as cf
+import subprocess
+import time
+from pathlib import Path
+from collections import deque
+from dataclasses import dataclass
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+
+import numpy as np
+import pandas as pd
+from pandas.util import hash_pandas_object
+from yahooquery import Ticker
+
+
+# ---------------------------------------------------------------------------
+# Utility helpers
+# ---------------------------------------------------------------------------
+
+OPTUNA_PRIOR_TRIALS: List[Dict[str, float]] = [
+    {"ATR_n": 5, "TPk": 1.5, "SLk": 2.0, "J_th": 1.7, "TMAX": 0.0, "dJ_th": 0.0, "vEMA_th": 0.0},
+    {"ATR_n": 5, "TPk": 2.5, "SLk": 2.0, "J_th": 2.0, "TMAX": 0.0, "dJ_th": 0.0, "vEMA_th": 0.0},
+    {"ATR_n": 8, "TPk": 1.5, "SLk": 2.0, "J_th": 1.8, "TMAX": 0.0, "dJ_th": 0.0, "vEMA_th": 0.0},
+    {"ATR_n": 8, "TPk": 2.5, "SLk": 2.0, "J_th": 2.2, "TMAX": 0.0, "dJ_th": 0.0, "vEMA_th": 0.0},
+    {"ATR_n": 3, "TPk": 2.5, "SLk": 2.0, "J_th": 2.2, "TMAX": 0.0, "dJ_th": 0.0, "vEMA_th": 0.0},
+    {"ATR_n": 5, "TPk": 1.5, "SLk": 2.0, "J_th": 1.8, "TMAX": 0.0, "dJ_th": 0.0, "vEMA_th": 0.0},
+]
+
+
+@dataclass
+class FeatureConfig:
+    """Thresholds and toggles for hypothesis feature capture and adjustments."""
+
+    session_label: str = ""
+    market_enabled: bool = False
+    market_up_bp: float = 15.0
+    market_down_bp: float = 15.0
+    # H1: 市場（例: 日経）バイアスに応じてJしきい値を調整
+    market_adjust_j: bool = False
+    market_j_delta_up: float = 0.0
+    market_j_delta_down: float = 0.0
+    # H3: 当日Jの大きさに応じてTP/SLを動的に調整
+    dynamic_risk_j: bool = False
+    tp_per_j: float = 0.0
+    sl_per_j: float = 0.0
+    # 付加情報取得
+    volume_window: int = 30
+    volume_spike_threshold: float = 3.0
+    repeat_soft_limit: int = 3
+    store_details: bool = False
+
+
+def _load_optuna_priors() -> Dict[str, Any]:
+    """Load dynamic weekend/weekday priors from state/optuna_priors.json if present."""
+    path = Path("state/optuna_priors.json")
+    try:
+        if path.exists():
+            with path.open("r", encoding="utf-8") as fh:
+                data = json.load(fh)
+                if isinstance(data, dict):
+                    return data
+    except Exception:
+        pass
+    return {"version": 1, "epoch": "", "ttl_days": 7, "priors": []}
+
+
+def _filter_priors_for_unique(unique_values: Dict[str, List[float]], priors: List[Dict[str, Any]]) -> List[Dict[str, float]]:
+    """Keep only priors with keys present in unique_values and within min/max bounds."""
+    out: List[Dict[str, float]] = []
+    for combo in priors:
+        params: Dict[str, float] = {}
+        valid = True
+        for key, value in combo.items():
+            if key not in unique_values:
+                continue
+            vals = unique_values[key]
+            if not vals:
+                continue
+            mn = float(min(vals)); mx = float(max(vals))
+            val = float(value)
+            if key == "ATR_n":
+                val = float(int(round(val)))
+            if val < mn - 1e-9 or val > mx + 1e-9:
+                valid = False
+                break
+            params[key] = val
+        if not valid:
+            continue
+        # Ensure required basics present
+        if not {"ATR_n", "TPk", "SLk", "J_th"}.issubset(params.keys()):
+            continue
+        # Fill optional keys
+        for opt_key in ("dJ_th", "vEMA_th", "TMAX"):
+            if opt_key in unique_values and opt_key not in params:
+                params[opt_key] = float(unique_values[opt_key][0])
+        out.append(params)
+    return out
+
+
+def parse_hhmm(value: str) -> dt.time:
+    return dt.datetime.strptime(value, "%H:%M").time()
+
+
+class RunLogger:
+    """Simple stdout + file logger."""
+
+    def __init__(self, path: Path):
+        self.path = path
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.fp = self.path.open("a", encoding="utf-8")
+
+    def log(self, msg: str) -> None:
+        ts = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        line = f"[{ts}] {msg}"
+        print(line)
+        self.fp.write(line + "\n")
+        self.fp.flush()
+
+    def close(self) -> None:
+        try:
+            self.fp.close()
+        except Exception:
+            pass
+
+
+class StatusTracker:
+    """Writes heartbeat JSON for progress monitoring."""
+
+    def __init__(self, path: Path, throttle_sec: float = 2.0):
+        self.path = path
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.throttle = throttle_sec
+        self.last_write = 0.0
+        self._latest: Dict = {}
+
+    def update(self, *, force: bool = False, **payload) -> None:
+        self._latest = payload
+        now = time.time()
+        if not force and now - self.last_write < self.throttle:
+            return
+        data = dict(payload)
+        data["timestamp"] = dt.datetime.now().isoformat()
+        tmp = self.path.with_suffix(".tmp")
+        with tmp.open("w", encoding="utf-8") as fp:
+            json.dump(data, fp, ensure_ascii=False, indent=2)
+        tmp.replace(self.path)
+        self.last_write = now
+
+    def flush(self) -> None:
+        if self._latest:
+            self.update(force=True, **self._latest)
+
+
+# ---------------------------------------------------------------------------
+# Caching + low-priority helpers
+# ---------------------------------------------------------------------------
+
+CACHE_SCHEMA_VERSION = 1
+
+
+def normalize_record(record: Dict[str, Any]) -> Dict[str, Any]:
+    normalized: Dict[str, Any] = {}
+    for key, value in record.items():
+        if isinstance(value, (np.floating,)):
+            normalized[key] = float(value)
+        elif isinstance(value, (np.integer,)):
+            normalized[key] = int(value)
+        else:
+            normalized[key] = value
+    return normalized
+
+
+def make_param_hash(params: Dict[str, float]) -> str:
+    payload = json.dumps({k: params[k] for k in sorted(params)}, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
+def build_plan_key(args: argparse.Namespace, session_label: str) -> str:
+    plan_meta = {
+        "mode": args.mode,
+        "signal_mode": args.signal_mode,
+        "session": session_label,
+        "train_days": args.train_days,
+        "forward_days": args.forward_days,
+        "forward_slices": args.forward_slices,
+        "lookback": args.lookback,
+        "liquidity_q": args.liquidity_quantile,
+        "slipbp": args.slipbp,
+        "feebp": args.feebp,
+        "gap_abs": float(getattr(args, "gap_guard_abs_bp", 0.0) or 0.0),
+        "gap_dir": float(getattr(args, "gap_guard_dir_bp", 0.0) or 0.0),
+    }
+    digest = hashlib.sha1(json.dumps(plan_meta, sort_keys=True).encode("utf-8")).hexdigest()[:10]
+    return f"{args.mode}-{args.signal_mode}-{session_label}-{digest}"
+
+
+def compute_data_hash(df: pd.DataFrame) -> str:
+    if df.empty:
+        return "empty"
+    cols = [col for col in ["ts", "open", "high", "low", "close", "volume", "vwap", "gap_bp", "is_entry"] if col in df.columns]
+    subset = df[cols].copy()
+    hashed = hash_pandas_object(subset, index=False).values
+    digest = hashlib.sha1(hashed.tobytes())
+    digest.update(str(len(df)).encode("utf-8"))
+    unique_days = ",".join(sorted({str(x) for x in df["date"].astype(str).unique()}))
+    digest.update(unique_days.encode("utf-8"))
+    return digest.hexdigest()
+
+
+def _cache_record_path(root: Path, code: str, plan_key: str, param_hash: str, data_hash: str) -> Path:
+    return root / code / plan_key / param_hash / data_hash / "result.json"
+
+
+def load_cache_record(root: Path, code: str, plan_key: str, param_hash: str, data_hash: str) -> Optional[Dict[str, Any]]:
+    path = _cache_record_path(root, code, plan_key, param_hash, data_hash)
+    if not path.exists():
+        return None
+    try:
+        with path.open("r", encoding="utf-8") as fp:
+            payload = json.load(fp)
+    except Exception:
+        return None
+    if payload.get("version") != CACHE_SCHEMA_VERSION:
+        return None
+    record = payload.get("record")
+    if isinstance(record, dict):
+        return record
+    return None
+
+
+def store_cache_record(
+    root: Path,
+    code: str,
+    plan_key: str,
+    param_hash: str,
+    data_hash: str,
+    record: Dict[str, Any],
+) -> None:
+    path = _cache_record_path(root, code, plan_key, param_hash, data_hash)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": CACHE_SCHEMA_VERSION,
+        "saved_at": dt.datetime.now().isoformat(),
+        "record": normalize_record(record),
+    }
+    tmp = path.with_suffix(".tmp")
+    with tmp.open("w", encoding="utf-8") as fp:
+        json.dump(payload, fp, ensure_ascii=False)
+    tmp.replace(path)
+
+
+def auto_worker_count(limit: int = 8) -> int:
+    logical = os.cpu_count() or 1
+    base = logical
+    try:
+        import psutil  # type: ignore
+
+        physical = psutil.cpu_count(logical=False)
+        if physical:
+            base = physical
+    except Exception:
+        # Fall back to heuristic using logical cores
+        base = max(1, logical // 2) if logical > 2 else logical
+    base = max(1, base)
+    return max(1, min(base, limit))
+
+
+class LowPriorityManager:
+    def __init__(
+        self,
+        path: Path,
+        *,
+        window: int,
+        trades_threshold: int,
+        pf_threshold: float,
+        win_threshold: float,
+        consecutive_limit: int,
+    ):
+        self.path = path
+        self.window = max(1, int(window))
+        self.trades_threshold = max(1, int(trades_threshold))
+        self.pf_threshold = float(pf_threshold)
+        self.win_threshold = float(win_threshold)
+        self.consecutive_limit = max(1, int(consecutive_limit))
+        self.data: Dict[str, Any] = {"version": 1, "tickers": {}}
+        self._touched = False
+        self._skipped: List[str] = []
+        self._load()
+
+    def _load(self) -> None:
+        if not self.path.exists():
+            return
+        try:
+            with self.path.open("r", encoding="utf-8") as fp:
+                payload = json.load(fp)
+            if isinstance(payload, dict) and "tickers" in payload:
+                self.data = payload
+        except Exception:
+            self.data = {"version": 1, "tickers": {}}
+
+    def register_skip(self, codes: Iterable[str]) -> None:
+        for code in codes:
+            if code not in self._skipped:
+                self._skipped.append(code)
+
+    def get_low_priority(self) -> List[str]:
+        tickers = self.data.get("tickers", {})
+        return [code for code, meta in tickers.items() if meta.get("low_priority")]
+
+    def update(
+        self,
+        summary_df: pd.DataFrame,
+        selected_map: Dict[str, bool],
+        *,
+        timestamp: dt.datetime,
+    ) -> None:
+        tickers = self.data.setdefault("tickers", {})
+        for _, row in summary_df.iterrows():
+            code = str(row["code"])
+            entry = tickers.setdefault(
+                code,
+                {
+                    "history": [],
+                    "consecutive_miss": 0,
+                    "low_priority": False,
+                },
+            )
+            history = deque(entry.get("history", []), maxlen=self.window)
+            record = {
+                "ts": timestamp.isoformat(),
+                "forward_pf_eff": float(row.get("forward_pf_eff", 0.0) or 0.0),
+                "forward_winrate": float(row.get("forward_winrate", 0.0) or 0.0),
+                "forward_trades": float(row.get("forward_trades", 0.0) or 0.0),
+                "train_pf_eff": float(row.get("train_pf_eff", 0.0) or 0.0),
+                "train_trades": float(row.get("train_trades", 0.0) or 0.0),
+                "selected": bool(selected_map.get(code, False)),
+            }
+            history.append(record)
+            entry["history"] = list(history)
+            if record["selected"]:
+                entry["consecutive_miss"] = 0
+            else:
+                entry["consecutive_miss"] = int(entry.get("consecutive_miss", 0)) + 1
+            entry["last_update"] = timestamp.isoformat()
+            entry["low_priority"] = self._is_low_priority(entry)
+        self._touched = True
+
+    def _is_low_priority(self, entry: Dict[str, Any]) -> bool:
+        history: List[Dict[str, Any]] = entry.get("history", [])
+        if not history:
+            return False
+        window = history[-self.window :]
+        pf_values = [float(item.get("forward_pf_eff", 0.0) or 0.0) for item in window]
+        win_values = [float(item.get("forward_winrate", 0.0) or 0.0) for item in window]
+        trade_values = [float(item.get("forward_trades", 0.0) or 0.0) for item in window]
+        pf_mean = sum(pf_values) / len(pf_values)
+        win_mean = sum(win_values) / len(win_values)
+        trade_mean = sum(trade_values) / len(trade_values)
+        low_pf = (pf_mean < self.pf_threshold) and (win_mean < self.win_threshold)
+        low_trades = trade_mean < float(self.trades_threshold)
+        consec = int(entry.get("consecutive_miss", 0)) >= self.consecutive_limit
+        return low_pf or low_trades or consec
+
+    def save(self) -> None:
+        if not self._touched:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(".tmp")
+        with tmp.open("w", encoding="utf-8") as fp:
+            json.dump(self.data, fp, ensure_ascii=False, indent=2)
+        tmp.replace(self.path)
+
+    def write_report(self, outdir: Path, run_type: str, evaluated: Iterable[str]) -> None:
+        report = {
+            "generated_at": dt.datetime.now().isoformat(),
+            "run_type": run_type,
+            "low_priority": self.get_low_priority(),
+            "skipped_this_run": self._skipped,
+            "evaluated": list(evaluated),
+        }
+        path = outdir / "low_priority_report.json"
+        with path.open("w", encoding="utf-8") as fp:
+            json.dump(report, fp, ensure_ascii=False, indent=2)
+
+
+class IneffectiveBandTracker:
+    def __init__(self, path: Path):
+        self.path = path
+        self.data: Dict[str, Any] = {"version": 1, "plans": {}}
+        self._touched = False
+        self._load()
+
+    def _load(self) -> None:
+        if not self.path.exists():
+            return
+        try:
+            with self.path.open("r", encoding="utf-8") as fp:
+                payload = json.load(fp)
+            if isinstance(payload, dict) and "plans" in payload:
+                self.data = payload
+        except Exception:
+            self.data = {"version": 1, "plans": {}}
+
+    def get_masked_values(self, plan_key: str) -> Set[float]:
+        plans = self.data.get("plans", {})
+        entry = plans.get(plan_key, {}).get("J_th", {})
+        masked: Set[float] = set()
+        for key, meta in entry.items():
+            if meta.get("masked"):
+                try:
+                    masked.add(float(key))
+                except Exception:
+                    continue
+        return masked
+
+    def manual_mask(
+        self,
+        plan_key: str,
+        j_values: Iterable[float],
+        reason: str,
+        timestamp: dt.datetime,
+    ) -> None:
+        plans = self.data.setdefault("plans", {})
+        plan_entry = plans.setdefault(plan_key, {"J_th": {}})
+        touched = False
+        for j in j_values:
+            try:
+                j_float = float(j)
+            except Exception:
+                continue
+            if not math.isfinite(j_float):
+                continue
+            key = f"{j_float:.4f}"
+            bucket = plan_entry["J_th"].setdefault(key, {"history": []})
+            history = bucket.setdefault("history", [])
+            if history and history[-1].get("source") == reason and bucket.get("masked"):
+                continue
+            history.append(
+                {
+                    "ts": timestamp.isoformat(),
+                    "forward_pf_eff": -1.0,
+                    "auto_mask": True,
+                    "source": reason,
+                }
+            )
+            bucket["masked"] = True
+            touched = True
+        if touched:
+            self._touched = True
+
+    def update(
+        self,
+        plan_key: str,
+        summary_df: pd.DataFrame,
+        *,
+        window: int,
+        threshold: float,
+        timestamp: dt.datetime,
+    ) -> None:
+        if summary_df.empty:
+            return
+        plans = self.data.setdefault("plans", {})
+        plan_entry = plans.setdefault(plan_key, {"J_th": {}})
+        bucket_size = max(1, int(window))
+        min_history = max(3, min(bucket_size, 5))
+        for _, row in summary_df.iterrows():
+            j_val = row.get("J_th")
+            if j_val is None:
+                continue
+            try:
+                j_float = float(j_val)
+            except Exception:
+                continue
+            key = f"{j_float:.4f}"
+            bucket = plan_entry["J_th"].setdefault(key, {"history": []})
+            history = deque(bucket.get("history", []), maxlen=bucket_size)
+            history.append(
+                {
+                    "ts": timestamp.isoformat(),
+                    "forward_pf_eff": float(row.get("forward_pf_eff", 0.0) or 0.0),
+                }
+            )
+            bucket["history"] = list(history)
+            pf_values = [float(item.get("forward_pf_eff", 0.0) or 0.0) for item in history]
+            avg_pf = sum(pf_values) / len(pf_values) if pf_values else 0.0
+            bucket["avg_pf"] = avg_pf
+            bucket["masked"] = len(history) >= min_history and avg_pf < float(threshold)
+        self._touched = True
+
+    def save(self) -> None:
+        if not self._touched:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(".tmp")
+        with tmp.open("w", encoding="utf-8") as fp:
+            json.dump(self.data, fp, ensure_ascii=False, indent=2)
+        tmp.replace(self.path)
+
+    def write_report(self, outdir: Path, plan_key: str) -> None:
+        report = {
+            "generated_at": dt.datetime.now().isoformat(),
+            "plan_key": plan_key,
+            "masked_j_th": sorted(self.get_masked_values(plan_key)),
+        }
+        path = outdir / "ineffective_bands_report.json"
+        with path.open("w", encoding="utf-8") as fp:
+            json.dump(report, fp, ensure_ascii=False, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# Data access + filtering
+# ---------------------------------------------------------------------------
+
+
+def load_tickers_from_excel(path: Path) -> List[str]:
+    """Return list of tickers from Excel, accepting multiple sheet/column conventions."""
+    if not path.exists():
+        raise FileNotFoundError(f"Excel workbook not found: {path}")
+
+    fallbacks: List[Tuple[str, Tuple[str, ...]]] = [
+        ("Ticker", ("Code", "Ticker")),
+        ("Candidates", ("Ticker", "Code")),
+        ("NewDashboard", ("Ticker",)),
+    ]
+
+    for sheet_name, candidates in fallbacks:
+        try:
+            df = pd.read_excel(path, sheet_name=sheet_name)
+        except Exception:
+            continue
+
+        for col in candidates:
+            if col in df.columns:
+                series = (
+                    df[col]
+                    .dropna()
+                    .astype(str)
+                    .map(lambda x: x.strip())
+                )
+                series = series[series != ""]
+                if not series.empty:
+                    return series.tolist()
+
+        # as a last resort, try first column if it looks like tickers
+        if df.shape[1] > 0:
+            series = (
+                df.iloc[:, 0]
+                .dropna()
+                .astype(str)
+                .map(lambda x: x.strip())
+            )
+            if not series.empty:
+                return series.tolist()
+
+    raise ValueError(
+        "Ticker list could not be located. "
+        "Ensure the workbook has either a 'Ticker' sheet with a 'Code' column, "
+        "or a sheet containing a 'Ticker' column."
+    )
+
+
+def fetch_1m_chunks(
+    tickers: Sequence[str],
+    *,
+    lookback_days: int,
+    chunk_days: int,
+    logger: RunLogger,
+) -> pd.DataFrame:
+    if lookback_days <= 0:
+        raise ValueError("lookback_days must be positive")
+    if chunk_days <= 0:
+        raise ValueError("chunk_days must be positive")
+
+    logger.log(f"Fetching Yahoo Finance 1m bars for {len(tickers)} tickers (lookback={lookback_days}, chunk={chunk_days})")
+    all_frames: List[pd.DataFrame] = []
+    today = dt.datetime.now().date()
+    start_base = today - dt.timedelta(days=lookback_days)
+
+    for offset in range(0, lookback_days, chunk_days):
+        chunk_start = start_base + dt.timedelta(days=offset)
+        chunk_end = start_base + dt.timedelta(days=offset + chunk_days)
+        chunk_end = min(chunk_end, today + dt.timedelta(days=1))
+        ticker = Ticker(tickers, asynchronous=True)
+        try:
+            df = ticker.history(start=str(chunk_start), end=str(chunk_end), interval="1m")
+        except Exception as exc:
+            logger.log(f"Chunk fetch error {chunk_start} - {chunk_end}: {exc}")
+            continue
+        if df is None or df.empty:
+            continue
+        df = df.reset_index()
+        if "symbol" in df.columns:
+            df = df.rename(columns={"symbol": "code"})
+        if "date" in df.columns and "ts" not in df.columns:
+            df = df.rename(columns={"date": "ts"})
+        df["ts"] = pd.to_datetime(df["ts"])
+        all_frames.append(df)
+
+    if not all_frames:
+        raise RuntimeError("1m data could not be fetched")
+
+    merged = pd.concat(all_frames, ignore_index=True)
+    merged = merged.drop_duplicates(subset=["ts", "code"])
+    merged["date"] = merged["ts"].dt.date
+    merged["amt"] = merged["close"] * merged["volume"]
+    merged["cumAmt"] = merged.groupby(["code", "date"])["amt"].cumsum()
+    merged["cumVol"] = merged.groupby(["code", "date"])["volume"].cumsum().replace(0, np.nan)
+    merged["vwap"] = merged["cumAmt"] / merged["cumVol"]
+    return merged[["ts", "code", "open", "high", "low", "close", "volume", "vwap", "date", "amt"]]
+
+
+def load_local_1m_chunks(
+    tickers: Sequence[str],
+    *,
+    lookback_days: int,
+    raw_root: Path,
+    logger: RunLogger,
+) -> pd.DataFrame:
+    """Load locally saved 1m bars from data/raw/yahoo_1m if available.
+
+    Expected layout: data/raw/yahoo_1m/<ticker>/YYYY-MM-DD.parquet
+    Returns same columns as fetch_1m_chunks.
+    """
+    frames: List[pd.DataFrame] = []
+    cutoff_date = (dt.datetime.now().date() - dt.timedelta(days=lookback_days))
+    for code in tickers:
+        ddir = raw_root / code
+        if not ddir.exists() or not ddir.is_dir():
+            continue
+        files = sorted([p for p in ddir.glob("*.parquet") if p.stem >= str(cutoff_date)])
+        if not files:
+            continue
+        for p in files:
+            try:
+                df = pd.read_parquet(p)
+            except Exception:
+                continue
+            # flatten columns
+            if isinstance(df.columns, pd.MultiIndex):
+                # Yahoo parquet files may contain duplicated price columns
+                # (Adj Close / Close etc.). Prefer actual OHLCV quotes.
+                selected: Dict[str, pd.Series] = {}
+                for tup in df.columns:
+                    name = str(tup[0]).strip().lower()
+                    if name == "adj close":
+                        continue
+                    if name in {"open", "high", "low", "close", "volume"} and name not in selected:
+                        selected[name] = df[tup]
+                df = pd.DataFrame(selected)
+            else:
+                cols = [str(c).strip().lower() for c in df.columns]
+                df.columns = cols
+                cleaned: Dict[str, pd.Series] = {}
+                for name, series in zip(cols, (df[col] for col in df.columns)):
+                    if name == "adj close":
+                        continue
+                    if name in {"open", "high", "low", "close", "volume"} and name not in cleaned:
+                        cleaned[name] = series
+                df = pd.DataFrame(cleaned)
+
+            needed_order = ["open", "high", "low", "close", "volume"]
+            if not set(needed_order).issubset(set(df.columns)):
+                continue
+            df = df[needed_order].copy()
+            df.index = pd.to_datetime(df.index)
+            df["code"] = code
+            df["ts"] = df.index
+            df["date"] = df["ts"].dt.date
+            df["amt"] = (df["close"] * df["volume"]).astype(float)
+            df["cumAmt"] = df.groupby(["code", "date"])['amt'].cumsum()
+            df["cumVol"] = df.groupby(["code", "date"])['volume'].cumsum().replace(0, np.nan)
+            df["vwap"] = df["cumAmt"] / df["cumVol"]
+            frames.append(df.reset_index(drop=True))
+    if not frames:
+        return pd.DataFrame(columns=["ts","code","open","high","low","close","volume","vwap","date","amt"])
+    merged = pd.concat(frames, ignore_index=True)
+    merged = merged.drop_duplicates(subset=["ts", "code"]) 
+    return merged[["ts", "code", "open", "high", "low", "close", "volume", "vwap", "date", "amt"]]
+
+
+def load_market_reference(
+    index_code: str,
+    *,
+    lookback_days: int,
+    chunk_days: int,
+    use_local: bool,
+    raw_root: Path,
+    logger: RunLogger,
+) -> pd.DataFrame:
+    """Load market index minute bars (local cache first, fallback to Yahoo)."""
+    codes = [index_code]
+    frames: List[pd.DataFrame] = []
+    if use_local:
+        local = load_local_1m_chunks(
+            codes,
+            lookback_days=lookback_days,
+            raw_root=raw_root,
+            logger=logger,
+        )
+        if not local.empty:
+            frames.append(local)
+    if not frames:
+        try:
+            remote = fetch_1m_chunks(
+                codes,
+                lookback_days=lookback_days,
+                chunk_days=chunk_days,
+                logger=logger,
+            )
+            if not remote.empty:
+                frames.append(remote)
+        except Exception as exc:
+            logger.log(f"Market reference fetch failed for {index_code}: {exc}")
+    if not frames:
+        return pd.DataFrame()
+    merged = pd.concat(frames, ignore_index=True, sort=False)
+    merged = merged.drop_duplicates(subset=["ts"]).sort_values("ts")
+    return merged
+
+
+def build_market_feature_table(market_df: pd.DataFrame) -> pd.DataFrame:
+    if market_df.empty:
+        return pd.DataFrame(columns=["ts", "market_close", "market_ret_1m", "market_ret_5m", "market_ret_15m"])
+    df = market_df.copy()
+    if "close" not in df.columns:
+        raise ValueError("Market reference dataframe missing 'close' column")
+    df = df.sort_values("ts")
+    df["market_close"] = df["close"].astype(float)
+    grouped = df.groupby("code")
+    df["market_ret_1m"] = grouped["market_close"].pct_change().fillna(0.0) * 10000.0
+    df["market_ret_5m"] = grouped["market_close"].pct_change(5).fillna(0.0) * 10000.0
+    df["market_ret_15m"] = grouped["market_close"].pct_change(15).fillna(0.0) * 10000.0
+    cols = ["ts", "market_close", "market_ret_1m", "market_ret_5m", "market_ret_15m"]
+    return df[cols].drop_duplicates(subset=["ts"]).reset_index(drop=True)
+
+
+def attach_market_features(
+    data: pd.DataFrame,
+    market_features: pd.DataFrame,
+) -> pd.DataFrame:
+    if data.empty or market_features.empty:
+        data["market_close"] = data.get("market_close", 0.0)
+        data["market_ret_1m"] = data.get("market_ret_1m", 0.0)
+        data["market_ret_5m"] = data.get("market_ret_5m", 0.0)
+        data["market_ret_15m"] = data.get("market_ret_15m", 0.0)
+        return data
+    merged = data.merge(market_features, on="ts", how="left")
+    for col in ["market_close", "market_ret_1m", "market_ret_5m", "market_ret_15m"]:
+        merged[col] = merged[col].fillna(0.0)
+    return merged
+
+
+def attach_volume_features(data: pd.DataFrame, window: int) -> pd.DataFrame:
+    if data.empty:
+        data["vol_spike"] = []
+        return data
+    if window <= 1:
+        data = data.copy()
+        data["vol_spike"] = 0.0
+        return data
+    df = data.sort_values(["code", "ts"]).copy()
+    min_periods = max(5, window // 2)
+    rolling_mean = (
+        df.groupby(["code", "date"])["volume"]
+        .transform(lambda s: s.rolling(window=window, min_periods=min_periods).mean())
+        .replace(0, np.nan)
+    )
+    df["vol_spike"] = (df["volume"] / rolling_mean).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    return df
+
+
+def apply_liquidity_and_mark_entry(
+    df: pd.DataFrame,
+    *,
+    session_start: dt.time,
+    session_end: dt.time,
+    liquidity_quantile: float,
+    logger: RunLogger,
+) -> pd.DataFrame:
+    """Keep full-day bars for codes/dates passing liquidity, add is_entry flag.
+
+    - is_entry True if ts within [session_start, session_end]
+    - Liquidity computed as daily amt_sum per (date, code) over full day
+    - Return all bars (for EOD exit), restricted to selected codes/dates
+    """
+    if df.empty:
+        return df
+
+    df = df.copy()
+    df["is_entry"] = df["ts"].dt.time.between(session_start, session_end)
+    n_entry = int(df["is_entry"].sum())
+    logger.log(f"Entry window marks set: {n_entry} rows flagged out of {len(df)}")
+
+    # attach daily gap in bp per (code,date): (open_first - prev_close) / prev_close * 10000
+    df = df.sort_values(["code", "ts"]).reset_index(drop=True)
+    daily = (
+        df.groupby(["code", "date"]).agg(open_first=("open", "first"), close_last=("close", "last")).reset_index()
+    )
+    daily = daily.sort_values(["code", "date"]).reset_index(drop=True)
+    daily["prev_close"] = daily.groupby("code")["close_last"].shift(1)
+    daily["gap_bp"] = ((daily["open_first"] - daily["prev_close"]) / daily["prev_close"]) * 10000.0
+    df = df.merge(daily[["code", "date", "gap_bp"]], on=["code", "date"], how="left")
+
+    if liquidity_quantile is None or liquidity_quantile <= 0:
+        return df
+
+    liquidity_quantile = min(liquidity_quantile, 0.999)
+    by_code_date = df.groupby(["date", "code"])["amt"].sum().reset_index(name="amt_sum")
+    thresh = by_code_date.groupby("date")["amt_sum"].quantile(liquidity_quantile)
+    by_code_date = by_code_date.merge(
+        thresh.rename("threshold"), left_on="date", right_index=True, how="left"
+    )
+    keep = by_code_date.loc[by_code_date["amt_sum"] >= by_code_date["threshold"], ["date", "code"]]
+    kept = df.merge(keep, on=["date", "code"], how="inner")
+    logger.log(
+        f"Liquidity filter q={liquidity_quantile:.2f} kept {kept['code'].nunique()} tickers and {len(kept)} rows"
+    )
+    return kept
+
+def build_slices(
+    days: Sequence[dt.date],
+    train_days: int,
+    forward_days: int,
+    max_slices: int,
+) -> List[Tuple[List[dt.date], List[dt.date]]]:
+    slices: List[Tuple[List[dt.date], List[dt.date]]] = []
+    if train_days <= 0 or forward_days <= 0:
+        return slices
+    step = forward_days
+    idx = 0
+    while idx + train_days + forward_days <= len(days):
+        train = list(days[idx : idx + train_days])
+        forward = list(days[idx + train_days : idx + train_days + forward_days])
+        if not train or not forward:
+            break
+        slices.append((train, forward))
+        if len(slices) >= max_slices:
+            break
+        idx += step
+    return slices
+
+
+# ---------------------------------------------------------------------------
+# Strategy evaluation helpers
+# ---------------------------------------------------------------------------
+
+
+def atr_ema(series: pd.Series, n: int) -> pd.Series:
+    return series.ewm(alpha=1 / n, adjust=False).mean()
+
+
+def make_tr(df: pd.DataFrame) -> pd.Series:
+    return pd.concat(
+        [
+            (df["high"] - df["low"]).abs(),
+            (df["high"] - df["close"].shift()).abs(),
+            (df["low"] - df["close"].shift()).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
+
+
+def build_signal_mask(
+    J: pd.Series,
+    dJ: pd.Series,
+    vE: pd.Series,
+    params: Dict[str, float],
+    signal_mode: str,
+) -> pd.Series:
+    j_th = float(params.get("J_th", 0.0))
+    dJ_th = float(params.get("dJ_th", 0.0))
+    vth = float(params.get("vEMA_th", 0.0))
+
+    j_cond = J.abs() >= j_th
+
+    if signal_mode == "j-only":
+        return j_cond
+
+    if signal_mode == "j-cross":
+        prev = J.abs().shift(1).fillna(float("inf"))
+        cross = prev < j_th
+        return j_cond & cross
+
+    if signal_mode != "full":
+        raise ValueError(f"Unknown signal_mode={signal_mode}")
+
+    if dJ_th > 0:
+        dj_cond = dJ.abs() >= dJ_th
+    else:
+        dj_cond = pd.Series(True, index=J.index)
+
+    if vth > 0:
+        v_cond = vE.abs() >= vth
+    else:
+        v_cond = pd.Series(True, index=J.index)
+
+    sign_cond = (np.sign(vE) != np.sign(dJ)) | (dJ == 0) | (vE == 0)
+
+    return j_cond & dj_cond & v_cond & sign_cond
+
+
+BP_EPS = 1e-6
+
+GAP_BUCKETS: List[Tuple[str, float, float]] = [
+    ("<80bp", 0.0, 80.0),
+    ("80-120bp", 80.0, 120.0),
+    ("120-200bp", 120.0, 200.0),
+    ("200-400bp", 200.0, 400.0),
+    ("400-500bp", 400.0, 500.0),
+    ("500-700bp", 500.0, 700.0),
+    ("700-1000bp", 700.0, 1000.0),
+    ("1000-1500bp", 1000.0, 1500.0),
+    ("1500-2000bp", 1500.0, 2000.0),
+    (">=2000bp", 2000.0, float("inf")),
+]
+
+GAP_RULE_TABLE = [
+    {
+        "label": "<50bp",
+        "abs_min": 0.0,
+        "abs_max": 50.0,
+        "settings": {
+            "j-only": {
+                "enabled": True,
+                "j_th_add": 0.0,
+                "tp_add": 0.0,
+                "sl_add": 0.0,
+                "skip_opposite": False,
+                "description": "Baseline: allow both signals",
+            },
+            "j-cross": {
+                "enabled": True,
+                "j_th_add": 0.0,
+                "tp_add": 0.0,
+                "sl_add": 0.0,
+                "skip_opposite": False,
+                "description": "Baseline: allow both signals",
+            },
+        },
+    },
+    {
+        "label": "50-80bp",
+        "abs_min": 50.0,
+        "abs_max": 80.0,
+        "settings": {
+            "j-only": {
+                "enabled": True,
+                "j_th_add": 0.1,
+                "tp_add": 0.0,
+                "sl_add": 0.0,
+                "skip_opposite": False,
+                "description": "Raise J_th by 0.1 to reduce noise",
+            },
+            "j-cross": {
+                "enabled": True,
+                "j_th_add": 0.1,
+                "tp_add": 0.0,
+                "sl_add": 0.0,
+                "skip_opposite": False,
+                "description": "Allow cross; J_th +0.1",
+            },
+        },
+    },
+    {
+        "label": "80-120bp",
+        "abs_min": 80.0,
+        "abs_max": 120.0,
+        "settings": {
+            "j-only": {
+                "enabled": True,
+                "j_th_add": 0.2,
+                "tp_add": 0.0,
+                "sl_add": 0.1,
+                "skip_opposite": True,
+                "description": "Skip opposite direction; J_th +0.2; SL +0.1",
+            },
+            "j-cross": {
+                "enabled": True,
+                "j_th_add": 0.2,
+                "tp_add": 0.0,
+                "sl_add": 0.1,
+                "skip_opposite": True,
+                "description": "Skip opposite direction; J_th +0.2; SL +0.1",
+            },
+        },
+    },
+    {
+        "label": ">=120bp",
+        "abs_min": 120.0,
+        "abs_max": float("inf"),
+        "settings": {
+            "j-only": {
+                "enabled": False,
+                "j_th_add": 0.3,
+                "tp_add": -0.2,
+                "sl_add": 0.2,
+                "skip_opposite": True,
+                "description": "Disable j-only; J_th +0.3; TP -0.2; SL +0.2",
+            },
+            "j-cross": {
+                "enabled": True,
+                "j_th_add": 0.3,
+                "tp_add": -0.2,
+                "sl_add": 0.2,
+                "skip_opposite": True,
+                "description": "Cross only; J_th +0.3; TP -0.2; SL +0.2",
+            },
+        },
+    },
+]
+
+# Override gap rule table with expanded buckets (2025-10-29)
+def _baseline_gap_settings(label: str, abs_min: float, abs_max: float) -> Dict[str, Any]:
+    base_setting = {
+        "enabled": True,
+        "j_th_add": 0.0,
+        "tp_add": 0.0,
+        "sl_add": 0.0,
+        "skip_opposite": False,
+        "description": f"Baseline ({label})",
+    }
+    return {
+        "label": label,
+        "abs_min": abs_min,
+        "abs_max": abs_max,
+        "settings": {
+            "j-only": dict(base_setting),
+            "j-cross": dict(base_setting),
+            "full": dict(base_setting),
+        },
+    }
+
+
+GAP_RULE_TABLE = [_baseline_gap_settings(label, gmin, gmax) for label, gmin, gmax in GAP_BUCKETS]
+
+# default gap-based J_th adjustments (can be tuned later; applied to all signal modes)
+_gap_jth_adjustments = {
+    "80-120bp": 0.1,
+    "120-200bp": 0.2,
+    "200-400bp": 0.3,
+    "400-500bp": 0.4,
+    "500-700bp": 0.5,
+}
+for entry in GAP_RULE_TABLE:
+    adj = _gap_jth_adjustments.get(entry["label"], 0.0)
+    if abs(adj) > 0:
+        for mode_settings in entry["settings"].values():
+            mode_settings["j_th_add"] = adj
+
+GAP_RULE_INDEX = {entry["label"]: entry for entry in GAP_RULE_TABLE}
+
+
+def bucket_for_gap(gap_bp: float) -> str:
+    gap_abs = abs(gap_bp)
+    for label, gmin, gmax in GAP_BUCKETS:
+        if gmin <= gap_abs < gmax:
+            return label
+    return GAP_BUCKETS[-1][0]
+
+
+def resolve_gap_settings(gap_bp: float, signal_mode: str) -> Dict[str, float]:
+    gap_abs = abs(gap_bp)
+    for entry in GAP_RULE_TABLE:
+        if entry["abs_min"] <= gap_abs < entry["abs_max"]:
+            settings = entry["settings"].get(signal_mode, {})
+            return {
+                "bucket": entry["label"],
+                "enabled": settings.get("enabled", True),
+                "j_th_add": float(settings.get("j_th_add", 0.0)),
+                "tp_add": float(settings.get("tp_add", 0.0)),
+                "sl_add": float(settings.get("sl_add", 0.0)),
+                "skip_opposite": bool(settings.get("skip_opposite", False)),
+                "description": settings.get("description", entry["label"]),
+            }
+    # fallback to default bucket
+    default = GAP_RULE_TABLE[0]["settings"][signal_mode]
+    return {
+        "bucket": GAP_RULE_TABLE[0]["label"],
+        "enabled": default.get("enabled", True),
+        "j_th_add": float(default.get("j_th_add", 0.0)),
+        "tp_add": float(default.get("tp_add", 0.0)),
+        "sl_add": float(default.get("sl_add", 0.0)),
+        "skip_opposite": bool(default.get("skip_opposite", False)),
+        "description": default.get("description", GAP_RULE_TABLE[0]["label"]),
+    }
+
+
+def summarize_gap(gaps: Sequence[float], pnl_list: Sequence[float], bars_list: Sequence[int]) -> List[Dict[str, float]]:
+    stats = {}
+    for label, _, _ in GAP_BUCKETS:
+        stats[label] = {
+            "bucket": label,
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "pnl_vals": [],
+            "bars_vals": [],
+            "pnl_sum": 0.0,
+            "bars_sum": 0.0,
+        }
+    for idx, gap in enumerate(gaps):
+        label = bucket_for_gap(float(gap))
+        entry = stats[label]
+        pnl = float(pnl_list[idx]) if idx < len(pnl_list) else 0.0
+        bars = float(bars_list[idx]) if idx < len(bars_list) else 0.0
+        entry["trades"] += 1
+        if pnl > BP_EPS:
+            entry["wins"] += 1
+        elif pnl < -BP_EPS:
+            entry["losses"] += 1
+        entry["pnl_vals"].append(pnl)
+        entry["bars_vals"].append(bars)
+        entry["pnl_sum"] += pnl
+        entry["bars_sum"] += bars
+    summary = []
+    for label, data in stats.items():
+        trades = data["trades"]
+        if trades > 0:
+            mean_pnl = data["pnl_sum"] / trades
+            mean_bars = data["bars_sum"] / trades
+            median_pnl = float(np.median(data["pnl_vals"])) if data["pnl_vals"] else 0.0
+        else:
+            mean_pnl = 0.0
+            mean_bars = 0.0
+            median_pnl = 0.0
+        summary.append(
+            {
+                "bucket": label,
+                "trades": trades,
+                "wins": data["wins"],
+                "losses": data["losses"],
+                "winrate": (data["wins"] / trades) if trades else 0.0,
+                "mean_pnl_bp": mean_pnl,
+                "median_pnl_bp": median_pnl,
+                "mean_bars": mean_bars,
+                "pnl_sum": data["pnl_sum"],
+                "bars_sum": data["bars_sum"],
+            }
+        )
+    return summary
+
+
+def select_best_gap_bucket(summary: Sequence[Dict[str, float]]) -> str:
+    best_bucket = ""
+    best_trades = -1
+    best_mean = -float("inf")
+    for item in summary:
+        trades = int(item.get("trades", 0))
+        if trades <= 0:
+            continue
+        mean_pnl = float(item.get("mean_pnl_bp", 0.0))
+        if trades > best_trades or (trades == best_trades and mean_pnl > best_mean):
+            best_bucket = item.get("bucket", "")
+            best_trades = trades
+            best_mean = mean_pnl
+    return best_bucket or "none"
+
+
+def describe_gap_rule(bucket_label: str, signal_mode: str) -> str:
+    entry = GAP_RULE_INDEX.get(bucket_label)
+    if not entry:
+        return ""
+    settings = entry["settings"].get(signal_mode, {})
+    return settings.get("description", bucket_label)
+
+
+def eval_one(
+    df: pd.DataFrame,
+    params: Dict[str, float],
+    signal_mode: str,
+    cost_bp: float,
+    abs_guard_bp: float,
+    dir_guard_bp: float,
+    feature_cfg: FeatureConfig,
+) -> Dict[str, List[Any]]:
+    if df.empty:
+        return {"pnl_bp": []}
+
+    df = df.sort_values("ts").copy().reset_index(drop=True)
+    tr = make_tr(df)
+    atr = atr_ema(tr, int(params["ATR_n"])).replace(0, np.nan)
+    J = (df["close"] - df["vwap"]) / atr
+    dJ = J.diff()
+    vE = dJ.ewm(alpha=0.3, adjust=False).mean()
+    sig = build_signal_mask(J, dJ, vE, params, signal_mode)
+    if "is_entry" in df.columns:
+        sig = sig & df["is_entry"]
+    sig = sig.fillna(False).astype(bool)
+
+    max_bars = int(params.get("TMAX", 0) or 0)
+    use_cap = max_bars > 0
+    trade_bp: List[float] = []
+    trade_bars: List[int] = []
+    trade_gap: List[float] = []
+    trade_gap_bucket: List[str] = []
+    market_biases: List[str] = []
+    volume_spikes: List[float] = []
+    repeat_indices: List[int] = []
+    j_abs_list: List[float] = []
+    j_range_list: List[float] = []
+    sector_codes: List[str] = []
+    timestamps: List[pd.Timestamp] = []
+    trade_details: Optional[List[Dict[str, Any]]] = [] if feature_cfg.store_details else None
+
+    peak_abs = J.abs().cummax().fillna(0.0)
+    repeat_tracker: Dict[Tuple[dt.date, str], int] = {}
+    grouped_indices = {date: sorted(idxs) for date, idxs in df.groupby("date").indices.items()}
+
+    def classify_market(ret_bp: float) -> str:
+        if not feature_cfg.market_enabled:
+            return "neutral"
+        if ret_bp >= feature_cfg.market_up_bp:
+            return "up"
+        if ret_bp <= -feature_cfg.market_down_bp:
+            return "down"
+        return "neutral"
+
+    for date in sorted(grouped_indices.keys()):
+        day_positions = grouped_indices[date]
+        if not day_positions:
+            continue
+        day_sig = sig.iloc[day_positions]
+        for offset, idx in enumerate(day_positions):
+            if not day_sig.iloc[offset]:
+                continue
+            a = atr.iloc[idx]
+            if pd.isna(a) or a == 0:
+                continue
+            px = df.iloc[idx]["close"]
+            if not np.isfinite(px) or px <= 0:
+                continue
+
+            side = "BUY" if J.iloc[idx] < 0 else "SELL"
+            g = float(df.loc[idx, "gap_bp"]) if "gap_bp" in df.columns else 0.0
+            gap_rule = resolve_gap_settings(g, signal_mode)
+            if not gap_rule["enabled"]:
+                continue
+            if abs_guard_bp and abs(g) >= abs_guard_bp:
+                continue
+            if dir_guard_bp and abs(g) >= dir_guard_bp:
+                if (g > 0 and side == "SELL") or (g < 0 and side == "BUY"):
+                    continue
+            if gap_rule["skip_opposite"]:
+                if (g > 0 and side == "SELL") or (g < 0 and side == "BUY"):
+                    continue
+
+            base_j_th = float(params.get("J_th", 0.0))
+            eff_j_th = base_j_th + float(gap_rule.get("j_th_add", 0.0))
+            # H1: 市場バイアスでJ_th調整（ret_5mベース）
+            market_ret_5m = float(df.loc[idx, "market_ret_5m"]) if "market_ret_5m" in df.columns else 0.0
+            market_bias = classify_market(market_ret_5m)
+            if feature_cfg.market_enabled and feature_cfg.market_adjust_j:
+                if market_bias == "up":
+                    eff_j_th += max(0.0, feature_cfg.market_j_delta_up)
+                elif market_bias == "down":
+                    eff_j_th += max(0.0, feature_cfg.market_j_delta_down)
+            if signal_mode == "j-only":
+                if abs(J.iloc[idx]) < eff_j_th:
+                    continue
+            elif signal_mode == "j-cross":
+                if abs(J.iloc[idx]) < eff_j_th:
+                    continue
+                prev_val = abs(J.iloc[idx - 1]) if idx > 0 else float("inf")
+                if prev_val >= eff_j_th:
+                    continue
+
+            eff_tp = max(0.2, float(params["TPk"]) + float(gap_rule.get("tp_add", 0.0)))
+            eff_sl = max(0.2, float(params["SLk"]) + float(gap_rule.get("sl_add", 0.0)))
+            # H3: |J|-J_th に応じてTP/SLをスケール
+            if feature_cfg.dynamic_risk_j:
+                j_abs_val_local = float(abs(J.iloc[idx]))
+                j_excess = max(0.0, j_abs_val_local - base_j_th)
+                if feature_cfg.tp_per_j:
+                    eff_tp = max(0.2, eff_tp + feature_cfg.tp_per_j * j_excess)
+                if feature_cfg.sl_per_j:
+                    eff_sl = max(0.2, eff_sl + feature_cfg.sl_per_j * j_excess)
+            tp = px + eff_tp * a if side == "BUY" else px - eff_tp * a
+            sl = px - eff_sl * a if side == "BUY" else px + eff_sl * a
+
+            future_positions = day_positions[offset + 1 :]
+            if not future_positions:
+                continue
+            if use_cap:
+                future_positions = future_positions[:max_bars]
+                if not future_positions:
+                    continue
+
+            exit_price = None
+            exit_idx = None
+            for fut_pos, fut_idx in enumerate(future_positions):
+                row = df.iloc[fut_idx]
+                high = row["high"]
+                low = row["low"]
+                if side == "BUY":
+                    reached_tp = high >= tp
+                    reached_sl = low <= sl
+                else:
+                    reached_tp = low <= tp
+                    reached_sl = high >= sl
+
+                if reached_tp and reached_sl:
+                    exit_price = sl
+                    exit_idx = fut_pos
+                    break
+                if reached_tp:
+                    exit_price = tp
+                    exit_idx = fut_pos
+                    break
+                if reached_sl:
+                    exit_price = sl
+                    exit_idx = fut_pos
+                    break
+
+            if exit_price is None:
+                exit_price = df.iloc[future_positions[-1]]["close"]
+                exit_idx = len(future_positions) - 1
+
+            pnl_price = (exit_price - px) if side == "BUY" else (px - exit_price)
+            pnl_bp = (pnl_price / px) * 10000.0
+            pnl_bp -= cost_bp
+            trade_bp.append(float(pnl_bp))
+            bar_len = (exit_idx + 1) if exit_idx is not None else len(future_positions)
+            trade_bars.append(int(bar_len))
+            trade_gap.append(g)
+            trade_gap_bucket.append(gap_rule["bucket"])
+
+            # market_bias appended for analysis (computed above if features available)
+            if "market_ret_5m" in df.columns:
+                market_ret_5m = float(df.loc[idx, "market_ret_5m"])
+                market_bias = classify_market(market_ret_5m)
+            market_biases.append(market_bias)
+
+            vol_spike = float(df.loc[idx, "vol_spike"]) if "vol_spike" in df.columns else 0.0
+            volume_spikes.append(vol_spike)
+
+            repeat_key = (date, side)
+            repeat_count = repeat_tracker.get(repeat_key, 0) + 1
+            repeat_tracker[repeat_key] = repeat_count
+            repeat_indices.append(repeat_count)
+
+            j_abs_val = float(abs(J.iloc[idx]))
+            j_abs_list.append(j_abs_val)
+            j_range_list.append(float(peak_abs.iloc[idx]))
+
+            sector_val = str(df.iloc[idx].get("sector_code", ""))
+            sector_codes.append(sector_val)
+            ts_val = pd.to_datetime(df.iloc[idx]["ts"])
+            timestamps.append(ts_val.isoformat())
+
+            if trade_details is not None:
+                trade_details.append(
+                    {
+                        "ts": ts_val.isoformat(),
+                        "date": str(date),
+                        "code": df.iloc[idx]["code"],
+                        "side": side,
+                        "pnl_bp": float(pnl_bp),
+                        "bars": int(bar_len),
+                        "gap_bp": g,
+                        "gap_bucket": gap_rule["bucket"],
+                        "market_ret_5m": market_ret_5m,
+                        "market_bias": market_bias,
+                        "vol_spike": vol_spike,
+                        "repeat_index": repeat_count,
+                        "j_abs": j_abs_val,
+                        "j_range": float(peak_abs.iloc[idx]),
+                        "sector_code": sector_val,
+                        "session": feature_cfg.session_label,
+                    }
+                )
+
+    result: Dict[str, List[Any]] = {
+        "pnl_bp": trade_bp,
+        "bars": trade_bars,
+        "gap_bp": trade_gap,
+        "gap_bucket": trade_gap_bucket,
+        "market_bias": market_biases,
+        "vol_spike": volume_spikes,
+        "repeat_index": repeat_indices,
+        "j_abs": j_abs_list,
+        "j_range": j_range_list,
+        "sector_code": sector_codes,
+        "ts": timestamps,
+    }
+    if trade_details is not None:
+        result["details"] = trade_details
+    return result
+
+
+def metrics_from_bp(bp_list: Sequence[float]) -> Dict[str, float]:
+    trades = len(bp_list)
+    if trades == 0:
+        return {
+            "wins": 0,
+            "losses": 0,
+            "flats": 0,
+            "trades": 0,
+            "winrate": 0.0,
+            "pf": 0.0,
+            "pf_eff": 0.0,
+            "exp_bp": 0.0,
+        }
+
+    wins = sum(1 for bp in bp_list if bp > BP_EPS)
+    losses = sum(1 for bp in bp_list if bp < -BP_EPS)
+    flats = trades - wins - losses
+
+    pos_sum = sum(bp for bp in bp_list if bp > BP_EPS)
+    neg_sum = sum(bp for bp in bp_list if bp < -BP_EPS)
+    winrate = wins / trades if trades else 0.0
+
+    if neg_sum < -BP_EPS:
+        pf = pos_sum / abs(neg_sum) if pos_sum > BP_EPS else 0.0
+    else:
+        pf = float("inf") if pos_sum > BP_EPS else 0.0
+
+    avg_win = pos_sum / wins if wins else 0.0
+    avg_loss = abs(neg_sum) / losses if losses else 0.0
+    if avg_loss == 0.0:
+        pf_eff = float("inf") if avg_win > 0 else 0.0
+    elif winrate >= 1.0:
+        pf_eff = float("inf")
+    else:
+        pf_eff = (winrate * avg_win) / ((1 - winrate) * avg_loss)
+
+    exp_bp = sum(bp_list) / trades
+    pf_value = float(pf) if math.isfinite(pf) else 999.0
+    pf_eff_value = float(pf_eff) if math.isfinite(pf_eff) else 999.0
+
+    return {
+        "wins": wins,
+        "losses": losses,
+        "flats": flats,
+        "trades": trades,
+        "winrate": winrate,
+        "pf": pf_value,
+        "pf_eff": pf_eff_value,
+        "exp_bp": exp_bp,
+    }
+
+
+def aggregate_segments(
+    segments: Sequence[Dict[str, List[float]]],
+    min_slice_trades: int,
+  ) -> Dict[str, float]:
+    slice_pf_effs: List[float] = []
+    slice_pass = 0
+    all_bp: List[float] = []
+    all_bars: List[int] = []
+    slice_exp_bp: List[float] = []
+    all_gap: List[float] = []
+    all_gap_bucket: List[str] = []
+    all_bias: List[str] = []
+    all_vol_spike: List[float] = []
+    all_repeat: List[int] = []
+    all_j_abs: List[float] = []
+    all_j_range: List[float] = []
+    all_sector: List[str] = []
+    all_ts: List[str] = []
+    all_details: List[Dict[str, Any]] = []
+
+    for seg in segments:
+        seg_bp = seg.get("pnl_bp", [])
+        all_bp.extend(seg_bp)
+        seg_metrics = metrics_from_bp(seg_bp)
+        slice_pf_effs.append(seg_metrics["pf_eff"])
+        slice_exp_bp.append(seg_metrics["exp_bp"])
+        seg_bars = seg.get("bars", [])
+        all_bars.extend(seg_bars)
+        seg_gap = seg.get("gap_bp", [])
+        all_gap.extend(seg_gap)
+        all_gap_bucket.extend(seg.get("gap_bucket", []))
+        all_bias.extend(seg.get("market_bias", []))
+        all_vol_spike.extend(seg.get("vol_spike", []))
+        all_repeat.extend(seg.get("repeat_index", []))
+        all_j_abs.extend(seg.get("j_abs", []))
+        all_j_range.extend(seg.get("j_range", []))
+        all_sector.extend(seg.get("sector_code", []))
+        all_ts.extend(seg.get("ts", []))
+        seg_details = seg.get("details")
+        if seg_details:
+            all_details.extend(seg_details)
+        if seg_metrics["trades"] >= min_slice_trades and seg_metrics["pf_eff"] > 1.0:
+            slice_pass += 1
+
+    metrics = metrics_from_bp(all_bp)
+    avg_bars = (sum(all_bars) / len(all_bars)) if all_bars else 0.0
+    gap_summary = summarize_gap(all_gap, all_bp, all_bars)
+    metrics.update(
+        {
+            "slices_total": len(segments),
+            "slices_pass": slice_pass,
+            "slice_pf_eff": slice_pf_effs,
+            "slice_exp_bp": slice_exp_bp,
+            "avg_bars": avg_bars,
+            "gap_summary": gap_summary,
+            "market_bias": all_bias,
+            "vol_spike": all_vol_spike,
+            "repeat_index": all_repeat,
+            "j_abs": all_j_abs,
+            "j_range": all_j_range,
+            "sector_code": all_sector,
+            "ts": all_ts,
+        }
+    )
+    if all_details:
+        metrics["details"] = all_details
+    return metrics
+
+
+def summarise_trade_groups(df: pd.DataFrame, column: str) -> List[Dict[str, Any]]:
+    if column not in df.columns or df.empty:
+        return []
+    grouped = (
+        df.groupby(column, dropna=False)
+        .agg(
+            trades=("pnl_bp", "count"),
+            wins=("pnl_bp", lambda s: int((s > BP_EPS).sum())),
+            losses=("pnl_bp", lambda s: int((s < -BP_EPS).sum())),
+            mean_pnl_bp=("pnl_bp", "mean"),
+            median_pnl_bp=("pnl_bp", "median"),
+            avg_bars=("bars", "mean"),
+        )
+        .reset_index()
+    )
+    if grouped.empty:
+        return []
+    grouped["winrate"] = grouped.apply(
+        lambda r: (r["wins"] / r["trades"]) if r["trades"] else 0.0,
+        axis=1,
+    )
+    grouped = grouped.drop(columns=["wins", "losses"])
+    for col in ["mean_pnl_bp", "median_pnl_bp", "avg_bars", "winrate"]:
+        grouped[col] = grouped[col].astype(float).fillna(0.0)
+    grouped["trades"] = grouped["trades"].astype(int)
+    return grouped.to_dict("records")
+
+
+def _bucket_j_range(val: float) -> str:
+    if not math.isfinite(val):
+        return "nan"
+    if val < 0.8:
+        return "<0.8"
+    if val < 1.2:
+        return "0.8-<1.2"
+    if val < 1.6:
+        return "1.2-<1.6"
+    if val < 2.0:
+        return "1.6-<2.0"
+    return ">=2.0"
+
+
+def _bucket_volume_spike(val: float) -> str:
+    if not math.isfinite(val):
+        return "nan"
+    if val < 1.5:
+        return "<1.5"
+    if val < 3.0:
+        return "1.5-<3.0"
+    if val < 5.0:
+        return "3.0-<5.0"
+    return ">=5.0"
+
+
+def max_repeat_index(value: Any) -> float:
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        num = abs(float(value))
+        return num if math.isfinite(num) else 0.0
+    parsed: Any = value
+    if isinstance(value, str):
+        val_strip = value.strip()
+        if not val_strip:
+            return 0.0
+        try:
+            parsed = json.loads(val_strip)
+        except Exception:
+            return 0.0
+    if not isinstance(parsed, (list, tuple)):
+        return 0.0
+    max_val = 0.0
+    for item in parsed:
+        try:
+            num = abs(float(item))
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(num) and num > max_val:
+            max_val = num
+    return max_val
+
+
+def build_hypothesis_summary(ledger_df: pd.DataFrame) -> Dict[str, Any]:
+    if ledger_df.empty:
+        return {}
+    df = ledger_df.copy()
+    summary: Dict[str, Any] = {}
+    summary["market_bias"] = summarise_trade_groups(df, "market_bias")
+    summary["gap_bucket"] = summarise_trade_groups(df, "gap_bucket")
+
+    df["j_range_bucket"] = df["j_range"].apply(_bucket_j_range)
+    summary["j_range_bucket"] = summarise_trade_groups(df, "j_range_bucket")
+
+    df["vol_spike_bucket"] = df["vol_spike"].apply(_bucket_volume_spike)
+    summary["vol_spike_bucket"] = summarise_trade_groups(df, "vol_spike_bucket")
+
+    df["repeat_bucket"] = df["repeat_index"].apply(lambda x: str(int(x)) if x <= 3 else ">=4")
+    summary["repeat_bucket"] = summarise_trade_groups(df, "repeat_bucket")
+
+    density = df.groupby(["ts", "sector_code"]).size().rename("sector_density")
+    df = df.merge(density, on=["ts", "sector_code"], how="left")
+    df["sector_density_bucket"] = df["sector_density"].fillna(0).apply(lambda x: str(int(x)) if x <= 3 else ">=4")
+    summary["sector_density_bucket"] = summarise_trade_groups(df, "sector_density_bucket")
+
+    return summary
+
+
+def evaluate_params_for_code(
+    code_df: pd.DataFrame,
+    slices: Sequence[Tuple[Sequence[dt.date], Sequence[dt.date]]],
+    params: Dict[str, float],
+    cost_bp: float,
+    abs_guard_bp: float,
+    dir_guard_bp: float,
+    min_train_trades: int,
+    min_forward_trades: int,
+    signal_mode: str,
+    feature_cfg: FeatureConfig,
+) -> Tuple[Dict[str, float], Dict[str, float]]:
+    train_segments: List[Dict[str, List[float]]] = []
+    forward_segments: List[Dict[str, List[float]]] = []
+    for train_dates, forward_dates in slices:
+        train_df = code_df[code_df["date"].isin(train_dates)]
+        forward_df = code_df[code_df["date"].isin(forward_dates)]
+        train_segments.append(
+            eval_one(train_df, params, signal_mode, cost_bp, abs_guard_bp, dir_guard_bp, feature_cfg)
+        )
+        forward_segments.append(
+            eval_one(forward_df, params, signal_mode, cost_bp, abs_guard_bp, dir_guard_bp, feature_cfg)
+        )
+
+    train_metrics = aggregate_segments(train_segments, min_train_trades)
+    forward_metrics = aggregate_segments(forward_segments, min_forward_trades)
+    return train_metrics, forward_metrics
+
+
+def assemble_record(
+    *,
+    code: str,
+    param: Dict[str, float],
+    mode: str,
+    signal_mode: str,
+    session_label: str,
+    train_metrics: Dict[str, Any],
+    forward_metrics: Dict[str, Any],
+    bootstrap_n: int,
+) -> Dict[str, Any]:
+    fw_wins = int(forward_metrics.get("wins", 0))
+    fw_trades = int(forward_metrics.get("trades", 0))
+    wlo, whi = wilson_ci(fw_wins, fw_trades)
+    bmean, blo, bhi = bootstrap_mean_ci(
+        forward_metrics.get("slice_exp_bp", []), n_boot=int(bootstrap_n)
+    )
+    record = {
+        "mode": mode,
+        "signal_mode": signal_mode,
+        "session": session_label,
+        "code": code,
+        "ATR_n": param["ATR_n"],
+        "TPk": param["TPk"],
+        "SLk": param["SLk"],
+        "J_th": param["J_th"],
+        "dJ_th": float(param.get("dJ_th", 0.0)),
+        "vEMA_th": float(param.get("vEMA_th", 0.0)),
+        "TMAX": float(param.get("TMAX", 0.0)),
+        "train_wins": train_metrics.get("wins", 0),
+        "train_losses": train_metrics.get("losses", 0),
+        "train_flats": train_metrics.get("flats", 0),
+        "train_trades": train_metrics.get("trades", 0),
+        "train_winrate": train_metrics.get("winrate", 0.0),
+        "train_pf": train_metrics.get("pf", 0.0),
+        "train_pf_eff": train_metrics.get("pf_eff", 0.0),
+        "train_exp_bp": train_metrics.get("exp_bp", 0.0),
+        "train_slices_pass": train_metrics.get("slices_pass", 0),
+        "train_slices_total": train_metrics.get("slices_total", 0),
+        "forward_wins": forward_metrics.get("wins", 0),
+        "forward_losses": forward_metrics.get("losses", 0),
+        "forward_flats": forward_metrics.get("flats", 0),
+        "forward_trades": forward_metrics.get("trades", 0),
+        "forward_winrate": forward_metrics.get("winrate", 0.0),
+        "forward_pf": forward_metrics.get("pf", 0.0),
+        "forward_pf_eff": forward_metrics.get("pf_eff", 0.0),
+        "forward_exp_bp": forward_metrics.get("exp_bp", 0.0),
+        "forward_slices_pass": forward_metrics.get("slices_pass", 0),
+        "forward_slices_total": forward_metrics.get("slices_total", 0),
+        "forward_win_ci_low": wlo,
+        "forward_win_ci_high": whi,
+        "forward_exp_boot_mean": bmean,
+        "forward_exp_boot_low": blo,
+        "forward_exp_boot_high": bhi,
+        "train_avg_bars": train_metrics.get("avg_bars", 0.0),
+        "forward_avg_bars": forward_metrics.get("avg_bars", 0.0),
+    }
+    record["train_gap_summary"] = json.dumps(train_metrics.get("gap_summary", []), ensure_ascii=False)
+    forward_gap_summary = forward_metrics.get("gap_summary", [])
+    record["forward_gap_summary"] = json.dumps(forward_gap_summary, ensure_ascii=False)
+    best_bucket = select_best_gap_bucket(forward_gap_summary)
+    record["forward_gap_best_bucket"] = best_bucket
+    record["forward_gap_rule"] = describe_gap_rule(best_bucket, signal_mode) if best_bucket != "none" else ""
+    forward_lists = {
+        "market_bias": forward_metrics.get("market_bias", []),
+        "vol_spike": forward_metrics.get("vol_spike", []),
+        "repeat_index": forward_metrics.get("repeat_index", []),
+        "j_abs": forward_metrics.get("j_abs", []),
+        "j_range": forward_metrics.get("j_range", []),
+        "sector_code": forward_metrics.get("sector_code", []),
+        "ts": forward_metrics.get("ts", []),
+    }
+    for key, values in forward_lists.items():
+        record[f"forward_{key}"] = json.dumps(values, ensure_ascii=False)
+    if "details" in forward_metrics:
+        record["forward_trade_details"] = json.dumps(forward_metrics["details"], ensure_ascii=False)
+    else:
+        record["forward_trade_details"] = ""
+    return normalize_record(record)
+
+
+def build_param_grid(mode: str, signal_mode: str) -> Dict[str, List[float]]:
+    # Coarse: ASHAで枝刈りする前提の軽量グリッド（ユーザー合意版）
+    if mode == "coarse":
+        grid = {
+            "ATR_n": [1, 3, 5, 10],
+            "TPk": [1.2, 1.5, 2.0],
+            "SLk": [1.0, 1.5, 2.0, 3.0],
+            "J_th": [0.6, 0.8, 1.0, 1.5, 2.0, 2.5],
+            "TMAX": [0],
+        }
+    # Refine: ベイズ探索ON時は連続値で近傍探索（アンカーは統計レポート用に保持）
+    else:
+        grid = {
+            "ATR_n": [1, 2, 3, 5, 8, 10, 20],
+            "TPk": [1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0],
+            "SLk": [0.8, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0],
+            "J_th": [
+                0.6, 0.7, 0.8, 0.9,
+                1.0, 1.1, 1.2, 1.3, 1.4, 1.5,
+                1.6, 1.7, 1.8, 2.0, 2.25, 2.5, 2.75, 3.0,
+            ],
+            "TMAX": [0],
+        }
+
+    # dJ_th / vEMA_th は現行ロジックで未使用のため、非 full モードでは探索から除外（固定0.0）。
+    # 下流互換のため full 以外でもキーが必要なコードパスがある場合は 0.0 固定で残す。
+    if signal_mode == "full":
+        grid.setdefault("dJ_th", [0.0])
+        grid.setdefault("vEMA_th", [0.0])
+    else:
+        # 非 full では完全に探索対象から外す（必要なら fallback 側で 0.0 を使用）
+        if "dJ_th" in grid:
+            del grid["dJ_th"]
+        if "vEMA_th" in grid:
+            del grid["vEMA_th"]
+
+    return grid
+
+
+def wilson_ci(k: int, n: int, z: float = 1.96) -> Tuple[float, float]:
+    if n <= 0:
+        return 0.0, 0.0
+    p = (k / n) if n else 0.0
+    denom = 1 + (z**2) / n
+    center = (p + (z**2) / (2 * n)) / denom
+    half = (z * math.sqrt((p * (1 - p) / n) + (z**2) / (4 * (n**2)))) / denom
+    lo = max(0.0, center - half)
+    hi = min(1.0, center + half)
+    return lo, hi
+
+
+def bootstrap_mean_ci(values: Sequence[float], n_boot: int = 300, alpha: float = 0.05) -> Tuple[float, float, float]:
+    vals = [float(v) for v in values if v is not None and math.isfinite(float(v))]
+    if len(vals) == 0:
+        return 0.0, 0.0, 0.0
+    rng = np.random.default_rng(12345)
+    boots = []
+    for _ in range(n_boot):
+        smp = rng.choice(vals, size=len(vals), replace=True)
+        boots.append(float(np.mean(smp)))
+    boots.sort()
+    mean = float(np.mean(boots))
+    lo = boots[int((alpha / 2) * (len(boots) - 1))]
+    hi = boots[int((1 - alpha / 2) * (len(boots) - 1))]
+    return mean, lo, hi
+
+
+def iter_param_dicts(param_spec: Dict[str, Sequence[float]]) -> Iterable[Dict[str, float]]:
+    keys = list(param_spec.keys())
+    for combo in itertools.product(*(param_spec[k] for k in keys)):
+        yield dict(zip(keys, combo))
+
+
+def score_record(
+    rec: Dict[str, float],
+    min_forward_trades: int,
+    forward_pf_min: float,
+) -> Tuple:
+    fw_ok = (
+        rec["forward_trades"] >= min_forward_trades
+        and rec["forward_pf_eff"] >= forward_pf_min
+    )
+    return (
+        1 if fw_ok else 0,
+        rec["forward_pf_eff"] if fw_ok else 0.0,
+        rec["forward_winrate"] if fw_ok else 0.0,
+        rec["forward_trades"],
+        rec["train_pf_eff"],
+        rec["train_winrate"],
+        rec["train_trades"],
+    )
+
+
+def safe_to_float(value: float) -> float:
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        if math.isnan(value):
+            return 0.0
+        return float(value)
+    return float(value)
+
+
+def write_csv(path: Path, df: pd.DataFrame) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    df.to_csv(tmp, index=False, encoding="utf-8-sig")
+    tmp.replace(path)
+
+
+def parse_gap_summary_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    records = []
+    for _, row in df.iterrows():
+        raw = row.get(column)
+        if raw is None or (isinstance(raw, float) and math.isnan(raw)):
+            continue
+        if isinstance(raw, str):
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                summary = json.loads(raw)
+            except Exception:
+                continue
+        else:
+            summary = raw
+        if not isinstance(summary, list):
+            continue
+        for item in summary:
+            if not isinstance(item, dict):
+                continue
+            rec = dict(item)
+            rec["code"] = row.get("code")
+            records.append(rec)
+    if not records:
+        return pd.DataFrame()
+    return pd.DataFrame(records)
+
+
+def aggregate_gap_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return pd.DataFrame()
+    agg = (
+        df.groupby("bucket", as_index=False)
+        .agg(
+            trades=("trades", "sum"),
+            wins=("wins", "sum"),
+            losses=("losses", "sum"),
+            pnl_sum=("pnl_sum", "sum"),
+            bars_sum=("bars_sum", "sum"),
+        )
+    )
+    agg["winrate"] = agg.apply(lambda r: (r["wins"] / r["trades"]) if r["trades"] else 0.0, axis=1)
+    agg["mean_pnl_bp"] = agg.apply(lambda r: (r["pnl_sum"] / r["trades"]) if r["trades"] else 0.0, axis=1)
+    agg["mean_bars"] = agg.apply(lambda r: (r["bars_sum"] / r["trades"]) if r["trades"] else 0.0, axis=1)
+    agg = agg[["bucket", "trades", "winrate", "mean_pnl_bp", "mean_bars"]].sort_values("bucket")
+    return agg
+
+
+def write_gap_summaries(summary_df: pd.DataFrame, outdir: Path) -> None:
+    train_df = parse_gap_summary_column(summary_df, "train_gap_summary")
+    if not train_df.empty:
+        agg_train = aggregate_gap_dataframe(train_df)
+        if not agg_train.empty:
+            write_csv(outdir / "_GAP_SUMMARY_TRAIN.csv", agg_train)
+    forward_df = parse_gap_summary_column(summary_df, "forward_gap_summary")
+    if not forward_df.empty:
+        agg_forward = aggregate_gap_dataframe(forward_df)
+        if not agg_forward.empty:
+            write_csv(outdir / "_GAP_SUMMARY_FORWARD.csv", agg_forward)
+
+
+def _eval_code_task(payload) -> Tuple[str, pd.DataFrame, Dict[str, float], Dict[str, int]]:
+    (
+        code,
+        code_df,
+        slices,
+        param_grid,
+        cost_bp,
+        abs_guard_bp,
+        dir_guard_bp,
+        min_train_trades,
+        min_forward_trades,
+        signal_mode,
+        mode,
+        session_label,
+        bootstrap_n,
+        forward_pf_min,
+        cache_cfg,
+        optim_cfg,
+        feature_cfg,
+    ) = payload
+    optim_cfg = optim_cfg or {}
+    asha_cfg = optim_cfg.get("asha", {}) if isinstance(optim_cfg, dict) else {}
+    asha_enabled = bool(asha_cfg.get("enabled") and mode == "coarse")
+    bayes_cfg = optim_cfg.get("bayes", {}) if isinstance(optim_cfg, dict) else {}
+    bayes_enabled = bool(bayes_cfg.get("enabled") and mode == "refine")
+
+    cache_enabled = bool(cache_cfg and cache_cfg.get("enabled"))
+    cache_root: Optional[Path] = cache_cfg.get("root") if cache_enabled else None  # type: ignore[assignment]
+    plan_key = cache_cfg.get("plan_key") if cache_enabled else ""
+    data_hash = cache_cfg.get("data_hash") if cache_enabled else ""
+    cache_refresh = bool(cache_cfg.get("refresh")) if cache_enabled else False
+
+    stage1_records: Dict[str, Dict[str, Any]] = {}
+    selected_param_hashes: set = set()
+    asha_pruned = 0
+    if asha_enabled and len(param_grid) > 1 and len(slices) > 1:
+        eta = max(2, int(asha_cfg.get("eta", 3)))
+        min_stage = max(1, int(asha_cfg.get("min_slices", 1)))
+        total_slices = len(slices)
+        stage_size = min(total_slices, max(min_stage, total_slices // eta))
+        if stage_size >= total_slices:
+            asha_enabled = False
+        else:
+            subset_slices = list(slices[:stage_size])
+            stage_scores: List[Tuple[float, str]] = []
+            for param in param_grid:
+                train_metrics, forward_metrics = evaluate_params_for_code(
+                    code_df,
+                    subset_slices,
+                    param,
+                    cost_bp,
+                    abs_guard_bp,
+                    dir_guard_bp,
+                    min_train_trades,
+                    min_forward_trades,
+                    signal_mode,
+                    feature_cfg,
+                )
+                record = assemble_record(
+                    code=code,
+                    param=param,
+                    mode=mode,
+                    signal_mode=signal_mode,
+                    session_label=session_label,
+                    train_metrics=train_metrics,
+                    forward_metrics=forward_metrics,
+                    bootstrap_n=int(bootstrap_n),
+                )
+                p_hash = make_param_hash(param)
+                stage1_records[p_hash] = record
+                score_val = score_record(record, min_forward_trades, forward_pf_min)
+                stage_scores.append((score_val, p_hash))
+            keep = max(1, int(math.ceil(len(param_grid) / eta)))
+            stage_scores.sort(key=lambda item: item[0], reverse=True)
+            selected_param_hashes = {ph for _, ph in stage_scores[:keep]}
+            asha_pruned = len(param_grid) - len(selected_param_hashes)
+
+    evaluated_hashes = set(stage1_records.keys())
+
+    code_records: List[Dict[str, Any]] = []
+    cache_hits = 0
+    cache_misses = 0
+    bayes_trials_done = 0
+    fallback_param: Optional[Dict[str, float]] = None
+    for param in param_grid:
+        if fallback_param is None:
+            fallback_param = param
+        record: Optional[Dict[str, Any]] = None
+        param_hash = make_param_hash(param)
+        if asha_enabled and param_hash in stage1_records and param_hash not in selected_param_hashes:
+            code_records.append(stage1_records[param_hash])
+            evaluated_hashes.add(param_hash)
+            continue
+        if cache_enabled and cache_root and data_hash and not cache_refresh:
+            record = load_cache_record(cache_root, code, plan_key, param_hash, data_hash)
+            if record:
+                cache_hits += 1
+        if record is None:
+            train_metrics, forward_metrics = evaluate_params_for_code(
+                code_df,
+                slices,
+                param,
+                cost_bp,
+                abs_guard_bp,
+                dir_guard_bp,
+                min_train_trades,
+                min_forward_trades,
+                signal_mode,
+                feature_cfg,
+            )
+            record = assemble_record(
+                code=code,
+                param=param,
+                mode=mode,
+                signal_mode=signal_mode,
+                session_label=session_label,
+                train_metrics=train_metrics,
+                forward_metrics=forward_metrics,
+                bootstrap_n=int(bootstrap_n),
+            )
+            if cache_enabled and cache_root and data_hash:
+                store_cache_record(cache_root, code, plan_key, param_hash, data_hash, record)
+            cache_misses += 1
+        code_records.append(record)
+        evaluated_hashes.add(param_hash)
+    if bayes_enabled and param_grid:
+        bayes_records: List[Dict[str, Any]] = []
+        try:
+            import optuna  # type: ignore
+        except Exception:
+            bayes_enabled = False
+        else:
+            unique_values = {k: sorted({combo[k] for combo in param_grid}) for k in param_grid[0].keys()}
+            trials_target = max(0, int(bayes_cfg.get("trials", 0)))
+            timeout_seconds = int(bayes_cfg.get("timeout", 0) or 0)
+            if trials_target > 0:
+                sampler = optuna.samplers.TPESampler(seed=bayes_cfg.get("seed"))
+                bayes_cache_hits_local = 0
+                bayes_cache_misses_local = 0
+
+                def objective(trial: "optuna.trial.Trial") -> float:
+                    nonlocal bayes_cache_hits_local, bayes_cache_misses_local, bayes_trials_done
+                    atr_candidates = unique_values.get("ATR_n", [1])
+                    atr_value = int(trial.suggest_categorical("ATR_n", atr_candidates)) if len(atr_candidates) > 1 else int(atr_candidates[0])
+
+                    def sample_float(name: str, values: List[float], step: float) -> float:
+                        low = float(min(values))
+                        high = float(max(values))
+                        if math.isclose(low, high):
+                            return low
+                        return float(trial.suggest_float(name, low, high, step=step))
+                    # ベイズ探索の刻み幅: TP/SL は 0.1、J は 0.05
+                    tp_value = sample_float("TPk", unique_values.get("TPk", [1.0]), 0.1)
+                    sl_value = sample_float("SLk", unique_values.get("SLk", [1.0]), 0.1)
+                    # 連続探索範囲の既定: [0.6, 3.0]
+                    j_values = unique_values.get("J_th", [0.6, 3.0])
+                    j_value = sample_float("J_th", j_values, 0.05)
+                    # dJ/vEMA は full モード以外では固定 0.0（unique_values に無ければ [0.0]）
+                    dj_value = sample_float("dJ_th", unique_values.get("dJ_th", [0.0]), 0.01)
+                    vema_value = sample_float("vEMA_th", unique_values.get("vEMA_th", [0.0]), 0.01)
+                    tmax_value = float(unique_values.get("TMAX", [0])[0])
+
+                    param = {
+                        "ATR_n": atr_value,
+                        "TPk": tp_value,
+                        "SLk": sl_value,
+                        "J_th": j_value,
+                        "dJ_th": dj_value,
+                        "vEMA_th": vema_value,
+                        "TMAX": tmax_value,
+                    }
+                    param_hash = make_param_hash(param)
+                    if param_hash in evaluated_hashes:
+                        raise optuna.TrialPruned()
+                    record = None
+                    if cache_enabled and cache_root and data_hash and not cache_refresh:
+                        record = load_cache_record(cache_root, code, plan_key, param_hash, data_hash)
+                        if record:
+                            bayes_cache_hits_local += 1
+                    if record is None:
+                        train_metrics, forward_metrics = evaluate_params_for_code(
+                            code_df,
+                            slices,
+                            param,
+                            cost_bp,
+                            abs_guard_bp,
+                            dir_guard_bp,
+                            min_train_trades,
+                            min_forward_trades,
+                            signal_mode,
+                            feature_cfg,
+                        )
+                        record = assemble_record(
+                            code=code,
+                            param=param,
+                            mode=mode,
+                            signal_mode=signal_mode,
+                            session_label=session_label,
+                            train_metrics=train_metrics,
+                            forward_metrics=forward_metrics,
+                            bootstrap_n=int(bootstrap_n),
+                        )
+                        if cache_enabled and cache_root and data_hash:
+                            store_cache_record(cache_root, code, plan_key, param_hash, data_hash, record)
+                        bayes_cache_misses_local += 1
+                    bayes_records.append(record)
+                    evaluated_hashes.add(param_hash)
+                    bayes_trials_done += 1
+                    return float(record.get("forward_pf_eff", 0.0))
+
+                study = optuna.create_study(direction="maximize", sampler=sampler)
+                # 優先探索: 週末priors → 平日補助priors → 固定シード
+                try:
+                    prior_state = _load_optuna_priors()
+                    prior_list = prior_state.get("priors", []) if isinstance(prior_state, dict) else []
+                    weekend = [p for p in prior_list if isinstance(p, dict) and p.get("source") == "weekend"]
+                    weekday = [p for p in prior_list if isinstance(p, dict) and p.get("source") == "weekday"]
+                    pri_weekend = _filter_priors_for_unique(unique_values, weekend)
+                    pri_weekday = _filter_priors_for_unique(unique_values, weekday)
+                except Exception:
+                    pri_weekend = []
+                    pri_weekday = []
+
+                def _enqueue_many(candidates: List[Dict[str, float]]) -> None:
+                    for params in candidates:
+                        try:
+                            study.enqueue_trial(params)
+                        except Exception:
+                            pass
+
+                _enqueue_many(pri_weekend)
+                _enqueue_many(pri_weekday)
+
+                seeded_params: List[Dict[str, float]] = _filter_priors_for_unique(unique_values, OPTUNA_PRIOR_TRIALS)
+                _enqueue_many(seeded_params)
+                study.optimize(
+                    objective,
+                    n_trials=trials_target,
+                    timeout=timeout_seconds if timeout_seconds > 0 else None,
+                )
+                cache_hits += bayes_cache_hits_local
+                cache_misses += bayes_cache_misses_local
+        if bayes_records:
+            code_records.extend(bayes_records)
+
+    df_code = pd.DataFrame(code_records)
+    if df_code.empty:
+        base_param = fallback_param or {
+            "ATR_n": 0.0,
+            "TPk": 0.0,
+            "SLk": 0.0,
+            "J_th": 0.0,
+            "dJ_th": 0.0,
+            "vEMA_th": 0.0,
+            "TMAX": 0.0,
+        }
+        best_record: Dict[str, float] = {
+            "mode": mode,
+            "signal_mode": signal_mode,
+            "session": session_label,
+            "code": code,
+            "ATR_n": base_param["ATR_n"],
+            "TPk": base_param["TPk"],
+            "SLk": base_param["SLk"],
+            "J_th": base_param["J_th"],
+            "dJ_th": base_param["dJ_th"],
+            "vEMA_th": base_param["vEMA_th"],
+            "TMAX": base_param["TMAX"],
+            "train_wins": 0,
+            "train_losses": 0,
+            "train_flats": 0,
+            "train_trades": 0,
+            "train_winrate": 0.0,
+            "train_pf": 0.0,
+            "train_pf_eff": 0.0,
+            "train_exp_bp": 0.0,
+            "train_slices_pass": 0,
+            "train_slices_total": 0,
+            "forward_wins": 0,
+            "forward_losses": 0,
+            "forward_flats": 0,
+            "forward_trades": 0,
+            "forward_winrate": 0.0,
+            "forward_pf": 0.0,
+            "forward_pf_eff": 0.0,
+            "forward_exp_bp": 0.0,
+            "forward_slices_pass": 0,
+            "forward_slices_total": 0,
+            "forward_win_ci_low": 0.0,
+            "forward_win_ci_high": 0.0,
+            "forward_exp_boot_mean": 0.0,
+            "forward_exp_boot_low": 0.0,
+            "forward_exp_boot_high": 0.0,
+            "train_avg_bars": 0.0,
+            "forward_avg_bars": 0.0,
+            "train_gap_summary": json.dumps([], ensure_ascii=False),
+            "forward_gap_summary": json.dumps([], ensure_ascii=False),
+            "forward_gap_best_bucket": "none",
+            "forward_gap_rule": "",
+        }
+    else:
+        best_record = max(
+            df_code.to_dict("records"),
+            key=lambda rec: score_record(rec, min_forward_trades, forward_pf_min),
+        )
+    stats = {"cache_hits": cache_hits, "cache_misses": cache_misses}
+    if asha_pruned > 0:
+        stats["asha_pruned"] = asha_pruned
+    if bayes_trials_done > 0:
+        stats["bayes_trials"] = bayes_trials_done
+    return code, df_code, best_record, stats
+
+
+# ---------------------------------------------------------------------------
+# Git helper (optional)
+# ---------------------------------------------------------------------------
+
+
+def git_push_results(repo_dir: Path, logger: RunLogger) -> None:
+    proc = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        cwd=repo_dir,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        err = proc.stderr or proc.stdout
+        logger.log(f"git rev-parse failed: {err}")
+        return
+    branch = proc.stdout.strip()
+    cmd = (
+        "git add output/bt30/bt30_*/*.csv output/bt30/bt30_*/*.json && "
+        "git commit -m \"Add bt30 results\" && "
+        f"git push origin {branch}"
+    )
+    p2 = subprocess.run(cmd, cwd=repo_dir, shell=True, capture_output=True, text=True)
+    if p2.returncode != 0:
+        err = p2.stderr or p2.stdout
+        logger.log(f"Push failed branch={branch}: {err}")
+    else:
+        logger.log("Git push succeeded")
+
+
+# ---------------------------------------------------------------------------
+# Main execution
+# ---------------------------------------------------------------------------
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--excel", required=True, help="Path to SHINSOKU workbook")
+    ap.add_argument("--outdir", required=True, help="Output directory for run artifacts")
+    ap.add_argument("--mode", choices=["coarse", "refine"], default="coarse")
+    ap.add_argument("--slipbp", type=float, default=4.0)
+    ap.add_argument("--feebp", type=float, default=4.0)
+    ap.add_argument("--lookback", type=int, default=60)
+    ap.add_argument("--chunk-days", type=int, default=5)
+    ap.add_argument("--train-days", type=int, default=16)
+    ap.add_argument("--forward-days", type=int, default=5)
+    ap.add_argument("--forward-slices", type=int, default=5)
+    ap.add_argument("--session-start", default="09:00")
+    ap.add_argument("--session-end", default="09:15")
+    ap.add_argument("--liquidity-quantile", type=float, default=0.5)
+    ap.add_argument("--signal-mode", choices=["full", "j-only", "j-cross"], default="full")
+    ap.add_argument("--min-train-trades", type=int, default=30)
+    ap.add_argument("--min-forward-trades", type=int, default=10)
+    ap.add_argument("--train-pf-min", type=float, default=0.8)
+    ap.add_argument("--forward-pf-min", type=float, default=1.3)
+    ap.add_argument("--train-exp-min", type=float, default=0.0)
+    ap.add_argument("--forward-exp-min", type=float, default=0.0)
+    ap.add_argument("--forward-pass-ratio", type=float, default=0.5)
+    ap.add_argument("--gap-guard-abs-bp", type=float, default=80.0, help="Skip entire day if abs gap >= bp")
+    ap.add_argument("--gap-guard-dir-bp", type=float, default=40.0, help="Skip inverse-direction trades if abs gap >= bp")
+    ap.add_argument("--enable-market-features", action="store_true", help="Attach market index derived features for hypothesis analysis")
+    ap.add_argument("--market-index", default="^N225", help="Yahoo Finance ticker for market reference index")
+    ap.add_argument("--market-threshold-up-bp", type=float, default=15.0, help="Market uptrend threshold (bp)")
+    ap.add_argument("--market-threshold-down-bp", type=float, default=15.0, help="Market downtrend threshold (bp)")
+    # H1: 市場バイアスに応じたJしきい値の調整（実験用）
+    ap.add_argument("--market-adjust-j", action="store_true", help="Adjust effective J_th by market bias during evaluation")
+    ap.add_argument("--market-j-delta-up", type=float, default=0.1, help="Delta added to J_th when market is 'up'")
+    ap.add_argument("--market-j-delta-down", type=float, default=0.1, help="Delta added to J_th when market is 'down'")
+    ap.add_argument("--volume-spike-window", type=int, default=30, help="Rolling window size (minutes) for volume spike ratio")
+    ap.add_argument("--volume-spike-threshold", type=float, default=3.0, help="Volume spike ratio threshold")
+    ap.add_argument("--repeat-soft-limit", type=int, default=3, help="Repeat-count soft limit for analysis buckets")
+    ap.add_argument(
+        "--repeat-mask-threshold",
+        type=float,
+        default=3.0,
+        help="Maximum allowed repeat index per combo (set <=0 to disable additional masking)",
+    )
+    ap.add_argument("--mask-keep-j-min", type=float, default=1.35, help="Do not mask J_th values >= this threshold")
+    ap.add_argument("--analysis-ledger", action="store_true", help="Persist per-trade feature ledger for hypothesis testing")
+    ap.add_argument("--codes-file", help="Optional CSV with column 'code' to limit evaluation universe")
+    ap.add_argument("--top-n", type=int, default=30, help="Number of codes to pass from coarse to refine stage")
+    ap.add_argument("--status-file", help="Optional custom status.json path")
+    ap.add_argument("--log-file", help="Optional custom log path")
+    ap.add_argument("--stop-file", help="Path to stop-file; if exists run halts gracefully")
+    ap.add_argument("--push", action="store_true", help="If set, git add/commit/push results when complete")
+    ap.add_argument("--candidate-dir", default="output/excel", help="Directory for Excel candidate CSV")
+    ap.add_argument("--excel-summary", action="store_true", help="Write Excel workbook summary (summary_*.xlsx)")
+    ap.add_argument("--grid-sample-size", type=int, default=200, help="Rows to include when sampling grid into Excel summary")
+    ap.add_argument("--bootstrap-n", type=int, default=300, help="Bootstrap resamples for CI")
+    ap.add_argument("--jobs", type=int, default=0, help="Parallel workers across codes (0=auto)")
+    # H3: |J|-J_th に応じたTP/SLの動的調整（実験用）
+    ap.add_argument("--dynamic-risk-j", action="store_true", help="Scale TP/SL by (|J|-J_th) during evaluation")
+    ap.add_argument("--tp-per-j", type=float, default=0.0, help="Increment to TPk per unit (|J|-J_th), min 0.0")
+    ap.add_argument("--sl-per-j", type=float, default=0.0, help="Increment to SLk per unit (|J|-J_th), min 0.0")
+    ap.add_argument("--use-local-raw", action="store_true", help="Use saved data/raw/yahoo_1m if available (fallback to Yahoo)")
+    ap.add_argument("--cache-root", default="cache/opt30", help="Root directory for cached evaluation results")
+    ap.add_argument("--cache", dest="cache_enabled", action="store_true", help="Enable caching (default)")
+    ap.add_argument("--no-cache", dest="cache_enabled", action="store_false", help="Disable caching")
+    ap.add_argument("--cache-refresh", action="store_true", help="Ignore cached results for this run")
+    ap.add_argument("--run-type", choices=["auto", "weekday", "weekend"], default="auto", help="Controls low-priority gating")
+    ap.add_argument("--low-priority-config", default="state/opt30_low_priority.json", help="Path for persisting low-priority state")
+    ap.add_argument("--low-priority-window", type=int, default=20, help="History (runs) window when computing low-priority metrics")
+    ap.add_argument("--low-priority-trade-threshold", type=int, default=4, help="Average forward trades below this flags low-priority")
+    ap.add_argument("--low-priority-forward-pf", type=float, default=1.1, help="Forward pf_eff threshold for low priority")
+    ap.add_argument("--low-priority-forward-win", type=float, default=0.52, help="Forward winrate threshold for low priority")
+    ap.add_argument("--low-priority-consecutive", type=int, default=5, help="Consecutive misses before forcing low priority")
+    ap.add_argument("--low-priority", dest="low_priority_enabled", action="store_true", help="Enable low-priority gating (default)")
+    ap.add_argument("--no-low-priority", dest="low_priority_enabled", action="store_false", help="Disable low-priority gating")
+    ap.add_argument("--partial-write-every", type=int, default=1, help="Update partial CSV outputs every N tickers (default 1)")
+    ap.add_argument("--optimize-io", action="store_true", help="Reduce partial write frequency and extra I/O")
+    ap.add_argument("--enable-asha", action="store_true", help="Enable ASHA pruning during coarse mode")
+    ap.add_argument("--asha-eta", type=int, default=3, help="Reduction factor (eta) for ASHA pruning (>=2)")
+    ap.add_argument("--asha-min-slices", type=int, default=1, help="Minimum slice count for ASHA warm-up stage")
+    ap.add_argument("--enable-bayes", action="store_true", help="Enable Optuna-based Bayesian search during refine mode")
+    ap.add_argument("--bayes-trials", type=int, default=40, help="Optuna trials when Bayesian search is enabled")
+    ap.add_argument("--bayes-timeout", type=int, default=0, help="Optional Optuna timeout in seconds (0=disabled)")
+    ap.add_argument("--mask-ineffective", action="store_true", help="Skip parameter bands that repeatedly underperform")
+    ap.add_argument("--mask-window", type=int, default=20, help="History window (runs) for ineffective band detection")
+    ap.add_argument("--mask-threshold", type=float, default=1.05, help="Minimum forward_pf_eff to keep a band active")
+    ap.set_defaults(cache_enabled=True, low_priority_enabled=True)
+    args = ap.parse_args()
+
+    if args.optimize_io and args.partial_write_every < 5:
+        args.partial_write_every = 5
+
+    run_type = args.run_type
+    if run_type == "auto":
+        run_type = "weekend" if dt.datetime.now().weekday() >= 5 else "weekday"
+
+    outdir = Path(args.outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    status_path = Path(args.status_file) if args.status_file else outdir / "status.json"
+    log_path = Path(args.log_file) if args.log_file else Path("logs") / f"opt30_run_{dt.datetime.now():%Y%m%d_%H%M%S}.log"
+    stop_path = Path(args.stop_file) if args.stop_file else outdir / "STOP"
+
+    logger = RunLogger(log_path)
+    tracker = StatusTracker(status_path)
+    start_ts = time.time()
+    logger.log("Run started")
+    logger.log(f"Run type resolved to {run_type}")
+    repeat_mask_threshold = float(getattr(args, "repeat_mask_threshold", 0.0) or 0.0)
+    if repeat_mask_threshold < 0:
+        repeat_mask_threshold = 0.0
+    repeat_mask_j_values: Set[float] = set()
+    if getattr(args, "enable_bayes", False) and args.mode == "refine":
+        try:
+            import optuna  # type: ignore
+        except Exception:
+            logger.log("Optuna is not available on this environment; Bayesian refine search disabled")
+            args.enable_bayes = False
+
+    cache_root = Path(args.cache_root)
+    if args.cache_enabled:
+        cache_root.mkdir(parents=True, exist_ok=True)
+    lp_manager: Optional[LowPriorityManager] = None
+    if args.low_priority_enabled:
+        lp_manager = LowPriorityManager(
+            Path(args.low_priority_config),
+            window=args.low_priority_window,
+            trades_threshold=args.low_priority_trade_threshold,
+            pf_threshold=args.low_priority_forward_pf,
+            win_threshold=args.low_priority_forward_win,
+            consecutive_limit=args.low_priority_consecutive,
+        )
+    mask_tracker: Optional[IneffectiveBandTracker] = None
+    if getattr(args, "mask_ineffective", False):
+        mask_tracker = IneffectiveBandTracker(Path("state/ineffective_bands.json"))
+
+    tickers = load_tickers_from_excel(Path(args.excel))
+    original_count = len(tickers)
+    if args.codes_file:
+        code_df = pd.read_csv(args.codes_file)
+        allow = [code.strip() for code in code_df["code"].astype(str).tolist() if code]
+        tickers = allow
+        logger.log(
+            f"Codes limited via {args.codes_file}: {len(tickers)} tickers "
+            f"(was {original_count})"
+        )
+    excluded_codes: List[str] = []
+    if lp_manager and run_type == "weekday":
+        low_priority_codes = set(lp_manager.get_low_priority())
+        if low_priority_codes:
+            excluded_codes = [code for code in tickers if code in low_priority_codes]
+            if excluded_codes:
+                tickers = [code for code in tickers if code not in low_priority_codes]
+                lp_manager.register_skip(excluded_codes)
+                logger.log(
+                    f"Low-priority gating removed {len(excluded_codes)} tickers "
+                    f"(remaining {len(tickers)})"
+                )
+    if not tickers:
+        raise RuntimeError("No tickers available for evaluation")
+
+    # Data source: local raw parquet (if enabled) + optional Yahoo top-up
+    if args.use_local_raw:
+        local = load_local_1m_chunks(
+            tickers,
+            lookback_days=args.lookback,
+            raw_root=Path("data/raw/yahoo_1m"),
+            logger=logger,
+        )
+        unique_days = sorted(pd.to_datetime(local["date"]).unique()) if not local.empty else []
+        need_topup = True
+        if unique_days:
+            min_needed = dt.datetime.now().date() - dt.timedelta(days=args.lookback)
+            have_span = (pd.to_datetime(unique_days[0]).date() <= min_needed)
+            have_counts = len(unique_days) >= int(args.lookback * 0.6)  # rough check
+            need_topup = not (have_span and have_counts)
+        if need_topup:
+            try:
+                remote = fetch_1m_chunks(
+                    tickers,
+                    lookback_days=args.lookback,
+                    chunk_days=args.chunk_days,
+                    logger=logger,
+                )
+            except Exception:
+                remote = pd.DataFrame()
+            data = pd.concat([local, remote], ignore_index=True) if not local.empty else remote
+            if data.empty:
+                raise RuntimeError("No 1m data available from local or remote sources")
+            data = data.drop_duplicates(subset=["ts", "code"]).reset_index(drop=True)
+        else:
+            data = local
+    else:
+        data = fetch_1m_chunks(
+            tickers,
+            lookback_days=args.lookback,
+            chunk_days=args.chunk_days,
+            logger=logger,
+        )
+
+    feature_cfg = FeatureConfig(
+        session_label="",  # placeholder, set after session label computed
+        market_enabled=bool(getattr(args, "enable_market_features", False)),
+        market_up_bp=float(getattr(args, "market_threshold_up_bp", 15.0)),
+        market_down_bp=float(getattr(args, "market_threshold_down_bp", 15.0)),
+        market_adjust_j=bool(getattr(args, "market_adjust_j", False)),
+        market_j_delta_up=float(getattr(args, "market_j_delta_up", 0.1)),
+        market_j_delta_down=float(getattr(args, "market_j_delta_down", 0.1)),
+        dynamic_risk_j=bool(getattr(args, "dynamic_risk_j", False)),
+        tp_per_j=float(getattr(args, "tp_per_j", 0.0)),
+        sl_per_j=float(getattr(args, "sl_per_j", 0.0)),
+        volume_window=max(1, int(getattr(args, "volume_spike_window", 30))),
+        volume_spike_threshold=float(getattr(args, "volume_spike_threshold", 3.0)),
+        repeat_soft_limit=max(1, int(getattr(args, "repeat_soft_limit", 3))),
+        store_details=bool(getattr(args, "analysis_ledger", False)),
+    )
+
+    if feature_cfg.market_enabled:
+        market_raw = load_market_reference(
+            getattr(args, "market_index", "^N225"),
+            lookback_days=args.lookback,
+            chunk_days=args.chunk_days,
+            use_local=bool(args.use_local_raw),
+            raw_root=Path("data/raw/yahoo_1m"),
+            logger=logger,
+        )
+        market_features = build_market_feature_table(market_raw)
+        if market_features.empty:
+            logger.log("Market reference data is empty; market features disabled for this run")
+            feature_cfg.market_enabled = False
+        else:
+            data = attach_market_features(data, market_features)
+    else:
+        data["market_close"] = 0.0
+        data["market_ret_1m"] = 0.0
+        data["market_ret_5m"] = 0.0
+        data["market_ret_15m"] = 0.0
+
+    data["sector_code"] = data["code"].astype(str).str[:2]
+    data = attach_volume_features(data, feature_cfg.volume_window)
+    data["vol_spike"] = data["vol_spike"].fillna(0.0)
+
+    days = sorted(data["date"].unique())
+    if len(days) < args.train_days + args.forward_days:
+        raise RuntimeError(
+            f"Insufficient distinct days ({len(days)}) for train={args.train_days} + forward={args.forward_days}"
+        )
+
+    session_start = parse_hhmm(args.session_start)
+    session_end = parse_hhmm(args.session_end)
+    session_label = "AM10" if session_end <= parse_hhmm("09:10") else "AM15"
+    feature_cfg.session_label = session_label
+    plan_key = build_plan_key(args, session_label)
+    filtered = apply_liquidity_and_mark_entry(
+        data,
+        session_start=session_start,
+        session_end=session_end,
+        liquidity_quantile=args.liquidity_quantile,
+        logger=logger,
+    )
+    if filtered.empty:
+        raise RuntimeError("All rows dropped by filters; adjust session or liquidity settings")
+
+    slices = build_slices(
+        sorted(filtered["date"].unique()),
+        train_days=args.train_days,
+        forward_days=args.forward_days,
+        max_slices=args.forward_slices,
+    )
+    if not slices:
+        raise RuntimeError("Unable to construct train/forward slices with current day counts")
+    logger.log(f"Using {len(slices)} rolling slices (train={args.train_days}, forward={args.forward_days})")
+
+    param_spec = build_param_grid(args.mode, args.signal_mode)
+    param_grid = list(iter_param_dicts(param_spec))
+    logger.log(f"Parameter grid size: {len(param_grid)} (mode={args.mode}, signal={args.signal_mode})")
+    masked_j_values: Set[float] = set()
+    if mask_tracker and run_type != "weekend":
+        masked_j_values = mask_tracker.get_masked_values(plan_key)
+        if masked_j_values:
+            # Keep high-J buckets for exploration (per user policy)
+            keep_min = float(getattr(args, "mask_keep_j_min", 1.35))
+            effective_mask = {val for val in masked_j_values if float(val) < keep_min}
+            filtered_grid = [combo for combo in param_grid if float(combo.get("J_th", 0.0)) not in effective_mask]
+            removed = len(param_grid) - len(filtered_grid)
+            if filtered_grid and removed > 0:
+                param_grid = filtered_grid
+                logger.log(f"Ineffective-band mask removed {removed} combos for J_th values {sorted(effective_mask)}")
+            else:
+                logger.log("Ineffective-band mask skipped (would remove all parameter combinations)")
+
+    cost_bp = float(args.slipbp + args.feebp)
+    summary_records: List[Dict[str, float]] = []
+    grid_columns = None
+    summary_partial_path = outdir / "_SUMMARY_TRAIN.partial.csv"
+    top_partial_path = outdir / "_TOP_FORWARD.partial.csv"
+    grid_path = outdir / "_GRID_FULL.csv"
+
+    if grid_path.exists():
+        grid_path.unlink()
+    if summary_partial_path.exists():
+        summary_partial_path.unlink()
+    if top_partial_path.exists():
+        top_partial_path.unlink()
+
+    grouped = filtered.groupby("code")
+    codes = list(grouped.groups.keys())
+    total_tasks = len(codes) * len(param_grid)
+    combo_done = 0
+    if args.jobs and args.jobs > 0:
+        max_workers = args.jobs
+    else:
+        max_workers = auto_worker_count()
+    optim_cfg = {
+        "asha": {
+            "enabled": bool(getattr(args, "enable_asha", False) and args.mode == "coarse"),
+            "eta": max(2, int(getattr(args, "asha_eta", 3))),
+            "min_slices": max(1, int(getattr(args, "asha_min_slices", 1))),
+        },
+    }
+    if getattr(args, "enable_bayes", False) and args.mode == "refine":
+        optim_cfg["bayes"] = {
+            "enabled": True,
+            "trials": int(getattr(args, "bayes_trials", 40)),
+            "timeout": int(getattr(args, "bayes_timeout", 0)),
+            "seed": None,
+        }
+
+    payloads = []
+    cache_flag = bool(args.cache_enabled)
+    for code in codes:
+        code_df = grouped.get_group(code)
+        cache_cfg = None
+        if cache_flag:
+            data_hash = compute_data_hash(code_df)
+            cache_cfg = {
+                "enabled": True,
+                "root": cache_root,
+                "plan_key": plan_key,
+                "data_hash": data_hash,
+                "refresh": args.cache_refresh,
+            }
+        cfg_copy = FeatureConfig(**feature_cfg.__dict__)
+        payloads.append((
+            code,
+            code_df,
+            slices,
+            param_grid,
+            cost_bp,
+            float(getattr(args, "gap_guard_abs_bp", 0.0)),
+            float(getattr(args, "gap_guard_dir_bp", 0.0)),
+            args.min_train_trades,
+            args.min_forward_trades,
+            args.signal_mode,
+            args.mode,
+            session_label,
+            int(getattr(args, "bootstrap_n", 300)),
+            args.forward_pf_min,
+            cache_cfg,
+            optim_cfg,
+            cfg_copy,
+        ))
+
+    idx = 0
+    processed_since_flush = 0
+    flush_interval = max(1, int(args.partial_write_every))
+    cache_hit_total = 0
+    cache_miss_total = 0
+    asha_pruned_total = 0
+    bayes_trials_total = 0
+    with cf.ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = [ex.submit(_eval_code_task, p) for p in payloads]
+        for fut in cf.as_completed(futures):
+            code, df_code, best_record, task_stats = fut.result()
+            idx += 1
+            combo_done += len(param_grid)
+            cache_hit_total += int(task_stats.get("cache_hits", 0))
+            cache_miss_total += int(task_stats.get("cache_misses", 0))
+            asha_pruned_total += int(task_stats.get("asha_pruned", 0))
+            bayes_trials_total += int(task_stats.get("bayes_trials", 0))
+            if not df_code.empty:
+                write_mode = "w" if not grid_path.exists() else "a"
+                df_code.to_csv(
+                    grid_path,
+                    mode=write_mode,
+                    header=write_mode == "w",
+                    index=False,
+                    encoding="utf-8-sig",
+                )
+            summary_records.append(best_record)
+            processed_since_flush += 1
+            if processed_since_flush >= flush_interval or idx == len(codes):
+                summary_snapshot = pd.DataFrame(summary_records)
+                if repeat_mask_threshold > 0 and "forward_repeat_index" in summary_snapshot.columns:
+                    summary_snapshot["_repeat_max"] = summary_snapshot["forward_repeat_index"].apply(max_repeat_index)
+                    repeat_snapshot_mask = summary_snapshot["_repeat_max"] >= repeat_mask_threshold
+                    if repeat_snapshot_mask.any():
+                        for val in summary_snapshot.loc[repeat_snapshot_mask, "J_th"].tolist():
+                            try:
+                                num = float(val)
+                            except Exception:
+                                continue
+                            if math.isfinite(num):
+                                repeat_mask_j_values.add(num)
+                    summary_snapshot = summary_snapshot.loc[~repeat_snapshot_mask].copy()
+                    if "_repeat_max" in summary_snapshot.columns:
+                        summary_snapshot.drop(columns=["_repeat_max"], inplace=True)
+                write_csv(summary_partial_path, summary_snapshot)
+                top_df = summary_snapshot[
+                    (summary_snapshot["train_pf_eff"] >= args.train_pf_min)
+                    & (summary_snapshot["train_trades"] >= args.min_train_trades)
+                    & (summary_snapshot["forward_pf_eff"] >= args.forward_pf_min)
+                    & (summary_snapshot["forward_trades"] >= args.min_forward_trades)
+                    & (summary_snapshot["train_exp_bp"] >= args.train_exp_min)
+                    & (summary_snapshot["forward_exp_bp"] >= args.forward_exp_min)
+                ].sort_values(
+                    ["forward_pf_eff", "forward_trades", "train_pf_eff"],
+                    ascending=[False, False, False],
+                )
+                write_csv(top_partial_path, top_df)
+                processed_since_flush = 0
+            progress = combo_done / total_tasks if total_tasks else 0.0
+            elapsed = time.time() - start_ts
+            eta = (elapsed / progress - elapsed) if progress > 0 else None
+            tracker.update(
+                phase=f"{args.mode}-eval",
+                code=code,
+                combo_done=combo_done,
+                combo_total=total_tasks,
+                ticker_index=idx,
+                ticker_total=len(codes),
+                elapsed_seconds=elapsed,
+                eta_seconds=eta if eta is not None else None,
+            )
+            logger.log(
+                f"[{idx}/{len(codes)}] {code}: best train_pf_eff={best_record.get('train_pf_eff', 0):.3f}, "
+                f"forward_pf_eff={best_record.get('forward_pf_eff', 0):.3f}, trades={best_record.get('train_trades', 0)}/{best_record.get('forward_trades', 0)}"
+            )
+
+    tracker.update(
+        phase="completed",
+        elapsed_seconds=time.time() - start_ts,
+        combo_done=combo_done,
+        combo_total=total_tasks,
+    )
+    tracker.flush()
+
+    if cache_flag:
+        total_cache_ops = cache_hit_total + cache_miss_total
+        if total_cache_ops > 0:
+            reuse_pct = (cache_hit_total / total_cache_ops) * 100.0
+            logger.log(f"Cache reuse: {cache_hit_total}/{total_cache_ops} combos ({reuse_pct:.1f}%) served from cache")
+        else:
+            logger.log("Cache reuse: no parameter combos evaluated")
+    if asha_pruned_total > 0:
+        logger.log(f"ASHA pruned {asha_pruned_total} parameter combos prior to full evaluation")
+    if bayes_trials_total > 0:
+        logger.log(f"Bayesian refine trials executed: {bayes_trials_total}")
+
+    if not summary_records:
+        logger.log("No summary records produced")
+        logger.close()
+        return
+
+    summary_df = pd.DataFrame(summary_records)
+    if "repeat_max" not in summary_df.columns:
+        summary_df["repeat_max"] = 0.0
+    if repeat_mask_threshold > 0 and "forward_repeat_index" in summary_df.columns:
+        summary_df["repeat_max"] = summary_df["forward_repeat_index"].apply(max_repeat_index)
+        repeat_mask_rows = summary_df["repeat_max"] >= repeat_mask_threshold
+        if repeat_mask_rows.any():
+            for val in summary_df.loc[repeat_mask_rows, "J_th"].tolist():
+                try:
+                    num = float(val)
+                except Exception:
+                    continue
+                if math.isfinite(num):
+                    repeat_mask_j_values.add(num)
+        summary_df = summary_df.loc[~repeat_mask_rows].copy()
+    else:
+        summary_df["repeat_max"] = 0.0
+    if mask_tracker and repeat_mask_threshold > 0 and repeat_mask_j_values:
+        mask_tracker.manual_mask(
+            plan_key,
+            sorted({round(v, 4) for v in repeat_mask_j_values}),
+            reason=f"repeat_ge_{repeat_mask_threshold:.2f}",
+            timestamp=dt.datetime.now(),
+        )
+
+    if lp_manager and not summary_df.empty:
+        selection_mask = (
+            (summary_df["train_pf_eff"] >= args.train_pf_min)
+            & (summary_df["train_trades"] >= args.min_train_trades)
+            & (summary_df["forward_pf_eff"] >= args.forward_pf_min)
+            & (summary_df["forward_trades"] >= args.min_forward_trades)
+            & (summary_df["train_exp_bp"] >= args.train_exp_min)
+            & (summary_df["forward_exp_bp"] >= args.forward_exp_min)
+        )
+        selected_map = dict(zip(summary_df["code"], selection_mask.astype(bool)))
+        lp_manager.update(summary_df, selected_map, timestamp=dt.datetime.now())
+        lp_manager.write_report(outdir, run_type, summary_df["code"].tolist())
+        lp_manager.save()
+        if excluded_codes:
+            excluded_path = outdir / "low_priority_excluded.csv"
+            with excluded_path.open("w", encoding="utf-8") as fp:
+                fp.write("code\n")
+                for item in excluded_codes:
+                    fp.write(f"{item}\n")
+    if mask_tracker and not summary_df.empty:
+        mask_tracker.update(
+            plan_key,
+            summary_df,
+            window=args.mask_window,
+            threshold=args.mask_threshold,
+            timestamp=dt.datetime.now(),
+        )
+        mask_tracker.write_report(outdir, plan_key)
+        mask_tracker.save()
+
+    summary_cols = [
+        "code",
+        "mode",
+        "signal_mode",
+        "ATR_n",
+        "TPk",
+        "SLk",
+        "J_th",
+        "dJ_th",
+        "vEMA_th",
+        "TMAX",
+        "train_trades",
+        "train_winrate",
+        "train_pf",
+        "train_pf_eff",
+        "train_exp_bp",
+        "train_slices_pass",
+        "train_slices_total",
+        "train_avg_bars",
+        "train_gap_summary",
+        "repeat_max",
+    ]
+    forward_cols = [
+        "code",
+        "mode",
+        "signal_mode",
+        "forward_trades",
+        "forward_winrate",
+        "forward_pf",
+        "forward_pf_eff",
+        "forward_exp_bp",
+        "forward_slices_pass",
+        "forward_slices_total",
+        "forward_avg_bars",
+        "forward_gap_summary",
+        "forward_gap_best_bucket",
+        "forward_gap_rule",
+    ]
+    write_csv(outdir / "_SUMMARY_TRAIN.csv", summary_df[summary_cols])
+    write_csv(outdir / "_SUMMARY_FORWARD.csv", summary_df[forward_cols])
+    write_csv(outdir / "_COMPARE.csv", summary_df)
+    write_gap_summaries(summary_df, outdir)
+
+    if getattr(args, "analysis_ledger", False):
+        ledger_rows: List[Dict[str, Any]] = []
+        for _, row in summary_df.iterrows():
+            details_str = row.get("forward_trade_details", "")
+            if not details_str:
+                continue
+            try:
+                trade_details = json.loads(details_str)
+            except Exception:
+                continue
+            for trade in trade_details:
+                entry = {
+                    "code": row.get("code"),
+                    "mode": row.get("mode"),
+                    "signal_mode": row.get("signal_mode"),
+                    "session": row.get("session"),
+                    "ATR_n": row.get("ATR_n"),
+                    "TPk": row.get("TPk"),
+                    "SLk": row.get("SLk"),
+                    "J_th": row.get("J_th"),
+                    "forward_pf_eff": row.get("forward_pf_eff"),
+                    "forward_exp_bp": row.get("forward_exp_bp"),
+                }
+                entry.update(trade)
+                ledger_rows.append(entry)
+        if ledger_rows:
+            ledger_df = pd.DataFrame(ledger_rows)
+            write_csv(outdir / "hypothesis_trade_ledger.csv", ledger_df)
+            hypo_summary = build_hypothesis_summary(ledger_df)
+            with (outdir / "hypothesis_summary.json").open("w", encoding="utf-8") as fh:
+                json.dump(hypo_summary, fh, ensure_ascii=False, indent=2)
+
+    top_df = summary_df[
+        (summary_df["train_pf_eff"] >= args.train_pf_min)
+        & (summary_df["train_trades"] >= args.min_train_trades)
+        & (summary_df["forward_pf_eff"] >= args.forward_pf_min)
+        & (summary_df["forward_trades"] >= args.min_forward_trades)
+    ].sort_values(
+        ["forward_pf_eff", "forward_trades", "train_pf_eff"],
+        ascending=[False, False, False],
+    )
+    write_csv(outdir / "_TOP_CANDIDATES.csv", top_df)
+
+    if args.mode == "refine":
+        required_pass = summary_df["forward_slices_total"].apply(
+            lambda s: max(1, math.ceil(args.forward_pass_ratio * s))
+        )
+        final_candidates = summary_df[
+            (summary_df["train_pf_eff"] >= args.train_pf_min)
+            & (summary_df["train_trades"] >= args.min_train_trades)
+            & (summary_df["forward_pf_eff"] >= args.forward_pf_min)
+            & (summary_df["forward_trades"] >= args.min_forward_trades)
+            & (summary_df["forward_slices_pass"] >= required_pass)
+            & (summary_df["train_exp_bp"] >= args.train_exp_min)
+            & (summary_df["forward_exp_bp"] >= args.forward_exp_min)
+        ].copy()
+        final_candidates = final_candidates.sort_values(
+            ["forward_pf_eff", "forward_trades", "train_pf_eff"],
+            ascending=[False, False, False],
+        )
+        candidate_dir = Path(args.candidate_dir)
+        candidate_dir.mkdir(parents=True, exist_ok=True)
+        candidate_path = candidate_dir / f"candidates_{dt.datetime.now():%Y%m%d}.csv"
+        export_cols = [
+            "code",
+            "signal_mode",
+            "ATR_n",
+            "TPk",
+            "SLk",
+            "J_th",
+            "dJ_th",
+            "vEMA_th",
+            "TMAX",
+            "session",
+            "train_winrate",
+            "train_pf_eff",
+            "train_trades",
+            "forward_winrate",
+            "forward_pf_eff",
+            "forward_trades",
+            "forward_slices_pass",
+            "forward_slices_total",
+            "forward_win_ci_low",
+            "forward_win_ci_high",
+            "forward_exp_boot_mean",
+            "forward_exp_boot_low",
+            "forward_exp_boot_high",
+            "train_avg_bars",
+            "forward_avg_bars",
+            "forward_gap_best_bucket",
+            "forward_gap_rule",
+            "forward_gap_summary",
+        ]
+        rename_map = {
+            "code": "Ticker",
+            "signal_mode": "SignalMode",
+            "forward_avg_bars": "ForwardAvgBars",
+            "forward_gap_best_bucket": "GapBucket",
+            "forward_gap_rule": "GapRule",
+            "forward_gap_summary": "GapSummary",
+        }
+        final_out = final_candidates[export_cols].rename(columns=rename_map)
+        final_out.insert(0, "Selected", 1)
+        write_csv(candidate_path, final_out)
+        logger.log(f"Refine candidates exported to {candidate_path}")
+
+    if args.excel_summary:
+        excel_path = outdir / f"summary_{dt.datetime.now():%Y%m%d_%H%M%S}.xlsx"
+        try:
+            writer = pd.ExcelWriter(excel_path, engine="openpyxl")
+            with writer:
+                top_forward = summary_df.sort_values(
+                    ["forward_pf_eff", "forward_trades", "train_pf_eff"],
+                    ascending=[False, False, False],
+                ).head(100)
+                top_train = summary_df.sort_values(
+                    ["train_pf_eff", "train_trades", "forward_pf_eff"],
+                    ascending=[False, False, False],
+                ).head(100)
+                compare_sample = summary_df.head(min(len(summary_df), 500))
+                top_forward.to_excel(writer, sheet_name="TopForward", index=False)
+                top_train.to_excel(writer, sheet_name="TopTrain", index=False)
+                compare_sample.to_excel(writer, sheet_name="Compare", index=False)
+                gap_train_df = aggregate_gap_dataframe(parse_gap_summary_column(summary_df, "train_gap_summary"))
+                if not gap_train_df.empty:
+                    gap_train_df.to_excel(writer, sheet_name="GapTrain", index=False)
+                gap_forward_df = aggregate_gap_dataframe(parse_gap_summary_column(summary_df, "forward_gap_summary"))
+                if not gap_forward_df.empty:
+                    gap_forward_df.to_excel(writer, sheet_name="GapForward", index=False)
+
+                if outdir.joinpath("_GRID_FULL.csv").exists():
+                    grid_df = pd.read_csv(outdir / "_GRID_FULL.csv")
+                    grid_sample = grid_df.sort_values(
+                        ["forward_pf_eff", "forward_trades", "train_pf_eff"],
+                        ascending=[False, False, False],
+                    ).head(args.grid_sample_size)
+                    grid_sample.to_excel(writer, sheet_name="GridSamples", index=False)
+
+                if args.mode == "refine":
+                    final_sheet = final_candidates if "final_candidates" in locals() else pd.DataFrame()
+                    final_sheet.to_excel(writer, sheet_name="FinalCandidates", index=False)
+                else:
+                    top_df.to_excel(writer, sheet_name="TopCandidates", index=False)
+            logger.log(f"Excel summary written to {excel_path}")
+        except Exception as exc:
+            logger.log(f"Failed to create Excel summary ({excel_path}): {exc}")
+
+    elapsed_total = time.time() - start_ts
+    logger.log(f"Run completed in {elapsed_total/60:.1f} minutes")
+
+    if args.push:
+        logger.log("Attempting git push...")
+        git_push_results(Path(__file__).resolve().parent.parent, logger)
+
+    logger.close()
+
+
+if __name__ == "__main__":
+    main()
+
+

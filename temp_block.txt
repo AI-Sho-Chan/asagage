@@ -1,0 +1,255 @@
+    For r = DASH_DATA_START To lastRow
+
+        ticker = CStr(wsDash.Cells(r, tickerCol).value)
+
+        jVal = CDbl(IfZero(wsDash.Cells(r, jCol).value, 0))
+
+        mode = LCase$(CStr(wsDash.Cells(r, signalCol).value))
+
+        sessionVal = CStr(wsDash.Cells(r, sessionCol).value)
+
+        If Len(ticker) = 0 Then GoTo UpdatePrev
+
+        If wsDash.Cells(r, selCol).value <> 1 Then
+
+            If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = ""
+
+            If signalKindCol > 0 Then wsDash.Cells(r, signalKindCol).value = ""
+
+            If qtyCol > 0 Then wsDash.Cells(r, qtyCol).value = ""
+
+            GoTo UpdatePrev
+
+        End If
+
+
+
+        If rowScores.Exists(CStr(r)) Then rowScore = rowScores(CStr(r))
+
+        If rowScore <= 0 Then
+
+            If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = "SKIP"
+
+            wsDash.Cells(r, selCol).value = 0
+
+            If qtyCol > 0 Then wsDash.Cells(r, qtyCol).value = ""
+
+            GoTo UpdatePrev
+
+        End If
+
+
+
+        sessionKey = GetSessionKey(sessionVal, mode)
+
+        sessionWeight = GetSessionWeight(sessionKey)
+
+        If sessionWeight <= 0 Then
+
+            wsDash.Cells(r, selCol).value = 0
+
+            If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = "SKIP_SESSION"
+
+            GoTo UpdatePrev
+
+        End If
+
+
+
+        If sessionScores.Exists(sessionKey) Then sessionScoreSum = sessionScores(sessionKey)
+
+        If sessionScoreSum <= 0 Then GoTo UpdatePrev
+
+
+
+        ' base price will be selected after side is determined
+
+
+
+        allocBudget = totalBudget * sessionWeight * (rowScore / sessionScoreSum)
+
+        sessionCap = totalBudget * sessionWeight
+
+        If sessionRiskUsed.Exists(sessionKey) Then sessionUsed = sessionRiskUsed(sessionKey)
+
+        sessionAvail = sessionCap - sessionUsed
+
+        If sessionAvail <= 0 Then
+
+            If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = "SESSION_FULL"
+
+            wsDash.Cells(r, selCol).value = 0
+
+            GoTo UpdatePrev
+
+        End If
+
+        If allocBudget > sessionAvail Then allocBudget = sessionAvail
+
+        capFraction = GetOrderCapFraction(sessionKey)
+
+        If capFraction > 0 Then
+
+            orderCap = totalBudget * capFraction
+
+            If allocBudget > orderCap Then allocBudget = orderCap
+
+        End If
+
+        If allocBudget <= 0 Then GoTo UpdatePrev
+
+
+
+        If jVal < 0 Then
+
+            side = "BUY"
+
+        Else
+
+            side = "SELL"
+
+        End If
+
+        ' choose side-specific quote first, then fall back to mid/prev
+
+        Dim bidCol As Long: bidCol = FindColumn(wsDash, DASH_HEADER_ROW, HeaderPreopenBidJP())
+
+        Dim askCol As Long: askCol = FindColumn(wsDash, DASH_HEADER_ROW, HeaderPreopenAskJP())
+
+        Dim midCol As Long: midCol = FindColumn(wsDash, DASH_HEADER_ROW, HeaderPreopenMidJP())
+
+        Dim pxBid As Double, pxAsk As Double, pxMid As Double, pxPrev As Double
+
+        If bidCol > 0 Then pxBid = CDbl(IfZero(wsDash.Cells(r, bidCol).value, 0))
+
+        If askCol > 0 Then pxAsk = CDbl(IfZero(wsDash.Cells(r, askCol).value, 0))
+
+        If midCol > 0 Then pxMid = CDbl(IfZero(wsDash.Cells(r, midCol).value, 0))
+
+        If priceCol > 0 Then pxPrev = CDbl(IfZero(wsDash.Cells(r, priceCol).value, 0))
+
+        If side = "BUY" Then
+
+            px = IIf(pxAsk > 0, pxAsk, IIf(pxMid > 0, pxMid, pxPrev))
+
+        Else
+
+            px = IIf(pxBid > 0, pxBid, IIf(pxMid > 0, pxMid, pxPrev))
+
+        End If
+
+        If px <= 0 Then
+
+            If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = "NO_PRICE"
+
+            GoTo UpdatePrev
+
+        End If
+
+
+
+        ' Prefer sheet-driven DynamicQty when present; fallback to VBA sizing
+
+        Dim qtyFromSheet As Long
+
+        qtyFromSheet = 0
+
+        If qtyCol > 0 Then
+
+            On Error Resume Next
+
+            If wsDash.Cells(r, qtyCol).HasFormula Then
+
+                qtyFromSheet = CLng(IfZero(wsDash.Cells(r, qtyCol).value, 0))
+
+            Else
+
+                qtyFromSheet = CLng(IfZero(wsDash.Cells(r, qtyCol).value, 0))
+
+            End If
+
+            On Error GoTo 0
+
+        End If
+
+        If qtyFromSheet > 0 Then
+
+            qty = qtyFromSheet
+
+        Else
+
+            qty = ComputeDynamicQty(px, side, allocBudget, lotStep, slipBp, defaultQty)
+
+        End If
+
+        If qty <= 0 Then
+
+            If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = "NO_QTY"
+
+            wsDash.Cells(r, selCol).value = 0
+
+            GoTo UpdatePrev
+
+        End If
+
+
+
+        atrParam = CDbl(IfZero(wsDash.Cells(r, colATRDash).value, 0))
+
+        If colAtrValueDash > 0 Then
+
+            atrValue = CDbl(IfZero(wsDash.Cells(r, colAtrValueDash).value, atrParam))
+
+        Else
+
+            atrValue = atrParam
+
+        End If
+
+        slVal = CDbl(IfZero(wsDash.Cells(r, colSLDash).value, 0))
+
+        riskVal = EstimateOrderRisk(qty, atrValue, slVal, px, slipBp)
+
+        If Not CheckRiskAndBudgetLimits(ticker, sessionKey, riskVal, totalBudget) Then
+
+            wsDash.Cells(r, selCol).value = 0
+
+            If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = "RISK_LIMIT"
+
+            GoTo UpdatePrev
+
+        End If
+
+
+
+        If qtyCol > 0 Then
+
+            If Not wsDash.Cells(r, qtyCol).HasFormula Then
+
+                wsDash.Cells(r, qtyCol).value = qty
+
+            End If
+
+        End If
+
+        If signalStatusCol > 0 Then wsDash.Cells(r, signalStatusCol).value = "ORDERED"
+
+        If signalKindCol > 0 Then wsDash.Cells(r, signalKindCol).value = side & " / " & mode
+
+        PlaceOrder ticker, side, px, qty, mode & ":" & sessionVal
+
+        PlaceBracketIfAvailable wsDash, r, ticker, side, px, qty
+
+        ScheduleCloseExit wsDash, ticker, side
+
+        wsDash.Cells(r, selCol).value = 0
+
+        orderCount = orderCount + 1
+
+        If orderCount >= maxOrders Then Exit For
+
+UpdatePrev:
+
+        SetPrevJ ticker, CDbl(IfZero(wsDash.Cells(r, jCol).value, 0))
+
+    Next r

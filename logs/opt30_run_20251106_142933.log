@@ -1,0 +1,11 @@
+[2025-11-06 14:29:33] Run started
+[2025-11-06 14:29:33] Run type resolved to weekend
+[2025-11-06 14:29:33] Codes limited via temp_single_codes.csv: 1 tickers (was 20)
+[2025-11-06 14:29:34] Entry window marks set: 537 rows flagged out of 6437
+[2025-11-06 14:29:34] Liquidity filter q=0.60 kept 1 tickers and 6437 rows
+[2025-11-06 14:29:34] Using 3 rolling slices (train=6, forward=2)
+[2025-11-06 14:29:34] Parameter grid size: 24 (mode=refine, signal=j-cross)
+[2025-11-06 14:29:36] [1/1] 8035.T: best train_pf_eff=2.060, forward_pf_eff=999.000, trades=4/3
+[2025-11-06 14:29:36] Cache reuse: 0/24 combos (0.0%) served from cache
+[2025-11-06 14:29:36] Refine candidates exported to output\excel\candidates_20251106.csv
+[2025-11-06 14:29:36] Run completed in 0.1 minutes

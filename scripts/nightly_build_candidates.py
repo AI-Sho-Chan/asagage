@@ -44,10 +44,10 @@ def write_status(**updates: object) -> None:
             fh.write(f"{key}={value}\n")
 
 
-def run(cmd: List[str], cwd: Path) -> None:
+def run(cmd: List[str], cwd: Path, env: Dict[str, str] | None = None) -> None:
     """Run a subprocess and bubble up failures with context."""
     print("[run]", " ".join(cmd))
-    proc = subprocess.run(cmd, cwd=cwd)
+    proc = subprocess.run(cmd, cwd=cwd, env=env)
     if proc.returncode != 0:
         write_status(state="error", step="subprocess", message="Command failed", returncode=proc.returncode)
         raise SystemExit(proc.returncode)
@@ -185,6 +185,7 @@ def enrich_dashboard_columns(csv_path: Path, coeff_path: Path) -> None:
     if df.empty:
         return
 
+    coeff_df = None
     if coeff_path.exists():
         try:
             coeff_df = pd.read_csv(coeff_path)
@@ -475,6 +476,7 @@ def _main_impl() -> None:
     ap.add_argument("--mask-window", type=int, default=20, help="Mask history window (runs)")
     ap.add_argument("--mask-threshold", type=float, default=1.05, help="Forward pf_eff threshold for mask retention")
     ap.add_argument("--cache-refresh-weekend", action="store_true", help="Force --cache-refresh on weekend runs")
+    ap.add_argument("--plan-profile", choices=["auto", "weekend", "weekday"], default="auto")
     ap.add_argument("--analysis-ledger", action="store_true", help="(deprecated) no-op placeholder")
     ap.add_argument(
         "--refine-quick-grid",
@@ -497,6 +499,8 @@ def _main_impl() -> None:
         help="Run only the R&D windows (skip standard plans)",
     )
     args = ap.parse_args()
+
+    repo_root = Path(__file__).resolve().parent.parent
 
     excel_path = Path(args.excel)
     if not excel_path.is_absolute():
@@ -523,20 +527,35 @@ def _main_impl() -> None:
     night_root.mkdir(parents=True, exist_ok=True)
 
     # Plan entries: (label, session_start, session_end, signal_mode)
-    plans: List[Tuple[str, str, str, str]] = [
-        ("AM0930", "09:00", "09:30", "j-only"),
-        ("AM0930", "09:00", "09:30", "j-cross"),
-        ("AM0945", "09:00", "09:45", "j-only"),
-        ("AM0945", "09:00", "09:45", "j-cross"),
-        ("AM1000", "09:00", "10:00", "j-only"),
-        ("AM1000", "09:00", "10:00", "j-cross"),
-        ("AM1015", "09:00", "10:15", "j-only"),
-        ("AM1015", "09:00", "10:15", "j-cross"),
-        ("AM1030", "09:00", "10:30", "j-only"),
-        ("AM1030", "09:00", "10:30", "j-cross"),
-    ]
+    plan_profile = args.plan_profile
+    if plan_profile == "auto":
+        plan_profile = "weekend" if run_type == "weekend" else "weekday"
 
-    # Optional R&D windows (mid/pm time slices). Can be enabled for any run-type.
+    def _base_windows(profile: str) -> List[Tuple[str, str, str]]:
+        if profile == "weekend":
+            return [
+                ("AM15", "09:00", "09:15"),
+                ("AM0930", "09:00", "09:30"),
+                ("AM0945", "09:00", "09:45"),
+                ("AM1015", "09:00", "10:15"),
+                ("AM1030", "09:00", "10:30"),
+            ]
+        return [
+            ("AM15", "09:00", "09:15"),
+            ("AM0930", "09:00", "09:30"),
+            ("AM0945", "09:00", "09:45"),
+            ("AM1000", "09:00", "10:00"),
+            ("AM1015", "09:00", "10:15"),
+            ("AM1030", "09:00", "10:30"),
+            ("PM1", "12:30", "13:30"),
+        ]
+
+    plans: List[Tuple[str, str, str, str]] = []
+    for base in _base_windows(plan_profile):
+        label, start, end = base
+        plans.append((label, start, end, "j-only"))
+        plans.append((label, start, end, "j-cross"))
+
     rd_windows: List[Tuple[str, str, str, str]] = [
         ("MID1030", "10:30", "11:00", "j-cross"),
         ("PM1230", "12:30", "13:00", "j-cross"),
@@ -548,6 +567,9 @@ def _main_impl() -> None:
     total_plans = len(plans)
     plan_counts: Dict[str, int] = {f"{label}_{sig}": 0 for label, _, __, sig in plans}
     plan_order: List[str] = []
+
+    bt_env = os.environ.copy()
+    bt_env["BT30_PARAM_PROFILE"] = plan_profile
 
     write_status(
         state="running",
@@ -646,8 +668,6 @@ def _main_impl() -> None:
             completed_plans=0,
         )
         base_codes = load_codes_from_excel(Path(args.excel), args.excel_ticker_sheet)
-
-    repo_root = Path(__file__).resolve().parent.parent
 
     if not args.disable_minute_cache:
         minute_codes = set(base_codes)
@@ -761,7 +781,7 @@ def _main_impl() -> None:
         ]
         if args.enable_asha:
             coarse_cmd.append("--enable-asha")
-        if args.mask_ineffective and not is_weekend:
+        if args.mask_ineffective:
             coarse_cmd.extend(
                 [
                     "--mask-ineffective",
@@ -777,7 +797,7 @@ def _main_impl() -> None:
             coarse_cmd.extend(["--codes-file", str(codes_file_for_runs)])
         if args.excel_summary:
             coarse_cmd.append("--excel-summary")
-        run(coarse_cmd, cwd=repo_root)
+        run(coarse_cmd, cwd=repo_root, env=bt_env)
 
         codes_file = out_coarse / "_TOP_CANDIDATES.csv"
         if not codes_file.exists() or codes_file.stat().st_size == 0:
@@ -890,7 +910,7 @@ def _main_impl() -> None:
             refine_cmd.append("--excel-summary")
         if args.refine_quick_grid:
             refine_cmd.extend(["--quick-grid", "--optimize-io"])
-        run(refine_cmd, cwd=repo_root)
+        run(refine_cmd, cwd=repo_root, env=bt_env)
 
         candidates_found = 0
         candidate_path = next(cand_dir.glob(f"candidates_{date_tag}.csv"), None)

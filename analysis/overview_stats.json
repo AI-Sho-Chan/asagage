@@ -1,0 +1,60 @@
+{
+  "overall_side": {
+    "BUY": {
+      "count": 408,
+      "mean": 29.38136081489668,
+      "std": 42.615671064467435,
+      "median": 35.65340713492148,
+      "win_rate": 0.8995098039215687,
+      "se_mean": 2.109790099839229,
+      "ci95_low": 25.246172219211793,
+      "ci95_high": 33.51654941058157
+    },
+    "SELL": {
+      "count": 645,
+      "mean": 24.61016915103449,
+      "std": 59.59693039661521,
+      "median": 41.02797689615283,
+      "win_rate": 0.7813953488372093,
+      "se_mean": 2.3466268427400667,
+      "ci95_low": 20.010780539263962,
+      "ci95_high": 29.20955776280502
+    }
+  },
+  "diff_stats": {
+    "mean_diff_sell_minus_buy": -4.77119166386219,
+    "z_score": -1.511971473961767,
+    "p_value_approx": 0.1305411196060692
+  },
+  "nky_day_trend_counts": {
+    "down": 567,
+    "up": 486
+  },
+  "nky_window_trend_counts": {
+    "up": 493,
+    "down": 323,
+    "flat": 237
+  },
+  "batch_counts": [
+    {
+      "batch_kind": "nightly",
+      "side": "BUY",
+      "count": 128
+    },
+    {
+      "batch_kind": "nightly",
+      "side": "SELL",
+      "count": 143
+    },
+    {
+      "batch_kind": "weekly",
+      "side": "BUY",
+      "count": 280
+    },
+    {
+      "batch_kind": "weekly",
+      "side": "SELL",
+      "count": 502
+    }
+  ]
+}

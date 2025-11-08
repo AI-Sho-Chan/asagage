@@ -1,0 +1,12 @@
+[2025-11-06 14:04:08] Run started
+[2025-11-06 14:04:08] Run type resolved to weekend
+[2025-11-06 14:04:08] Codes limited via temp_single_codes.csv: 1 tickers (was 20)
+[2025-11-06 14:04:09] Fetching Yahoo Finance 1m bars for 1 tickers (lookback=40, chunk=5)
+[2025-11-06 14:04:26] Entry window marks set: 1482 rows flagged out of 8372
+[2025-11-06 14:04:26] Liquidity filter q=0.60 kept 1 tickers and 8372 rows
+[2025-11-06 14:04:26] Using 3 rolling slices (train=8, forward=4)
+[2025-11-06 14:04:26] Parameter grid size: 9072 (mode=refine, signal=j-cross)
+[2025-11-06 14:29:06] [1/1] 8035.T: best train_pf_eff=5.536, forward_pf_eff=999.000, trades=47/21
+[2025-11-06 14:29:06] Cache reuse: 0/9072 combos (0.0%) served from cache
+[2025-11-06 14:29:06] Refine candidates exported to output\excel\candidates_20251106.csv
+[2025-11-06 14:29:06] Run completed in 25.0 minutes

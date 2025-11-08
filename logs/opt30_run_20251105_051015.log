@@ -1,0 +1,9 @@
+[2025-11-05 05:10:15] Run started
+[2025-11-05 05:10:15] Run type resolved to weekday
+[2025-11-05 05:10:16] Codes limited via output\bt30\NIGHTLY_20251104\RUN_coarse_AM1000_j-only\_TOP_CANDIDATES.csv: 1 tickers (was 20)
+[2025-11-05 05:10:16] Fetching Yahoo Finance 1m bars for 1 tickers (lookback=60, chunk=5)
+[2025-11-05 05:10:42] Fetching Yahoo Finance 1m bars for 1 tickers (lookback=60, chunk=5)
+[2025-11-05 05:11:04] Entry window marks set: 2120 rows flagged out of 12150
+[2025-11-05 05:11:04] Liquidity filter q=0.50 kept 1 tickers and 12150 rows
+[2025-11-05 05:11:04] Using 5 rolling slices (train=12, forward=4)
+[2025-11-05 05:11:04] Parameter grid size: 9072 (mode=refine, signal=j-only)

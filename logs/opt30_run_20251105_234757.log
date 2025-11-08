@@ -1,0 +1,32 @@
+[2025-11-05 23:47:57] Run started
+[2025-11-05 23:47:57] Run type resolved to weekend
+[2025-11-05 23:48:03] Fetching Yahoo Finance 1m bars for 20 tickers (lookback=60, chunk=5)
+[2025-11-05 23:48:34] Fetching Yahoo Finance 1m bars for 1 tickers (lookback=60, chunk=5)
+[2025-11-05 23:49:01] Entry window marks set: 27844 rows flagged out of 216205
+[2025-11-05 23:49:01] Liquidity filter q=0.50 kept 20 tickers and 112618 rows
+[2025-11-05 23:49:01] Using 5 rolling slices (train=12, forward=4)
+[2025-11-05 23:49:01] Parameter grid size: 240 (mode=coarse, signal=j-cross)
+[2025-11-05 23:49:31] [1/20] 1579.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-05 23:49:58] [2/20] 5706.T: best train_pf_eff=1.617, forward_pf_eff=1.617, trades=8/4
+[2025-11-05 23:50:01] [3/20] 1357.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=13/7
+[2025-11-05 23:50:25] [4/20] 285A.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=9/10
+[2025-11-05 23:50:43] [5/20] 6740.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-05 23:51:26] [6/20] 5801.T: best train_pf_eff=8.918, forward_pf_eff=1.352, trades=17/9
+[2025-11-05 23:51:30] [7/20] 5016.T: best train_pf_eff=0.758, forward_pf_eff=4.661, trades=72/17
+[2025-11-05 23:51:37] [8/20] 6525.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=21/7
+[2025-11-05 23:52:05] [9/20] 7269.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-05 23:52:17] [10/20] 7014.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-05 23:52:40] [11/20] 7735.T: best train_pf_eff=3.120, forward_pf_eff=3.120, trades=5/5
+[2025-11-05 23:52:41] [12/20] 6526.T: best train_pf_eff=3.312, forward_pf_eff=4.653, trades=50/16
+[2025-11-05 23:53:02] [13/20] 8053.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-05 23:53:03] [14/20] 6857.T: best train_pf_eff=1.127, forward_pf_eff=3.575, trades=38/20
+[2025-11-05 23:53:06] [15/20] 7012.T: best train_pf_eff=0.597, forward_pf_eff=999.000, trades=24/5
+[2025-11-05 23:53:17] [16/20] 8105.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-05 23:53:41] [17/20] 9432.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-05 23:54:13] [18/20] 8035.T: best train_pf_eff=1.500, forward_pf_eff=3.323, trades=34/13
+[2025-11-05 23:54:28] [19/20] 8136.T: best train_pf_eff=0.757, forward_pf_eff=6.847, trades=65/14
+[2025-11-05 23:54:30] [20/20] 8411.T: best train_pf_eff=2.067, forward_pf_eff=43.527, trades=42/11
+[2025-11-05 23:54:30] Cache reuse: 400/1600 combos (25.0%) served from cache
+[2025-11-05 23:54:30] ASHA pruned 3200 parameter combos prior to full evaluation
+[2025-11-05 23:54:30] Excel summary written to C:\AI\asagake\output\bt30\WEEKLY_\NIGHTLY_20251105\RUN_coarse_AM0945_j-cross\summary_20251105_235430.xlsx
+[2025-11-05 23:54:30] Run completed in 6.5 minutes

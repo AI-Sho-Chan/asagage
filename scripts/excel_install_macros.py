@@ -1,5 +1,7 @@
-﻿import sys
+import sys
 from pathlib import Path
+
+IMPORTABLE_EXTS = {".bas", ".cls", ".frm"}
 
 
 def main():
@@ -20,7 +22,7 @@ def main():
     if not wb_path.exists():
         print("Workbook not found:", wb_path)
         sys.exit(3)
-    module_paths = [Path(p) for p in sys.argv[2:]]
+    module_paths = [Path(p).resolve() for p in sys.argv[2:]]
     for mod in module_paths:
         if not mod.exists():
             print("Module file not found:", mod)
@@ -65,11 +67,17 @@ def normalize_module_text(text: str) -> str:
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     if text.startswith("\ufeff"):
         text = text[1:]
-    lines = text.split("\n")
-    if lines and lines[0].strip().lower().startswith("attribute vb_name"):
-        lines = lines[1:]
-    # Ensure trailing newline so AddFromString ends cleanly
-    return "\r\n".join(lines).rstrip() + "\r\n"
+    cleaned: list[str] = []
+    for line in text.split("\n"):
+        stripped = line.strip().lower()
+        if stripped.startswith("version ") or stripped in {"begin", "end"}:
+            continue
+        if stripped.startswith("attribute vb_"):
+            continue
+        cleaned.append(line)
+    if not cleaned:
+        cleaned = [""]
+    return "\r\n".join(cleaned).rstrip() + "\r\n"
 
 
 def extract_module_name(text: str, default: str) -> str:
@@ -86,14 +94,19 @@ def extract_module_name(text: str, default: str) -> str:
 def install_module(vbproj, module_path: Path) -> None:
     raw_text = module_path.read_text(encoding="utf-8")
     module_name = extract_module_name(raw_text, module_path.stem)
+    ext = module_path.suffix.lower()
+    if ext in IMPORTABLE_EXTS:
+        remove_module(vbproj, module_name)
+        vbcomp = vbproj.VBComponents.Import(str(module_path))
+        try:
+            vbcomp.Name = module_name
+        except Exception:
+            pass
+        return
+
     code = normalize_module_text(raw_text)
     remove_module(vbproj, module_name)
-    ext = module_path.suffix.lower()
-    if ext == ".cls":
-        comp_type = 2  # vbext_ct_ClassModule
-    else:
-        comp_type = 1  # standard module
-    vbcomp = vbproj.VBComponents.Add(comp_type)
+    vbcomp = vbproj.VBComponents.Add(1)  # standard module fallback
     vbcomp.Name = module_name
     vbcomp.CodeModule.AddFromString(code)
 

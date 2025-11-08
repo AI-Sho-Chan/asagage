@@ -1,0 +1,12 @@
+[2025-11-03 10:55:19] Run started
+[2025-11-03 10:55:19] Run type resolved to weekend
+[2025-11-03 10:55:19] Codes limited via C:\AI\asagake\output\bt30\TIMEPLAN_TEST_20251102\A_10_WINDOWS\RUN_coarse_AM1015_j-cross\_TOP_CANDIDATES_TOP20_codes.csv: 1 tickers (was 20)
+[2025-11-03 10:55:19] Entry window marks set: 2752 rows flagged out of 12432
+[2025-11-03 10:55:19] Liquidity filter q=0.50 kept 1 tickers and 12432 rows
+[2025-11-03 10:55:19] Using 1 rolling slices (train=12, forward=20)
+[2025-11-03 10:55:19] Parameter grid size: 24 (mode=refine, signal=j-cross)
+[2025-11-03 10:55:23] [1/1] 4506.T: best train_pf_eff=0.709, forward_pf_eff=2.125, trades=21/32
+[2025-11-03 10:55:23] Bayesian refine trials executed: 9
+[2025-11-03 10:55:23] Refine candidates exported to output\excel\candidates_20251103.csv
+[2025-11-03 10:55:23] Excel summary written to C:\AI\asagake\output\bt30\TIMEPLAN_TEST_20251102\A_10_WINDOWS\RUN_refine_AM1015_j-cross\summary_20251103_105523.xlsx
+[2025-11-03 10:55:23] Run completed in 0.1 minutes

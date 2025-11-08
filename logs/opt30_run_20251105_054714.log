@@ -1,0 +1,16 @@
+[2025-11-05 05:47:14] Run started
+[2025-11-05 05:47:14] Run type resolved to weekday
+[2025-11-05 05:47:15] Codes limited via output\bt30\NIGHTLY_20251105\RUN_coarse_AM1000_j-cross\_TOP_CANDIDATES.csv: 2 tickers (was 20)
+[2025-11-05 05:47:15] Fetching Yahoo Finance 1m bars for 2 tickers (lookback=60, chunk=5)
+[2025-11-05 05:47:40] Fetching Yahoo Finance 1m bars for 1 tickers (lookback=60, chunk=5)
+[2025-11-05 05:48:05] Entry window marks set: 4238 rows flagged out of 24203
+[2025-11-05 05:48:05] Liquidity filter q=0.50 kept 2 tickers and 12063 rows
+[2025-11-05 05:48:05] Using 5 rolling slices (train=12, forward=4)
+[2025-11-05 05:48:05] Parameter grid size: 24 (mode=refine, signal=j-cross)
+[2025-11-05 05:48:14] [1/2] 8035.T: best train_pf_eff=1.187, forward_pf_eff=0.000, trades=24/0
+[2025-11-05 05:48:18] [2/2] 6857.T: best train_pf_eff=1.539, forward_pf_eff=2.378, trades=49/23
+[2025-11-05 05:48:18] Cache reuse: 0/80 combos (0.0%) served from cache
+[2025-11-05 05:48:18] Bayesian refine trials executed: 32
+[2025-11-05 05:48:18] Refine candidates exported to output\excel\NIGHTLY_20251105\AM1000_j-cross\candidates_20251105.csv
+[2025-11-05 05:48:18] Excel summary written to output\bt30\NIGHTLY_20251105\RUN_refine_AM1000_j-cross\summary_20251105_054818.xlsx
+[2025-11-05 05:48:18] Run completed in 1.1 minutes

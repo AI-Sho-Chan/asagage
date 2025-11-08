@@ -1284,19 +1284,45 @@ def assemble_record(
     return normalize_record(record)
 
 
-def build_param_grid(mode: str, signal_mode: str) -> Dict[str, List[float]]:
-    # Coarse: ASHAで枝刈りする前提の軽量グリッド（ユーザー合意版）
-    if mode == "coarse":
-        grid = {
+def build_param_grid(mode: str, signal_mode: str, run_type: str | None) -> Dict[str, List[float]]:
+    profile = os.environ.get("BT30_PARAM_PROFILE") or run_type or "weekday"
+    profile = profile.lower()
+    weekend_j = [0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0]
+    weekday_j = [0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]
+
+    if profile == "weekend":
+        coarse_defaults = {
+            "ATR_n": [2, 3],
+            "TPk": [1.0, 1.5, 2.0, 3.0],
+            "SLk": [1.0, 1.5, 2.0],
+            "J_th": weekend_j,
+            "TMAX": [0],
+        }
+        refine_defaults = {
+            "ATR_n": [2, 3],
+            "TPk": [1.0, 1.25, 1.5, 2.0, 2.5, 3.0],
+            "SLk": [0.8, 1.0, 1.2, 1.5, 2.0],
+            "J_th": weekend_j,
+            "TMAX": [0],
+        }
+    elif profile == "weekday":
+        coarse_defaults = {
+            "ATR_n": [2],
+            "TPk": [1.5, 2.0],
+            "SLk": [1.0, 1.5],
+            "J_th": weekday_j,
+            "TMAX": [0],
+        }
+        refine_defaults = coarse_defaults
+    else:
+        coarse_defaults = {
             "ATR_n": [1, 3, 5, 10],
             "TPk": [1.2, 1.5, 2.0],
             "SLk": [1.0, 1.5, 2.0, 3.0],
             "J_th": [0.6, 0.8, 1.0, 1.5, 2.0, 2.5],
             "TMAX": [0],
         }
-    # Refine: ベイズ探索ON時は連続値で近傍探索（アンカーは統計レポート用に保持）
-    else:
-        grid = {
+        refine_defaults = {
             "ATR_n": [1, 2, 3, 5, 8, 10, 20],
             "TPk": [1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0],
             "SLk": [0.8, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0],
@@ -1308,13 +1334,15 @@ def build_param_grid(mode: str, signal_mode: str) -> Dict[str, List[float]]:
             "TMAX": [0],
         }
 
-    # dJ_th / vEMA_th は現行ロジックで未使用のため、非 full モードでは探索から除外（固定0.0）。
-    # 下流互換のため full 以外でもキーが必要なコードパスがある場合は 0.0 固定で残す。
+    if mode == "coarse":
+        grid = coarse_defaults
+    else:
+        grid = refine_defaults
+
     if signal_mode == "full":
         grid.setdefault("dJ_th", [0.0])
         grid.setdefault("vEMA_th", [0.0])
     else:
-        # 非 full では完全に探索対象から外す（必要なら fallback 側で 0.0 を使用）
         if "dJ_th" in grid:
             del grid["dJ_th"]
         if "vEMA_th" in grid:
@@ -2010,7 +2038,7 @@ def main() -> None:
         raise RuntimeError("Unable to construct train/forward slices with current day counts")
     logger.log(f"Using {len(slices)} rolling slices (train={args.train_days}, forward={args.forward_days})")
 
-    param_spec = build_param_grid(args.mode, args.signal_mode)
+    param_spec = build_param_grid(args.mode, args.signal_mode, args.run_type)
     param_grid = list(iter_param_dicts(param_spec))
     logger.log(f"Parameter grid size: {len(param_grid)} (mode={args.mode}, signal={args.signal_mode})")
     masked_j_values: Set[float] = set()

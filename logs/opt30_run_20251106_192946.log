@@ -1,0 +1,23 @@
+[2025-11-06 19:29:46] Run started
+[2025-11-06 19:29:46] Run type resolved to weekday
+[2025-11-06 19:29:48] Low-priority gating removed 11 tickers (remaining 9)
+[2025-11-06 19:29:57] Fetching Yahoo Finance 1m bars for 9 tickers (lookback=60, chunk=5)
+[2025-11-06 19:30:27] Fetching Yahoo Finance 1m bars for 1 tickers (lookback=60, chunk=5)
+[2025-11-06 19:30:54] Entry window marks set: 13221 rows flagged out of 103691
+[2025-11-06 19:30:55] Liquidity filter q=0.50 kept 9 tickers and 57958 rows
+[2025-11-06 19:30:55] Using 5 rolling slices (train=12, forward=4)
+[2025-11-06 19:30:55] Parameter grid size: 240 (mode=coarse, signal=j-only)
+[2025-11-06 19:30:55] Ineffective-band mask removed 48 combos for J_th values [0.3, 0.4, 0.6, 0.7, 1.0]
+[2025-11-06 19:31:20] [1/9] 1357.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-06 19:32:21] [2/9] 285A.T: best train_pf_eff=4.050, forward_pf_eff=4.048, trades=14/14
+[2025-11-06 19:32:32] [3/9] 6525.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-06 19:33:16] [4/9] 5801.T: best train_pf_eff=0.667, forward_pf_eff=4.863, trades=16/8
+[2025-11-06 19:33:39] [5/9] 5016.T: best train_pf_eff=9.116, forward_pf_eff=999.000, trades=90/19
+[2025-11-06 19:35:18] [6/9] 6526.T: best train_pf_eff=0.296, forward_pf_eff=5.900, trades=49/24
+[2025-11-06 19:35:21] [7/9] 8411.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=75/25
+[2025-11-06 19:36:02] [8/9] 6857.T: best train_pf_eff=0.604, forward_pf_eff=1.092, trades=272/125
+[2025-11-06 19:36:18] [9/9] 8035.T: best train_pf_eff=11.275, forward_pf_eff=999.000, trades=64/17
+[2025-11-06 19:36:18] Cache reuse: 64/576 combos (11.1%) served from cache
+[2025-11-06 19:36:18] ASHA pruned 1152 parameter combos prior to full evaluation
+[2025-11-06 19:36:20] Excel summary written to output\bt30\NIGHTLY_20251106\RUN_coarse_AM0945_j-only\summary_20251106_193619.xlsx
+[2025-11-06 19:36:20] Run completed in 6.6 minutes

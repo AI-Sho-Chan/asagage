@@ -1,0 +1,15 @@
+[2025-11-04 23:24:03] Run started
+[2025-11-04 23:24:03] Run type resolved to weekday
+[2025-11-04 23:24:03] Low-priority gating removed 14 tickers (remaining 6)
+[2025-11-04 23:24:05] Fetching Yahoo Finance 1m bars for 1 tickers (lookback=60, chunk=5)
+[2025-11-04 23:24:28] Entry window marks set: 11929 rows flagged out of 68326
+[2025-11-04 23:24:28] Liquidity filter q=0.60 kept 3 tickers and 31957 rows
+[2025-11-04 23:24:28] Using 5 rolling slices (train=12, forward=4)
+[2025-11-04 23:24:28] Parameter grid size: 240 (mode=coarse, signal=j-only)
+[2025-11-04 23:26:33] [1/3] 5801.T: best train_pf_eff=0.573, forward_pf_eff=1.095, trades=21/24
+[2025-11-04 23:27:15] [2/3] 8035.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=70/30
+[2025-11-04 23:27:27] [3/3] 6857.T: best train_pf_eff=0.906, forward_pf_eff=1.089, trades=418/180
+[2025-11-04 23:27:27] Cache reuse: 0/240 combos (0.0%) served from cache
+[2025-11-04 23:27:27] ASHA pruned 480 parameter combos prior to full evaluation
+[2025-11-04 23:27:27] Excel summary written to output\bt30\NIGHTLY_20251104\RUN_coarse_AM1000_j-only\summary_20251104_232727.xlsx
+[2025-11-04 23:27:27] Run completed in 3.4 minutes

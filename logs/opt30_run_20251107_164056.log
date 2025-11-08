@@ -1,0 +1,6 @@
+[2025-11-07 16:40:56] Run started
+[2025-11-07 16:40:56] Run type resolved to weekend
+[2025-11-07 16:41:10] Entry window marks set: 18347 rows flagged out of 222707
+[2025-11-07 16:41:11] Liquidity filter q=0.50 kept 15 tickers and 116050 rows
+[2025-11-07 16:41:11] Using 5 rolling slices (train=12, forward=4)
+[2025-11-07 16:41:11] Parameter grid size: 288 (mode=coarse, signal=j-only)
