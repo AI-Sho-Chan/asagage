@@ -1,4 +1,4 @@
-param(
+﻿param(
   [int]$Jobs = 8,
   [int]$BayesTrialsWeekend = 36,
   [int]$BayesTrialsNightly = 24
@@ -45,7 +45,7 @@ function Run-Nightly() {
   Write-SeqLog 'Starting NIGHTLY batch (weekday mode)'
   $args = @(
     'scripts/nightly_build_candidates.py',
-    '--excel','SHINSOKU.xlsm','--excel-summary',
+    '--excel','ASAGAKE.xlsm','--excel-summary',
     '--jobs',"$Jobs",'--universe-mode','yahoo-top','--universe-size','150',
     '--run-type','weekday','--plan-profile','weekday',
     '--enable-asha','--enable-bayes','--bayes-trials',"$BayesTrialsNightly",'--bayes-timeout','300',

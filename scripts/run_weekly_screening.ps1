@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$DateTag = (Get-Date -Format 'yyyyMMdd'),
   [int]$TopUniverse = 200,
   [int]$TargetTop = 50
@@ -44,7 +44,7 @@ try {
 
 $args = @(
     'scripts/nightly_build_candidates.py',
-    '--excel','SHINSOKU.xlsm',
+    '--excel','ASAGAKE.xlsm',
     '--base-out',$OutRoot,
     '--run-type','weekend','--plan-profile','weekend',
     '--target-date',$resolvedTag,
@@ -74,7 +74,7 @@ $args = @(
     $written = [System.IO.Path]::GetFullPath($aggJson.written)
     $latest = Join-Path $Repo 'output/excel/weekly_candidates_latest.csv'
     Copy-Item $written $latest -Force
-    # 週末結果を直ちに翌営業日候補に反映
+    # 騾ｱ譛ｫ邨先棡繧堤峩縺｡縺ｫ鄙悟霧讌ｭ譌･蛟呵｣懊↓蜿肴丐
     Copy-Item $written (Join-Path $Repo 'output/excel/candidates_nextday.csv') -Force
     Write-Status 'aggregate' "weekly candidates: $($aggJson.rows) rows -> $written"
   }
@@ -82,7 +82,7 @@ $args = @(
   $coeffArgs = @(
     'tools/compute_dashboard_coeffs.py',
     '--codes-file',$weeklyOut,
-    '--history-days','90',
+    '--history-days','8',
     '--save-dated'
   )
   & $Python $coeffArgs

@@ -13,7 +13,7 @@ from yahooquery import Ticker
 
 STATUS_PATH = Path("logs/nightly_status.txt")
 STATUS_DATA: Dict[str, str] = {}
-DEFAULT_WORKBOOK_PATH = Path("C:/AI/asagake/SHINSOKU.xlsm")
+DEFAULT_WORKBOOK_PATH = Path("C:/AI/asagake/ASAGAKE.xlsm")
 START_ROW = 6
 FORMULA_COLS = (8, 9, 10, 11, 14, 15, 16, 17, 18, 19, 20)
 
@@ -412,7 +412,7 @@ def build_yahoo_universe(
 
 def _main_impl() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--excel", default="SHINSOKU.xlsm")
+    ap.add_argument("--excel", default="ASAGAKE.xlsm")
     ap.add_argument("--base-out", default="output/bt30")
     ap.add_argument("--lookback", type=int, default=60)
     ap.add_argument("--chunk-days", type=int, default=5)
