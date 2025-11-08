@@ -13,7 +13,7 @@ from yahooquery import Ticker
 
 STATUS_PATH = Path("logs/nightly_status.txt")
 STATUS_DATA: Dict[str, str] = {}
-WORKBOOK_PATH = Path("C:/AI/asagake/SHINSOKU.xlsm")
+DEFAULT_WORKBOOK_PATH = Path("C:/AI/asagake/SHINSOKU.xlsm")
 START_ROW = 6
 FORMULA_COLS = (8, 9, 10, 11, 14, 15, 16, 17, 18, 19, 20)
 
@@ -239,7 +239,7 @@ def enrich_dashboard_columns(csv_path: Path, coeff_path: Path) -> None:
     df.to_csv(csv_path, index=False, encoding="utf-8-sig")
 
 
-def ensure_dashboard_formulas(repo_root: Path) -> None:
+def ensure_dashboard_formulas(repo_root: Path, workbook_path: Path) -> None:
     """Restore formulas via COM and verify key RSS columns.
 
     Note: We prefer restore_dashboard_formulas.py as it reapplies the canonical
@@ -269,7 +269,7 @@ def ensure_dashboard_formulas(repo_root: Path) -> None:
     excel.Visible = False
     excel.DisplayAlerts = False
     try:
-        wb = excel.Workbooks.Open(str(WORKBOOK_PATH))
+        wb = excel.Workbooks.Open(str(workbook_path))
         try:
             ws = wb.Worksheets("NewDashboard")
         except Exception:
@@ -310,6 +310,58 @@ def ensure_dashboard_formulas(repo_root: Path) -> None:
         except Exception:
             pass
         excel.Quit()
+
+
+def apply_trend_preferences(csv_path: Path, pref_path: Path, bp_threshold: float) -> None:
+    if not csv_path.exists():
+        return
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return
+    if df.empty:
+        return
+
+    if "Ticker" in df.columns:
+        ticker_key = df["Ticker"].astype(str).str.strip().str.upper()
+    elif "code" in df.columns:
+        ticker_key = df["code"].astype(str).str.strip().str.upper()
+    else:
+        ticker_key = pd.Series([""] * len(df))
+
+    if "trend_driver" in df.columns:
+        df["trend_driver"] = df["trend_driver"].fillna("NKY")
+    else:
+        df["trend_driver"] = "NKY"
+    if "trend_window" in df.columns:
+        df["trend_window"] = df["trend_window"].fillna("window")
+    else:
+        df["trend_window"] = "window"
+    df["trend_bp_th"] = float(bp_threshold)
+    if "trend_allowed_policy" in df.columns:
+        df["trend_allowed_policy"] = df["trend_allowed_policy"].fillna("ALIGNED_ONLY")
+    else:
+        df["trend_allowed_policy"] = "ALIGNED_ONLY"
+
+    if pref_path.exists():
+        try:
+            pref = pd.read_csv(pref_path)
+        except Exception:
+            pref = pd.DataFrame()
+        if not pref.empty and {"code", "driver", "trend_type"}.issubset(pref.columns):
+            pref = pref.copy()
+            pref["key"] = pref["code"].astype(str).str.strip().str.upper()
+            pref = pref.dropna(subset=["key"])
+            pref = pref.set_index("key")
+            if "driver" in pref.columns:
+                df["trend_driver"] = ticker_key.map(pref["driver"]).fillna(df["trend_driver"])
+            if "trend_type" in pref.columns:
+                df["trend_window"] = ticker_key.map(pref["trend_type"]).fillna(df["trend_window"])
+
+    try:
+        df.to_csv(csv_path, index=False, encoding="utf-8-sig")
+    except Exception:
+        pass
 
 
 def format_plan_counts(plan_counts: Dict[str, int]) -> str:
@@ -417,6 +469,8 @@ def _main_impl() -> None:
     ap.add_argument("--bayes-timeout", type=int, default=0, help="Bayesian timeout seconds (0=disabled)")
     ap.add_argument("--coeff-history-days", type=int, default=60, help="Trading days used for dashboard coefficient regression")
     ap.add_argument("--disable-dashboard-coeffs", action="store_true", help="Skip coefficient refresh/merge")
+    ap.add_argument("--trend-pref", default="analysis/trend_ticker_preference.csv", help="Ticker→trend driver mapping CSV")
+    ap.add_argument("--trend-bp-th", type=float, default=15.0, help="bp threshold for trend alignment policies")
     ap.add_argument("--mask-ineffective", action="store_true", help="Enable ineffective-band masking during coarse runs")
     ap.add_argument("--mask-window", type=int, default=20, help="Mask history window (runs)")
     ap.add_argument("--mask-threshold", type=float, default=1.05, help="Forward pf_eff threshold for mask retention")
@@ -443,6 +497,12 @@ def _main_impl() -> None:
         help="Run only the R&D windows (skip standard plans)",
     )
     args = ap.parse_args()
+
+    excel_path = Path(args.excel)
+    if not excel_path.is_absolute():
+        excel_path = (repo_root / excel_path).resolve()
+    else:
+        excel_path = excel_path.resolve()
 
     if args.target_date:
         try:
@@ -921,8 +981,21 @@ def _main_impl() -> None:
         except SystemExit:
             pass
     enrich_dashboard_columns(out_all, coeff_latest)
+    apply_trend_preferences(out_all, (repo_root / args.trend_pref).resolve(), args.trend_bp_th)
 
-    ensure_dashboard_formulas(repo_root)
+    ensure_dashboard_formulas(repo_root, excel_path)
+    try:
+        run(
+            [
+                sys.executable,
+                "scripts/run_macros_on_copy.py",
+                "--excel",
+                str(excel_path),
+            ],
+            cwd=repo_root,
+        )
+    except SystemExit:
+        pass
 
     write_status(
         state="success",

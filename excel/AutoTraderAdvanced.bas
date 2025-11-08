@@ -39,6 +39,8 @@ Private gNkyTrendWindow As String
 Private gNkyAllowedSide As String
 Private gStrategyRules As Object
 Private gLastOrderAllowedSide As String
+Private gJStats As Object
+Private Const J_STATS_PATH As String = "state\j_stats.csv"
 
 
 Private Function HeaderTickerJP() As String: HeaderTickerJP = "Ticker": End Function
@@ -150,6 +152,82 @@ Private Sub ClearRowDynamicCells(ByVal ws As Worksheet, ByVal rowIndex As Long, 
         End If
     Next i
 End Sub
+
+Private Sub EnsureJStatsLoaded()
+    On Error GoTo FailLoad
+    If Not gJStats Is Nothing Then Exit Sub
+    Dim statsPath As String
+    statsPath = ThisWorkbook.Path & Application.PathSeparator & J_STATS_PATH
+    Dim fso As Object
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If Not fso.FileExists(statsPath) Then Exit Sub
+    Dim f As Integer
+    f = FreeFile()
+    Open statsPath For Input As #f
+    Set gJStats = CreateObject("Scripting.Dictionary")
+    Dim line As String
+    Dim firstLine As Boolean: firstLine = True
+    Do While Not EOF(f)
+        Line Input #f, line
+        If firstLine Then
+            firstLine = False
+        Else
+            Dim parts As Variant
+            parts = Split(line, ",")
+            If UBound(parts) >= 4 Then
+                Dim code As String: code = Trim$(UCase$(CStr(parts(0))))
+                Dim sess As String: sess = Trim$(UCase$(CStr(parts(1))))
+                If Len(code) > 0 And Len(sess) > 0 Then
+                    Dim key As String: key = code & "|" & sess
+                    Dim info(2) As Double
+                    info(0) = ToDouble(parts(3), 0#)
+                    info(1) = ToDouble(parts(4), 0#)
+                    info(2) = ToDouble(parts(2), 0#)
+                    gJStats(key) = info
+                End If
+            End If
+        End If
+    Loop
+    Close #f
+    Exit Sub
+FailLoad:
+    On Error Resume Next
+    Close #f
+    Set gJStats = Nothing
+End Sub
+
+Private Function GetJStatsKey(ByVal ticker As String, ByVal session As String) As String
+    GetJStatsKey = UCase$(Trim$(ticker)) & "|" & UCase$(Trim$(session))
+End Function
+
+Private Function ShouldBlockByBollinger(ByVal ticker As String, ByVal session As String, ByVal trendWindow As String, ByVal ratioVal As Double) As Boolean
+    ShouldBlockByBollinger = False
+    If ratioVal <= 0# Then Exit Function
+    If Len(Trim$(ticker)) = 0 Or Len(Trim$(session)) = 0 Then Exit Function
+    EnsureJStatsLoaded
+    If gJStats Is Nothing Then Exit Function
+    Dim key As String
+    key = GetJStatsKey(ticker, session)
+    If Not gJStats.Exists(key) Then Exit Function
+    Dim stats As Variant
+    stats = gJStats(key)
+    Dim samples As Double: samples = stats(2)
+    Dim minSamples As Double: minSamples = GetStrategyRuleDouble("bb_min_samples", 12#)
+    If samples < minSamples Then Exit Function
+    Dim mu As Double: mu = stats(0)
+    Dim sigma As Double: sigma = stats(1)
+    If sigma <= 0# Then sigma = GetStrategyRuleDouble("bb_sigma_floor", 0.05)
+    Dim trendUpper As String: trendUpper = UCase$(Trim$(trendWindow))
+    Dim k As Double
+    If trendUpper = "FLAT" Or Len(trendUpper) = 0 Then
+        k = GetStrategyRuleDouble("bb_flat_k", 1#)
+    Else
+        k = GetStrategyRuleDouble("bb_trend_k", 1.3)
+    End If
+    Dim threshold As Double
+    threshold = mu + k * sigma
+    ShouldBlockByBollinger = (ratioVal < threshold)
+End Function
 
 Private Function ComputeVolFactor(ByVal gapAbsPct As Double, ByVal jAbs As Double, ByVal atrVal As Double) As Double
     Dim factor As Double
@@ -939,6 +1017,8 @@ Public Sub ApplyDynamicSignalsV2()
     EnsureParamFormulas ws
     EnsureDashboardWatcher
     UpdateNkyTrend ws
+    Set gJStats = Nothing
+    EnsureJStatsLoaded
 
     Dim lastRow As Long
     lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
@@ -974,6 +1054,7 @@ Public Sub ApplyDynamicSignalsV2()
     Dim selCol As Long: selCol = FindColumn(ws, DASH2_HEADER_ROW, "Selected")
     Dim batchKindCol As Long: batchKindCol = FindColumn(ws, DASH2_HEADER_ROW, "BatchKind")
     Dim volTagCol As Long: volTagCol = FindColumn(ws, DASH2_HEADER_ROW, "VolatilityTag")
+    Dim trendWindowCol As Long: trendWindowCol = FindColumn(ws, DASH2_HEADER_ROW, "trend_window")
 
     If tickerCol = 0 Or jCol = 0 Or jthCol = 0 Or jthBaseCol = 0 Then Exit Sub
 
@@ -1074,6 +1155,25 @@ Public Sub ApplyDynamicSignalsV2()
             End If
         End If
 
+        Dim ratioVal As Double
+        If adjJth <> 0# Then
+            ratioVal = Abs(jVal) / Abs(adjJth)
+        Else
+            ratioVal = 0#
+        End If
+        Dim tickerVal As String
+        If tickerCol > 0 Then tickerVal = Trim$(CStr(ws.Cells(r, tickerCol).Value))
+        Dim sessionVal As String
+        If colSession > 0 Then sessionVal = Trim$(CStr(ws.Cells(r, colSession).Value))
+        Dim trendWindowVal As String
+        If trendWindowCol > 0 Then
+            trendWindowVal = Trim$(CStr(ws.Cells(r, trendWindowCol).Value))
+        Else
+            trendWindowVal = gNkyTrendWindow
+        End If
+        Dim bbBlocked As Boolean
+        bbBlocked = ShouldBlockByBollinger(tickerVal, sessionVal, trendWindowVal, ratioVal)
+
         Dim blockReason As String: blockReason = ""
         Dim batchKindVal As String
         If batchKindCol > 0 Then batchKindVal = Trim$(CStr(ws.Cells(r, batchKindCol).Value))
@@ -1106,9 +1206,17 @@ Public Sub ApplyDynamicSignalsV2()
                 End If
             End If
         End If
+        If blockReason = "" And bbBlocked Then
+            blockReason = "BLOCKED_BB"
+        End If
         If blockReason <> "" Then
-            If selCol > 0 Then ws.Cells(r, selCol).Value = 0
             If entryStatusCol > 0 Then ws.Cells(r, entryStatusCol).Value = blockReason
+            Dim shouldDeselect As Boolean: shouldDeselect = True
+            If Left$(blockReason, 11) = "BLOCKED_NKY" Or blockReason = "BLOCKED_BB" Then
+                shouldDeselect = False
+            End If
+            If shouldDeselect And selCol > 0 Then ws.Cells(r, selCol).Value = 0
+            ClearRowDynamicCells ws, r, eBuyCol, eSellCol, tpEffCol, slEffCol, trailEffCol, qtyCol
             GoTo ContinueLoop
         Else
             If entryStatusCol > 0 Then
@@ -1676,6 +1784,10 @@ Public Sub ImportCandidatesV2()
     Dim colTpRow As Long: colTpRow = FindColumn(ws, DASH2_HEADER_ROW, "TP_per_J_row")
     Dim colSlRow As Long: colSlRow = FindColumn(ws, DASH2_HEADER_ROW, "SL_per_J_row")
     Dim colTrailRow As Long: colTrailRow = FindColumn(ws, DASH2_HEADER_ROW, "Trail_per_J_row")
+    Dim colTrendDriver As Long: colTrendDriver = FindColumn(ws, DASH2_HEADER_ROW, "trend_driver")
+    Dim colTrendWindow As Long: colTrendWindow = FindColumn(ws, DASH2_HEADER_ROW, "trend_window")
+    Dim colTrendBp As Long: colTrendBp = FindColumn(ws, DASH2_HEADER_ROW, "trend_bp_th")
+    Dim colTrendPolicy As Long: colTrendPolicy = FindColumn(ws, DASH2_HEADER_ROW, "trend_allowed_policy")
 
     Dim colTpk As Long: colTpk = FindColumn(ws, DASH2_HEADER_ROW, "TPk")
 
@@ -1697,12 +1809,14 @@ Public Sub ImportCandidatesV2()
     Dim idxAtr As Long, idxTpk As Long, idxSlk As Long, idxMode As Long, idxSession As Long, idxPlan As Long, idxBatchKind As Long
     Dim idxBiasSlope As Long, idxGapSlope As Long, idxCorrSlope As Long
     Dim idxTpRow As Long, idxSlRow As Long, idxTrailRow As Long
+    Dim idxTrendDriver As Long, idxTrendWindow As Long, idxTrendBp As Long, idxTrendPolicy As Long
 
     idxTicker = -1: idxJtb = -1: idxPf = -1: idxCi = -1: idxTrades = -1: idxExpBp = -1
 
     idxAtr = -1: idxTpk = -1: idxSlk = -1: idxMode = -1: idxSession = -1: idxPlan = -1: idxBatchKind = -1
     idxBiasSlope = -1: idxGapSlope = -1: idxCorrSlope = -1
     idxTpRow = -1: idxSlRow = -1: idxTrailRow = -1
+    idxTrendDriver = -1: idxTrendWindow = -1: idxTrendBp = -1: idxTrendPolicy = -1
 
     Dim hdr As Variant
     Do While Not EOF(f)
@@ -1758,6 +1872,10 @@ Public Sub ImportCandidatesV2()
                 If h = "tp_per_j" Or h = "tp_per_j_row" Then idxTpRow = i
                 If h = "sl_per_j" Or h = "sl_per_j_row" Then idxSlRow = i
                 If h = "trail_per_j" Or h = "trail_per_j_row" Then idxTrailRow = i
+                If h = "trend_driver" Then idxTrendDriver = i
+                If h = "trend_window" Then idxTrendWindow = i
+                If h = "trend_bp_th" Then idxTrendBp = i
+                If h = "trend_allowed_policy" Then idxTrendPolicy = i
 
             Next i
 
@@ -1840,6 +1958,18 @@ Public Sub ImportCandidatesV2()
                     If idxTrailRow >= 0 And idxTrailRow <= UBound(parts) And colTrailRow > 0 Then
                         ws.Cells(r, colTrailRow).Value = ToDouble(Trim$(parts(idxTrailRow)), 0#)
                     End If
+                    If idxTrendDriver >= 0 And idxTrendDriver <= UBound(parts) And colTrendDriver > 0 Then
+                        ws.Cells(r, colTrendDriver).Value = Trim$(parts(idxTrendDriver))
+                    End If
+                    If idxTrendWindow >= 0 And idxTrendWindow <= UBound(parts) And colTrendWindow > 0 Then
+                        ws.Cells(r, colTrendWindow).Value = Trim$(parts(idxTrendWindow))
+                    End If
+                    If idxTrendBp >= 0 And idxTrendBp <= UBound(parts) And colTrendBp > 0 Then
+                        ws.Cells(r, colTrendBp).Value = ToDouble(Trim$(parts(idxTrendBp)), 0#)
+                    End If
+                    If idxTrendPolicy >= 0 And idxTrendPolicy <= UBound(parts) And colTrendPolicy > 0 Then
+                        ws.Cells(r, colTrendPolicy).Value = Trim$(parts(idxTrendPolicy))
+                    End If
 
                     r = r + 1
 
@@ -1898,6 +2028,14 @@ Public Sub ImportCandidatesV2()
             If colSlRow > 0 Then ws.Cells(clearRow, colSlRow).ClearContents
 
             If colTrailRow > 0 Then ws.Cells(clearRow, colTrailRow).ClearContents
+
+            If colTrendDriver > 0 Then ws.Cells(clearRow, colTrendDriver).ClearContents
+
+            If colTrendWindow > 0 Then ws.Cells(clearRow, colTrendWindow).ClearContents
+
+            If colTrendBp > 0 Then ws.Cells(clearRow, colTrendBp).ClearContents
+
+            If colTrendPolicy > 0 Then ws.Cells(clearRow, colTrendPolicy).ClearContents
 
         Next clearRow
 

@@ -110,6 +110,10 @@ JP_MAP = {
     "NKY_allowed_side": ("NKY許容サイド", "BUY/SELL/BOTH を表示"),
     "J_ratio": ("J到達率", "|J| / |J_th|"),
     "VolatilityTag": ("ボラタグ", "当日ボラ状況メモ"),
+    "trend_driver": ("トレンドドライバ", "NKY / NKY_F / TOPIX のいずれか"),
+    "trend_window": ("トレンド窓", "day / window などの判定窓"),
+    "trend_bp_th": ("トレンド閾値(bp)", "方向フィルタのbp閾値"),
+    "trend_allowed_policy": ("トレンド許容ポリシー", "ALIGNED_ONLY / BOTH など"),
 }
 
 BUTTONS = [
@@ -139,6 +143,10 @@ def col_letter(col: int) -> str:
         col, rem = divmod(col - 1, 26)
         result = chr(65 + rem) + result
     return result
+
+
+def rgb(red: int, green: int, blue: int) -> int:
+    return red + (green << 8) + (blue << 16)
 
 
 def set_comment(cell, text: str) -> None:
@@ -188,6 +196,7 @@ def fill_formula(ws, col: int, formula: str) -> None:
 
 def build_dashboard(excel_path: Path) -> None:
     import win32com.client  # type: ignore
+    from win32com.client import constants  # type: ignore
 
     work_copy = excel_path.with_name(f"{excel_path.stem}_work_{datetime.now():%Y%m%d_%H%M%S}{excel_path.suffix}")
     shutil.copy2(excel_path, work_copy)
@@ -299,7 +308,14 @@ def build_dashboard(excel_path: Path) -> None:
             ws,
             COL_INDEX["J_th"],
             (
-                f'=IF(ABS(N({rc_relative(COL_INDEX["J_th"], COL_INDEX["Gap_bp"])}))/100>R2C7,"BAN",'
+                f'=IF(OR(ABS(N({rc_relative(COL_INDEX["J_th"], COL_INDEX["Gap_bp"])}))/100>R2C7,'
+                f'AND({rc_relative(COL_INDEX["J_th"], COL_INDEX["trend_allowed_policy"])}<>"",'
+                f'UPPER({rc_relative(COL_INDEX["J_th"], COL_INDEX["trend_allowed_policy"])})="ALIGNED_ONLY",'
+                f'{rc_relative(COL_INDEX["J_th"], COL_INDEX["EntrySide"])}<>"",'
+                f'{rc_relative(COL_INDEX["J_th"], COL_INDEX["NKY_allowed_side"])}<>"",'
+                f'UPPER({rc_relative(COL_INDEX["J_th"], COL_INDEX["NKY_allowed_side"])})<>"BOTH",'
+                f'UPPER({rc_relative(COL_INDEX["J_th"], COL_INDEX["NKY_allowed_side"])})<>UPPER({rc_relative(COL_INDEX["J_th"], COL_INDEX["EntrySide"])})'
+                f')), "BAN",'
                 f'{rc_relative(COL_INDEX["J_th"], COL_INDEX["J_th_base"])}+'
                 f'IF({rc_relative(COL_INDEX["J_th"], COL_INDEX["BiasSlope_row"])}="",R2C5,{rc_relative(COL_INDEX["J_th"], COL_INDEX["BiasSlope_row"])})*R2C4/100+'
                 f'IF({rc_relative(COL_INDEX["J_th"], COL_INDEX["GapSlope_row"])}="",R2C6,{rc_relative(COL_INDEX["J_th"], COL_INDEX["GapSlope_row"])})*ABS(N({rc_relative(COL_INDEX["J_th"], COL_INDEX["Gap_bp"])}))/100+'
@@ -426,6 +442,45 @@ def build_dashboard(excel_path: Path) -> None:
                 ws.Cells(row, selected_col).Value = 1
             if ws.Cells(row, atr_col).Value in ("", None):
                 ws.Cells(row, atr_col).Value = 2
+
+        ratio_letter = col_letter(COL_INDEX["J_ratio"])
+        ratio_range = ws.Range(
+            f"{ratio_letter}{DATA_START_ROW}:{ratio_letter}{DATA_END_ROW}"
+        )
+        ratio_range.FormatConditions.Delete()
+        cond_high = ratio_range.FormatConditions.Add(
+            Type=constants.xlExpression,
+            Formula1=f"=ABS(${ratio_letter}{DATA_START_ROW})>=1"
+        )
+        cond_high.Interior.Color = rgb(146, 208, 80)
+        cond_high.StopIfTrue = False
+        cond_mid = ratio_range.FormatConditions.Add(
+            Type=constants.xlExpression,
+            Formula1=f"=AND(ABS(${ratio_letter}{DATA_START_ROW})>=0.8,ABS(${ratio_letter}{DATA_START_ROW})<1)"
+        )
+        cond_mid.Interior.Color = rgb(198, 239, 206)
+        cond_mid.StopIfTrue = False
+
+        allowed_letter = col_letter(COL_INDEX["NKY_allowed_side"])
+        entry_letter = col_letter(COL_INDEX["EntrySide"])
+        policy_letter = col_letter(COL_INDEX["trend_allowed_policy"])
+        row_range = ws.Range(f"A{DATA_START_ROW}:{last_col}{DATA_END_ROW}")
+        row_range.FormatConditions.Delete()
+        gray_formula = (
+            f'=AND(${policy_letter}{DATA_START_ROW}<>"",'
+            f'UPPER(${policy_letter}{DATA_START_ROW})="ALIGNED_ONLY",'
+            f'${entry_letter}{DATA_START_ROW}<>"",'
+            f'${allowed_letter}{DATA_START_ROW}<>"",'
+            f'UPPER(${allowed_letter}{DATA_START_ROW})<>"BOTH",'
+            f'UPPER(${allowed_letter}{DATA_START_ROW})<>UPPER(${entry_letter}{DATA_START_ROW}))'
+        )
+        cond_gray = row_range.FormatConditions.Add(
+            Type=constants.xlExpression,
+            Formula1=gray_formula,
+        )
+        cond_gray.Interior.Color = rgb(242, 242, 242)
+        cond_gray.Font.Color = rgb(109, 109, 109)
+        cond_gray.StopIfTrue = False
 
         wb.Save()
         wb.Close(SaveChanges=True)

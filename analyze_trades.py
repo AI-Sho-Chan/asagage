@@ -274,6 +274,10 @@ def write_strategy_rules(trades: pd.DataFrame, batch_side_df: pd.DataFrame, sess
         "nky_initial_bp=10",
         "nky_steady_bp=15",
         "alert_cooldown_min=10",
+        "bb_flat_k=1",
+        "bb_trend_k=1.3",
+        "bb_min_samples=12",
+        "bb_sigma_floor=0.05",
     ]
     STATE_RULES_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
