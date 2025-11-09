@@ -1852,6 +1852,7 @@ def main() -> None:
     ap.add_argument("--forward-slices", type=int, default=5)
     ap.add_argument("--session-start", default="09:00")
     ap.add_argument("--session-end", default="09:15")
+    ap.add_argument("--session-label", default="", help="Explicit session label (e.g., AM0930/AM1000)")
     ap.add_argument("--liquidity-quantile", type=float, default=0.5)
     ap.add_argument("--signal-mode", choices=["full", "j-only", "j-cross"], default="full")
     ap.add_argument("--min-train-trades", type=int, default=30)
@@ -2016,7 +2017,24 @@ def main() -> None:
 
     session_start = parse_hhmm(args.session_start)
     session_end = parse_hhmm(args.session_end)
-    session_label = "AM10" if session_end <= parse_hhmm("09:10") else "AM15"
+    # Prefer explicit label if provided
+    if getattr(args, "session_label", ""):
+        session_label = str(args.session_label)
+    else:
+        # Derive from time window
+        start_s = session_start.strftime("%H:%M")
+        end_s = session_end.strftime("%H:%M")
+        # Common windows mapping
+        mapping = {
+            ("09:00","09:15"): "AM15",
+            ("09:00","09:30"): "AM0930",
+            ("09:00","09:45"): "AM0945",
+            ("09:00","10:00"): "AM1000",
+            ("09:00","10:15"): "AM1015",
+            ("09:00","10:30"): "AM1030",
+            ("12:30","13:30"): "PM1",
+        }
+        session_label = mapping.get((start_s, end_s), f"{start_s}-{end_s}")
     plan_key = build_plan_key(args, session_label)
     filtered = apply_liquidity_and_mark_entry(
         data,

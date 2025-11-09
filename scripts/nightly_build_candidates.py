@@ -71,7 +71,7 @@ def ensure_numeric_mean(df: pd.DataFrame, column: str, decimals: int = 4) -> str
     return f"{series.mean():.{decimals}f}"
 
 
-def aggregate_candidates(frames: List[pd.DataFrame], out_path: Path, *, min_forward_ci: float = 0.65) -> Dict[str, str]:
+def aggregate_candidates(frames: List[pd.DataFrame], out_path: Path, *, min_forward_ci: float = 0.65, min_forward_winrate: float = 0.0) -> Dict[str, str]:
     """Combine plan outputs, enforce quality filters, and pick one combo per ticker.
 
     Filters (hard):
@@ -118,6 +118,8 @@ def aggregate_candidates(frames: List[pd.DataFrame], out_path: Path, *, min_forw
         df = df[num(c("forward_pf_eff")) >= 1.30]
     if c("forward_trades") in df.columns:
         df = df[num(c("forward_trades")) >= 5]
+    if min_forward_winrate > 0 and c("forward_winrate") in df.columns:
+        df = df[num(c("forward_winrate")) >= float(min_forward_winrate)]
 
     # Score
     pf = num(c("forward_pf_eff"))
@@ -429,6 +431,7 @@ def _main_impl() -> None:
     )
     ap.add_argument("--gap-guard-abs-bp", type=float, default=80.0)
     ap.add_argument("--gap-guard-dir-bp", type=float, default=40.0)
+    ap.add_argument("--min-forward-winrate", type=float, default=0.0, help="Optional min forward winrate filter in aggregation (e.g., 0.60)")
     ap.add_argument("--slipbp", type=float, default=4.0)
     ap.add_argument("--feebp", type=float, default=4.0)
     ap.add_argument("--liquidity-quantile", type=float, default=0.5)
@@ -715,6 +718,20 @@ def _main_impl() -> None:
     candidate_files: List[Path] = []
     completed_plans = 0
 
+    # Load strategy rules (for session-specific overrides like AM1000 SELL)
+    rules_kv: Dict[str, str] = {}
+    try:
+        rules_path = repo_root / "state/strategy_rules.ini"
+        if rules_path.exists():
+            for line in rules_path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                rules_kv[k.strip()] = v.strip()
+    except Exception:
+        pass
+
     for plan_idx, (sess_label, sess_start, sess_end, sig) in enumerate(plans, start=1):
         tag = f"{sess_label}_{sig}"
         plan_order.append(tag)
@@ -734,6 +751,12 @@ def _main_impl() -> None:
         cand_dir = Path("output/excel") / f"NIGHTLY_{date_tag}" / tag
         cand_dir.mkdir(parents=True, exist_ok=True)
 
+        # Session-specific directional guard tuning (AM1000 SELL auto)
+        dir_bp = float(args.gap_guard_dir_bp)
+        if sess_label.upper().startswith("AM1000") and sig == "j-cross":
+            if rules_kv.get("am1000_sell_enabled", "0") == "1":
+                dir_bp = min(dir_bp, 15.0)
+
         coarse_cmd = [
             sys.executable,
             "scripts/bt_opt30_forward.py",
@@ -745,6 +768,8 @@ def _main_impl() -> None:
             "coarse",
             "--signal-mode",
             sig,
+            "--session-label",
+            sess_label,
             "--session-start",
             sess_start,
             "--session-end",
@@ -766,7 +791,7 @@ def _main_impl() -> None:
             "--gap-guard-abs-bp",
             str(args.gap_guard_abs_bp),
             "--gap-guard-dir-bp",
-            str(args.gap_guard_dir_bp),
+            str(dir_bp),
             "--slipbp",
             str(args.slipbp),
             "--feebp",
@@ -850,6 +875,7 @@ def _main_impl() -> None:
             plan_counts=format_plan_counts(plan_counts),
         )
 
+        # Apply same dir_bp in refine phase
         refine_cmd = [
             sys.executable,
             "scripts/bt_opt30_forward.py",
@@ -861,6 +887,8 @@ def _main_impl() -> None:
             "refine",
             "--signal-mode",
             sig,
+            "--session-label",
+            sess_label,
             "--session-start",
             sess_start,
             "--session-end",
@@ -882,7 +910,7 @@ def _main_impl() -> None:
             "--gap-guard-abs-bp",
             str(args.gap_guard_abs_bp),
             "--gap-guard-dir-bp",
-            str(args.gap_guard_dir_bp),
+            str(dir_bp),
             "--slipbp",
             str(args.slipbp),
             "--feebp",
@@ -951,7 +979,12 @@ def _main_impl() -> None:
     )
 
     out_all = Path("output/excel") / "candidates_nextday.csv"
-    summary = aggregate_candidates(candidate_frames, out_all, min_forward_ci=float(getattr(args, "min_forward_ci", 0.65)))
+    summary = aggregate_candidates(
+        candidate_frames,
+        out_all,
+        min_forward_ci=float(getattr(args, "min_forward_ci", 0.65)),
+        min_forward_winrate=float(getattr(args, "min_forward_winrate", 0.0)),
+    )
     summary.update(
         {
             "plans": ",".join(plan_order),

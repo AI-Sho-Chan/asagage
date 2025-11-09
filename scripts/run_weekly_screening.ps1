@@ -1,4 +1,4 @@
-﻿param(
+param(
   [string]$DateTag = (Get-Date -Format 'yyyyMMdd'),
   [int]$TopUniverse = 200,
   [int]$TargetTop = 50
@@ -50,7 +50,7 @@ $args = @(
     '--target-date',$resolvedTag,
     '--universe-mode','yahoo-top','--universe-size',$TopUniverse,
     '--lookback','60','--chunk-days','5','--train-days','12','--forward-days','4',
-    '--min-train-trades','12','--min-forward-trades','5','--forward-pf-min','1.3','--min-forward-ci','0.65',
+    '--min-train-trades','12','--min-forward-trades','5','--forward-pf-min','1.3','--min-forward-winrate','0.60','--min-forward-ci','0.65',
     '--gap-guard-abs-bp','80.0','--gap-guard-dir-bp','40.0','--slipbp','4.0','--feebp','4.0',
     '--liquidity-quantile','0.3','--jobs','6','--enable-asha','--enable-bayes','--bayes-trials','24','--bayes-timeout','600',
     '--mask-ineffective','--mask-window','20','--mask-threshold','1.05',
@@ -74,7 +74,7 @@ $args = @(
     $written = [System.IO.Path]::GetFullPath($aggJson.written)
     $latest = Join-Path $Repo 'output/excel/weekly_candidates_latest.csv'
     Copy-Item $written $latest -Force
-    # 騾ｱ譛ｫ邨先棡繧堤峩縺｡縺ｫ鄙悟霧讌ｭ譌･蛟呵｣懊↓蜿肴丐
+    # 週末結果を直ちに翌営業日候補に反映
     Copy-Item $written (Join-Path $Repo 'output/excel/candidates_nextday.csv') -Force
     Write-Status 'aggregate' "weekly candidates: $($aggJson.rows) rows -> $written"
   }
@@ -98,7 +98,7 @@ $args = @(
   & $Python $coeffArgs
   if ($LASTEXITCODE -ne 0) { throw "dashboard coeff calc failed ($LASTEXITCODE)" }
 
-  # 成果に基づくルール自動更新（AM1000 SELL の自動拡張可否）
+  # ���ʂɊ�Â����[�������X�V�iAM1000 SELL �̎����g���ہj
   try {
     & $Python @('tools/auto_rules_from_results.py','--summary','analysis/session_mode_summary.csv','--rules','state/strategy_rules.ini') | Out-Null
     Write-Status 'rules' 'auto_rules_from_results completed'

@@ -1,4 +1,4 @@
-﻿param(
+param(
   [int]$Jobs = 8,
   [int]$BayesTrialsWeekend = 36,
   [int]$BayesTrialsNightly = 24
@@ -30,7 +30,7 @@ function Run-Weekend() {
     'scripts/nightly_build_candidates.py',
     '--universe-mode','yahoo-top','--universe-size','200',
     '--lookback','60','--chunk-days','5','--train-days','12','--forward-days','4',
-    '--min-train-trades','10','--min-forward-trades','2','--forward-pf-min','1.3',
+    '--min-train-trades','10','--min-forward-trades','2','--forward-pf-min','1.3','--min-forward-winrate','0.60',
     '--gap-guard-abs-bp','80','--gap-guard-dir-bp','40','--slipbp','4','--feebp','4',
     '--liquidity-quantile','0.3','--jobs',"$Jobs",'--run-type','weekend','--plan-profile','weekend',
     '--enable-asha','--enable-bayes','--bayes-trials',"$BayesTrialsWeekend",'--bayes-timeout','600',
