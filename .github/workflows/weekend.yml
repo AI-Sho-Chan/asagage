@@ -1,0 +1,74 @@
+name: Weekend Screening (Cloud)
+
+on:
+  workflow_dispatch:
+    inputs:
+      universe_size:
+        description: 'Universe size (top by amount)'
+        required: true
+        default: '150'
+      jobs:
+        description: 'Parallel jobs'
+        required: true
+        default: '8'
+  schedule:
+    - cron: '30 7 * * FRI' # JST 16:30 (07:30 UTC)
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  weekend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || true
+          pip install pandas numpy yahooquery yfinance optuna xlrd openpyxl pyarrow polars || true
+
+      - name: Prepare output dirs
+        run: |
+          mkdir -p output/bt30 output/excel data/raw/yahoo_1m
+
+      - name: Weekend screening (profile=weekend)
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          python scripts/nightly_build_candidates.py \
+            --excel ASAGAKE.xlsm \
+            --base-out output/bt30/WEEKLY_${{ github.run_id }} \
+            --run-type weekend --plan-profile weekend \
+            --universe-mode yahoo-top --universe-size ${{ inputs.universe_size || '150' }} \
+            --lookback 60 --chunk-days 5 --train-days 12 --forward-days 4 \
+            --min-train-trades 12 --min-forward-trades 5 --forward-pf-min 1.3 --min-forward-ci 0.65 \
+            --gap-guard-abs-bp 80 --gap-guard-dir-bp 40 \
+            --liquidity-quantile 0.3 --jobs ${{ inputs.jobs || '8' }} \
+            --enable-asha --enable-bayes --bayes-trials 20 --bayes-timeout 600 \
+            --mask-ineffective --mask-window 20 --mask-threshold 1.05 \
+            --enable-market-features --excel-summary --analysis-ledger
+
+      - name: Aggregate weekly candidates
+        run: |
+          python tools/aggregate_weekly_candidates.py --date $(date +%Y%m%d) --target-top 50 --output output/excel/weekly_candidates_ci.csv
+          cp output/excel/weekly_candidates_ci.csv output/excel/weekly_candidates_latest.csv
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekend_${{ github.run_id }}
+          path: |
+            output/bt30/**
+            output/excel/weekly_candidates_*.csv
+            logs/**
+

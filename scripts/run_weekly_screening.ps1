@@ -98,6 +98,15 @@ $args = @(
   & $Python $coeffArgs
   if ($LASTEXITCODE -ne 0) { throw "dashboard coeff calc failed ($LASTEXITCODE)" }
 
+  # 成果に基づくルール自動更新（AM1000 SELL の自動拡張可否）
+  try {
+    & $Python @('tools/auto_rules_from_results.py','--summary','analysis/session_mode_summary.csv','--rules','state/strategy_rules.ini') | Out-Null
+    Write-Status 'rules' 'auto_rules_from_results completed'
+  }
+  catch {
+    Write-Status 'rules_error' $_.Exception.Message
+  }
+
   Write-Status 'completed' "weekly screening completed"
   try {
     & "$Repo\scripts\run_trade_analysis.ps1" | Out-Null
