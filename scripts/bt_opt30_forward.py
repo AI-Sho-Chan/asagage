@@ -1945,16 +1945,16 @@ def main() -> None:
     if getattr(args, "mask_ineffective", False):
         mask_tracker = IneffectiveBandTracker(Path("state/ineffective_bands.json"))
 
-    tickers = load_tickers_from_excel(Path(args.excel))
-    original_count = len(tickers)
+    tickers: List[str] = []
+    original_count = 0
     if args.codes_file:
         code_df = pd.read_csv(args.codes_file)
-        allow = [code.strip() for code in code_df["code"].astype(str).tolist() if code]
-        tickers = allow
-        logger.log(
-            f"Codes limited via {args.codes_file}: {len(tickers)} tickers "
-            f"(was {original_count})"
-        )
+        tickers = [code.strip() for code in code_df["code"].astype(str).tolist() if code]
+        original_count = len(tickers)
+        logger.log(f"Codes loaded from {args.codes_file}: {original_count} tickers")
+    if not tickers:
+        tickers = load_tickers_from_excel(Path(args.excel))
+        original_count = len(tickers)
     excluded_codes: List[str] = []
     if lp_manager and run_type == "weekday":
         low_priority_codes = set(lp_manager.get_low_priority())

@@ -32,3 +32,7 @@
 - バッチ実行系（`run_weekend_then_nightly.ps1`, `run_weekly_screening.ps1`, `nightly_build_candidates.py`）は ASAGAKE 参照に統一済み。
 - ダッシュボード修復系も `scripts/restore_dashboard_formulas.py` を ASAGAKE 既定に修正済み。バックアップ名も `ASAGAKE_backup_YYYYMMDD_HHMMSS.xlsm` へ統一しました。
 - なお一部の保守用スクリプトは既定で `SHINSOKU.xlsm` を指す箇所が残存します（手動・個別検証用）。バッチフローでは呼ばれません。誤実行を防ぐため、運用時は `--excel C:/AI/asagake/ASAGAKE.xlsm` を明示するか、該当スクリプトを使用しないでください。
+
+## Execution Platforms
+- Github Actions�i���������i�[�j�͐��\/�Z���ԉ��̖ړI�ł͎g�p���Ȃ��B���x�E���肪�K�v�Ȏ������s�̓��[�J���������� AWS HPC�iRay+Spot �Ȃǂ̍����\�\���j��O��Ƃ���B
+
