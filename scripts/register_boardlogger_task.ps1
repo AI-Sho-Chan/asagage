@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$ExcelPath = 'C:\AI\asagake\ASAGAKE.xlsm',
   [string]$Repo = 'C:\AI\asagake',
   [int]$IntervalSec = 5,
@@ -6,7 +6,9 @@ param(
 )
 
 $TaskName = 'ASAGAKE_BoardLogger'
-$Python = 'C:\\Python313\\python.exe'
+$Python = 'C:\Python313\python.exe'
+$TaskCmd = Join-Path $Repo 'scripts\board_logger_task.cmd'
+$TaskCmdQuoted = '"' + $TaskCmd + '"'
 $Cmd = "$Python scripts/board_logger_daemon.py --dashboard `"$ExcelPath`" --dash-outdir `"$Repo\output\j_logs`" --interval $IntervalSec --retain-days $RetainDays"
 $CmdPs = "Set-Location `'$Repo`'; $Cmd"
 
@@ -21,10 +23,13 @@ function Register-WithScheduledTaskModule {
 
 function Register-WithSchTasksExe {
   param()
-  # 09:00 から 6時間35分の間、5分間隔で起動
-  $args = "/Create /F /TN `"$TaskName`" /SC MINUTE /MO 5 /ST 09:00 /DU 06:35 /TR `"powershell -NoProfile -ExecutionPolicy Bypass -Command `'$CmdPs`'`""
+  # 09:00~15:35 の間に5分おきで起動するタスクを登録（schtasks版）
+  if (-not (Test-Path $TaskCmd)) {
+    Set-Content -Path $TaskCmd -Value "@echo off`r`ncd /d $Repo`r`n$Cmd`r`n" -Encoding ASCII
+  }
   try { schtasks.exe /Delete /F /TN $TaskName | Out-Null } catch {}
-  schtasks.exe $args | Out-Null
+  $args = @('/Create','/F','/TN',$TaskName,'/SC','MINUTE','/MO','5','/ST','09:00','/DU','06:35','/TR',$TaskCmdQuoted)
+  schtasks.exe @args | Out-Null
 }
 
 try {
@@ -34,7 +39,6 @@ try {
       Register-WithScheduledTaskModule
       $used = 'ScheduledTask'
     } catch {
-      # 一部環境で RepetitionSettings が未実装のためフォールバック
       Register-WithSchTasksExe
       $used = 'schtasks'
     }
