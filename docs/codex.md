@@ -26,3 +26,9 @@
 ## Automation Principles
 - Tradingシステムは「取引開始」「取引終了」以外の工程（候補生成・学習・適用・可視化・アラート・ローテーション）をフル自動で回すことを前提に設計・実装する。手動オペが発生した場合は恒久的な自動化策を直ちに検討し、次回以降は人手不要にする。
 - 週末/ナイトなど長時間ジョブがマーケットオープンに間に合わない兆候を検知した時点で、必ず時間短縮の代替案（停止→時短再実行、グリッド縮小、残時間見積など）を提示し、ユーザー判断を仰ぐ。
+
+## ASAGAKE 移行メモ（重要）
+- 本番ワークブックは現在 `C:/AI/asagake/ASAGAKE.xlsm` を使用します。過去ドキュメントの `SHINSOKU.xlsm` 記載はレガシーです。
+- バッチ実行系（`run_weekend_then_nightly.ps1`, `run_weekly_screening.ps1`, `nightly_build_candidates.py`）は ASAGAKE 参照に統一済み。
+- ダッシュボード修復系も `scripts/restore_dashboard_formulas.py` を ASAGAKE 既定に修正済み。バックアップ名も `ASAGAKE_backup_YYYYMMDD_HHMMSS.xlsm` へ統一しました。
+- なお一部の保守用スクリプトは既定で `SHINSOKU.xlsm` を指す箇所が残存します（手動・個別検証用）。バッチフローでは呼ばれません。誤実行を防ぐため、運用時は `--excel C:/AI/asagake/ASAGAKE.xlsm` を明示するか、該当スクリプトを使用しないでください。
