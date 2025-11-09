@@ -121,3 +121,8 @@ catch {
   throw
 }
 
+try {
+  & C:\\Python313\\python.exe scripts\\register_boardlogger_task.ps1 | Out-Null
+  Write-Status 'boardlogger' 'registered'
+} catch { Write-Status 'boardlogger_error' .Exception.Message }
+

@@ -432,6 +432,7 @@ def _main_impl() -> None:
     ap.add_argument("--gap-guard-abs-bp", type=float, default=80.0)
     ap.add_argument("--gap-guard-dir-bp", type=float, default=40.0)
     ap.add_argument("--min-forward-winrate", type=float, default=0.0, help="Optional min forward winrate filter in aggregation (e.g., 0.60)")
+    ap.add_argument("--headless", action="store_true", help="Skip Excel/COM interactions (for cloud runners)")
     ap.add_argument("--slipbp", type=float, default=4.0)
     ap.add_argument("--feebp", type=float, default=4.0)
     ap.add_argument("--liquidity-quantile", type=float, default=0.5)
@@ -1036,19 +1037,20 @@ def _main_impl() -> None:
     enrich_dashboard_columns(out_all, coeff_latest)
     apply_trend_preferences(out_all, (repo_root / args.trend_pref).resolve(), args.trend_bp_th)
 
-    ensure_dashboard_formulas(repo_root, excel_path)
-    try:
-        run(
-            [
-                sys.executable,
-                "scripts/run_macros_on_copy.py",
-                "--excel",
-                str(excel_path),
-            ],
-            cwd=repo_root,
-        )
-    except SystemExit:
-        pass
+    if not bool(getattr(args, "headless", False)):
+        ensure_dashboard_formulas(repo_root, excel_path)
+        try:
+            run(
+                [
+                    sys.executable,
+                    "scripts/run_macros_on_copy.py",
+                    "--excel",
+                    str(excel_path),
+                ],
+                cwd=repo_root,
+            )
+        except SystemExit:
+            pass
 
     write_status(
         state="success",

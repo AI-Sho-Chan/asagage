@@ -61,3 +61,7 @@ Kill-OldRuns
 Run-Weekend
 Run-Nightly
 Write-SeqLog 'Sequential runner completed'
+try {
+  & C:\\Python313\\python.exe scripts\\register_boardlogger_task.ps1 | Out-Null
+} catch {}
+

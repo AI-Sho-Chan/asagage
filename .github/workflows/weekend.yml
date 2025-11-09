@@ -45,7 +45,7 @@ jobs:
         env:
           PYTHONIOENCODING: utf-8
         run: |
-          python scripts/nightly_build_candidates.py \
+          python scripts/nightly_build_candidates.py --headless \\\n
             --excel ASAGAKE.xlsm \
             --base-out output/bt30/WEEKLY_${{ github.run_id }} \
             --run-type weekend --plan-profile weekend \
