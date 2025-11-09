@@ -1,0 +1,15 @@
+[2025-11-09 07:52:20] Run started
+[2025-11-09 07:52:20] Run type resolved to weekday
+[2025-11-09 07:52:20] Low-priority gating removed 17 tickers (remaining 3)
+[2025-11-09 07:52:21] Entry window marks set: 6232 rows flagged out of 35635
+[2025-11-09 07:52:21] Liquidity filter q=0.50 kept 3 tickers and 23817 rows
+[2025-11-09 07:52:21] Using 5 rolling slices (train=12, forward=4)
+[2025-11-09 07:52:21] Parameter grid size: 28 (mode=coarse, signal=j-only)
+[2025-11-09 07:52:21] Ineffective-band mask removed 4 combos for J_th values [0.3, 0.4, 0.6, 0.7, 0.8]
+[2025-11-09 07:52:29] [1/3] 8035.T: best train_pf_eff=0.748, forward_pf_eff=3.857, trades=162/20
+[2025-11-09 07:52:29] [2/3] 5016.T: best train_pf_eff=2.047, forward_pf_eff=1.838, trades=141/35
+[2025-11-09 07:52:29] [3/3] 6857.T: best train_pf_eff=0.830, forward_pf_eff=0.966, trades=549/161
+[2025-11-09 07:52:29] Cache reuse: 24/24 combos (100.0%) served from cache
+[2025-11-09 07:52:29] ASHA pruned 48 parameter combos prior to full evaluation
+[2025-11-09 07:52:30] Excel summary written to output\bt30\NIGHTLY_20251109\RUN_coarse_AM1000_j-only\summary_20251109_075230.xlsx
+[2025-11-09 07:52:30] Run completed in 0.2 minutes

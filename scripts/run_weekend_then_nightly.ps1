@@ -32,7 +32,7 @@ function Run-Weekend() {
     '--lookback','60','--chunk-days','5','--train-days','12','--forward-days','4',
     '--min-train-trades','10','--min-forward-trades','2','--forward-pf-min','1.3',
     '--gap-guard-abs-bp','80','--gap-guard-dir-bp','40','--slipbp','4','--feebp','4',
-    '--liquidity-quantile','0.5','--jobs',"$Jobs",'--run-type','weekend','--plan-profile','weekend',
+    '--liquidity-quantile','0.3','--jobs',"$Jobs",'--run-type','weekend','--plan-profile','weekend',
     '--enable-asha','--enable-bayes','--bayes-trials',"$BayesTrialsWeekend",'--bayes-timeout','600',
     '--mask-ineffective','--mask-window','20','--mask-threshold','1.05','--cache-refresh-weekend',
     '--enable-rd-windows','--enable-market-features'

@@ -191,60 +191,6 @@
     "5706.T": {
       "history": [
         {
-          "ts": "2025-11-08T09:38:37.014564",
-          "forward_pf_eff": 0.6815264446567354,
-          "forward_winrate": 0.43478260869565216,
-          "forward_trades": 23.0,
-          "train_pf_eff": 0.6815264446567354,
-          "train_trades": 46.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T17:19:33.883436",
-          "forward_pf_eff": 1.6169414604708467,
-          "forward_winrate": 0.5,
-          "forward_trades": 4.0,
-          "train_pf_eff": 1.6169414604708467,
-          "train_trades": 8.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T20:24:58.931947",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 1.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 2.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T20:37:57.449253",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 1.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 2.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T20:48:39.783089",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 7.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 14.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-08T21:07:55.836307",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 2.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 4.0,
-          "selected": false
-        },
-        {
           "ts": "2025-11-08T21:26:17.270840",
           "forward_pf_eff": 0.6365001711718332,
           "forward_winrate": 0.38095238095238093,
@@ -369,11 +315,65 @@
           "train_pf_eff": 2.6293143715215486,
           "train_trades": 9.0,
           "selected": false
+        },
+        {
+          "ts": "2025-11-09T05:44:41.940241",
+          "forward_pf_eff": 0.746341992550793,
+          "forward_winrate": 0.45098039215686275,
+          "forward_trades": 51.0,
+          "train_pf_eff": 0.7463419925507933,
+          "train_trades": 153.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:06:06.942866",
+          "forward_pf_eff": 2.6293143715215486,
+          "forward_winrate": 0.6666666666666666,
+          "forward_trades": 3.0,
+          "train_pf_eff": 2.6293143715215486,
+          "train_trades": 9.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:38:31.156408",
+          "forward_pf_eff": 0.8808434649457455,
+          "forward_winrate": 0.48484848484848486,
+          "forward_trades": 66.0,
+          "train_pf_eff": 0.8808434649457455,
+          "train_trades": 198.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:17:56.209498",
+          "forward_pf_eff": 2.700396632744685,
+          "forward_winrate": 0.6666666666666666,
+          "forward_trades": 3.0,
+          "train_pf_eff": 2.700396632744685,
+          "train_trades": 9.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:32:22.593418",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:45:04.155405",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 1.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 3.0,
+          "selected": false
         }
       ],
-      "consecutive_miss": 3,
-      "low_priority": false,
-      "last_update": "2025-11-09T05:14:22.632438"
+      "consecutive_miss": 9,
+      "low_priority": true,
+      "last_update": "2025-11-09T07:45:04.155405"
     },
     "4063.T": {
       "history": [
@@ -662,16 +662,115 @@
     "5016.T": {
       "history": [
         {
-          "ts": "2025-11-09T00:29:01.626871",
-          "forward_pf_eff": 2.0922976147610166,
-          "forward_winrate": 0.5909090909090909,
+          "ts": "2025-11-09T07:51:19.646369",
+          "forward_pf_eff": 19.46023971183693,
+          "forward_winrate": 0.9285714285714286,
+          "forward_trades": 14.0,
+          "train_pf_eff": 8.478411877429735,
+          "train_trades": 50.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:51:27.087137",
+          "forward_pf_eff": 5.498643583858791,
+          "forward_winrate": 0.75,
+          "forward_trades": 4.0,
+          "train_pf_eff": 4.864800882349212,
+          "train_trades": 11.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:51:44.371866",
+          "forward_pf_eff": 1.7988472772717625,
+          "forward_winrate": 0.5641025641025641,
+          "forward_trades": 39.0,
+          "train_pf_eff": 1.4465681457659088,
+          "train_trades": 126.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:51:57.744317",
+          "forward_pf_eff": 2.3201805737423675,
+          "forward_winrate": 0.5714285714285714,
+          "forward_trades": 21.0,
+          "train_pf_eff": 2.4449032008600757,
+          "train_trades": 88.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:52:04.176953",
+          "forward_pf_eff": 1.6526033470498773,
+          "forward_winrate": 0.5714285714285714,
+          "forward_trades": 7.0,
+          "train_pf_eff": 1.6641676538525925,
+          "train_trades": 26.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:52:18.523495",
+          "forward_pf_eff": 3.52656082142813,
+          "forward_winrate": 0.625,
+          "forward_trades": 8.0,
+          "train_pf_eff": 2.754614989763565,
+          "train_trades": 28.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:52:29.943679",
+          "forward_pf_eff": 1.8380625957479717,
+          "forward_winrate": 0.6857142857142857,
+          "forward_trades": 35.0,
+          "train_pf_eff": 2.046815896591998,
+          "train_trades": 141.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:52:44.181571",
+          "forward_pf_eff": 1.8025500217785893,
+          "forward_winrate": 0.5319148936170213,
+          "forward_trades": 47.0,
+          "train_pf_eff": 1.6337103264157513,
+          "train_trades": 275.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:52:50.369574",
+          "forward_pf_eff": 1.6526033470498773,
+          "forward_winrate": 0.5714285714285714,
+          "forward_trades": 7.0,
+          "train_pf_eff": 1.5465227693454149,
+          "train_trades": 29.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:53:05.703503",
+          "forward_pf_eff": 3.52656082142813,
+          "forward_winrate": 0.625,
+          "forward_trades": 8.0,
+          "train_pf_eff": 2.5238901415894865,
+          "train_trades": 34.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:53:18.663439",
+          "forward_pf_eff": 1.8840292116638588,
+          "forward_winrate": 0.7045454545454546,
           "forward_trades": 44.0,
-          "train_pf_eff": 1.859035171375055,
+          "train_pf_eff": 1.8286971728480654,
           "train_trades": 182.0,
           "selected": true
         },
         {
-          "ts": "2025-11-09T00:29:13.438503",
+          "ts": "2025-11-09T07:53:39.226173",
+          "forward_pf_eff": 1.9239249094466186,
+          "forward_winrate": 0.5869565217391305,
+          "forward_trades": 46.0,
+          "train_pf_eff": 1.8026953961109926,
+          "train_trades": 192.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:53:45.925868",
           "forward_pf_eff": 1.311915034938934,
           "forward_winrate": 0.5,
           "forward_trades": 8.0,
@@ -680,16 +779,16 @@
           "selected": true
         },
         {
-          "ts": "2025-11-09T00:29:30.201567",
-          "forward_pf_eff": 2.924078427846014,
+          "ts": "2025-11-09T07:53:56.363794",
+          "forward_pf_eff": 2.5144999666192365,
           "forward_winrate": 0.6666666666666666,
           "forward_trades": 6.0,
-          "train_pf_eff": 1.9736184974240119,
+          "train_pf_eff": 1.9932643489039217,
           "train_trades": 26.0,
           "selected": true
         },
         {
-          "ts": "2025-11-09T00:30:01.525708",
+          "ts": "2025-11-09T07:54:10.203392",
           "forward_pf_eff": 1.9501868770514883,
           "forward_winrate": 0.717391304347826,
           "forward_trades": 46.0,
@@ -698,16 +797,16 @@
           "selected": true
         },
         {
-          "ts": "2025-11-09T00:30:51.486540",
-          "forward_pf_eff": 1.745868280287321,
-          "forward_winrate": 0.5321100917431193,
-          "forward_trades": 109.0,
-          "train_pf_eff": 1.1958622939917698,
-          "train_trades": 711.0,
+          "ts": "2025-11-09T07:54:32.293022",
+          "forward_pf_eff": 1.9090263605193456,
+          "forward_winrate": 0.5657894736842105,
+          "forward_trades": 76.0,
+          "train_pf_eff": 1.4659188587222192,
+          "train_trades": 532.0,
           "selected": true
         },
         {
-          "ts": "2025-11-09T00:31:05.911913",
+          "ts": "2025-11-09T07:54:39.297622",
           "forward_pf_eff": 1.5149855968652999,
           "forward_winrate": 0.6,
           "forward_trades": 10.0,
@@ -716,16 +815,16 @@
           "selected": true
         },
         {
-          "ts": "2025-11-09T00:31:24.031884",
-          "forward_pf_eff": 2.3114577791815942,
-          "forward_winrate": 0.6666666666666666,
-          "forward_trades": 9.0,
-          "train_pf_eff": 2.0994756038038993,
-          "train_trades": 38.0,
+          "ts": "2025-11-09T07:54:50.511420",
+          "forward_pf_eff": 2.3464306362864473,
+          "forward_winrate": 0.6363636363636364,
+          "forward_trades": 11.0,
+          "train_pf_eff": 1.8884134666407866,
+          "train_trades": 42.0,
           "selected": true
         },
         {
-          "ts": "2025-11-09T00:31:51.885144",
+          "ts": "2025-11-09T07:55:03.555201",
           "forward_pf_eff": 0.0929413160820277,
           "forward_winrate": 0.11475409836065574,
           "forward_trades": 61.0,
@@ -734,237 +833,21 @@
           "selected": false
         },
         {
-          "ts": "2025-11-09T00:31:59.674143",
+          "ts": "2025-11-09T07:55:10.901115",
           "forward_pf_eff": 0.0,
           "forward_winrate": 0.0,
           "forward_trades": 0.0,
           "train_pf_eff": 0.0,
           "train_trades": 3.0,
           "selected": false
-        },
-        {
-          "ts": "2025-11-09T03:42:01.287560",
-          "forward_pf_eff": 6.422706339882231,
-          "forward_winrate": 0.75,
-          "forward_trades": 4.0,
-          "train_pf_eff": 6.423422166954694,
-          "train_trades": 14.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T03:53:00.269557",
-          "forward_pf_eff": 6.737702214489993,
-          "forward_winrate": 0.75,
-          "forward_trades": 4.0,
-          "train_pf_eff": 4.584082188686149,
-          "train_trades": 15.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T03:57:57.030687",
-          "forward_pf_eff": 5.084688307590028,
-          "forward_winrate": 0.6666666666666666,
-          "forward_trades": 3.0,
-          "train_pf_eff": 1.5194843218359364,
-          "train_trades": 12.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T04:03:13.092027",
-          "forward_pf_eff": 5.534175781585317,
-          "forward_winrate": 0.5,
-          "forward_trades": 2.0,
-          "train_pf_eff": 1.4973908415171122,
-          "train_trades": 9.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T04:11:11.494087",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 14.0,
-          "train_pf_eff": 10.560302712265594,
-          "train_trades": 70.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T04:26:36.963815",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 14.0,
-          "train_pf_eff": 10.562035255704625,
-          "train_trades": 70.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T04:31:47.672349",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 5.0,
-          "train_pf_eff": 12.683347677489007,
-          "train_trades": 19.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T04:44:17.065332",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 5.0,
-          "train_pf_eff": 12.962142040846937,
-          "train_trades": 15.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T04:54:49.624689",
-          "forward_pf_eff": 12.132291576881792,
-          "forward_winrate": 0.9047619047619048,
-          "forward_trades": 21.0,
-          "train_pf_eff": 12.04506619313985,
-          "train_trades": 90.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T05:08:32.253847",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 9.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 60.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T05:14:22.632438",
-          "forward_pf_eff": 10.73298295901588,
-          "forward_winrate": 0.875,
-          "forward_trades": 8.0,
-          "train_pf_eff": 6.256023035635368,
-          "train_trades": 28.0,
-          "selected": true
         }
       ],
-      "consecutive_miss": 0,
+      "consecutive_miss": 2,
       "low_priority": false,
-      "last_update": "2025-11-09T05:14:22.632438"
+      "last_update": "2025-11-09T07:55:10.901115"
     },
     "5801.T": {
       "history": [
-        {
-          "ts": "2025-11-08T22:56:05.723930",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 2.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T23:15:50.549179",
-          "forward_pf_eff": 0.4574964602882975,
-          "forward_winrate": 0.5018587360594795,
-          "forward_trades": 269.0,
-          "train_pf_eff": 0.5245707108412287,
-          "train_trades": 524.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T23:47:39.949975",
-          "forward_pf_eff": 1.643845812524604,
-          "forward_winrate": 0.8181818181818182,
-          "forward_trades": 22.0,
-          "train_pf_eff": 1.5145248045151007,
-          "train_trades": 41.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T00:01:45.695432",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 4.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 2.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:06:22.009574",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 5.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 12.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T00:13:44.155743",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 1.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:18:26.157422",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 3.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 9.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:23:20.840555",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 1.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:23:54.092290",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 1.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:24:15.561300",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 3.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T03:42:01.287560",
-          "forward_pf_eff": 4.0304199687384985,
-          "forward_winrate": 0.75,
-          "forward_trades": 4.0,
-          "train_pf_eff": 3.24091707332523,
-          "train_trades": 11.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T03:53:00.269557",
-          "forward_pf_eff": 2.8091416917813095,
-          "forward_winrate": 0.6666666666666666,
-          "forward_trades": 3.0,
-          "train_pf_eff": 2.017547804896583,
-          "train_trades": 8.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T03:57:57.030687",
-          "forward_pf_eff": 3.7183709465587738,
-          "forward_winrate": 0.6666666666666666,
-          "forward_trades": 3.0,
-          "train_pf_eff": 0.6943520988376902,
-          "train_trades": 7.0,
-          "selected": false
-        },
         {
           "ts": "2025-11-09T04:11:11.494087",
           "forward_pf_eff": 999.0,
@@ -1027,11 +910,128 @@
           "train_pf_eff": 8.169211827608963,
           "train_trades": 17.0,
           "selected": true
+        },
+        {
+          "ts": "2025-11-09T05:27:47.196526",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 6.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T05:44:41.940241",
+          "forward_pf_eff": 0.573191911250375,
+          "forward_winrate": 0.6512820512820513,
+          "forward_trades": 195.0,
+          "train_pf_eff": 0.6790207498002409,
+          "train_trades": 390.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:06:06.942866",
+          "forward_pf_eff": 1.8461714976775228,
+          "forward_winrate": 0.7058823529411765,
+          "forward_trades": 17.0,
+          "train_pf_eff": 1.582743801396739,
+          "train_trades": 29.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T06:17:26.578201",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 10.90169149154193,
+          "train_trades": 5.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:38:31.156408",
+          "forward_pf_eff": 0.4572852671334618,
+          "forward_winrate": 0.5018587360594795,
+          "forward_trades": 269.0,
+          "train_pf_eff": 0.6029392970223598,
+          "train_trades": 522.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:17:56.209498",
+          "forward_pf_eff": 1.64384581249995,
+          "forward_winrate": 0.8181818181818182,
+          "forward_trades": 22.0,
+          "train_pf_eff": 1.635521126259898,
+          "train_trades": 43.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:27:29.082396",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 10.90169149154193,
+          "train_trades": 5.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:32:22.593418",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 5.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 12.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:40:08.302272",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 1.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:45:04.155405",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 3.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 9.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:50:36.792535",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 1.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:50:56.912275",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 1.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:51:10.491766",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 3.0,
+          "selected": false
         }
       ],
-      "consecutive_miss": 0,
-      "low_priority": false,
-      "last_update": "2025-11-09T05:14:22.632438"
+      "consecutive_miss": 5,
+      "low_priority": true,
+      "last_update": "2025-11-09T07:51:10.491766"
     },
     "1570.T": {
       "history": [
@@ -1160,141 +1160,6 @@
     "285A.T": {
       "history": [
         {
-          "ts": "2025-11-08T23:15:50.549179",
-          "forward_pf_eff": 2.665252287698036,
-          "forward_winrate": 0.8108108108108109,
-          "forward_trades": 37.0,
-          "train_pf_eff": 2.5132917265149857,
-          "train_trades": 68.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-08T23:41:25.527991",
-          "forward_pf_eff": 4.118757137964532,
-          "forward_winrate": 0.9,
-          "forward_trades": 40.0,
-          "train_pf_eff": 3.9621623647891084,
-          "train_trades": 112.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-08T23:47:39.949975",
-          "forward_pf_eff": 6.308185029276961,
-          "forward_winrate": 0.8888888888888888,
-          "forward_trades": 18.0,
-          "train_pf_eff": 5.81921650950934,
-          "train_trades": 32.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T00:01:45.695432",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 14.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 26.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T00:06:22.009574",
-          "forward_pf_eff": 1.6976354289311995,
-          "forward_winrate": 0.875,
-          "forward_trades": 8.0,
-          "train_pf_eff": 0.5620269772660877,
-          "train_trades": 11.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:18:26.157422",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 10.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 24.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T00:22:55.544125",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 5.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 22.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T00:23:20.840555",
-          "forward_pf_eff": 3.2097061072853323,
-          "forward_winrate": 0.6666666666666666,
-          "forward_trades": 3.0,
-          "train_pf_eff": 3.2097061072853315,
-          "train_trades": 9.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:23:54.092290",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 4.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 9.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:24:15.561300",
-          "forward_pf_eff": 0.7453989304623195,
-          "forward_winrate": 0.38095238095238093,
-          "forward_trades": 42.0,
-          "train_pf_eff": 0.8070397251316972,
-          "train_trades": 84.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:24:46.812384",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:25:17.007545",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T03:42:01.287560",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 5.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 13.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T03:53:00.269557",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 5.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 13.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T03:57:57.030687",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 3.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 7.0,
-          "selected": false
-        },
-        {
           "ts": "2025-11-09T04:11:11.494087",
           "forward_pf_eff": 0.7616809512753652,
           "forward_winrate": 0.38,
@@ -1338,11 +1203,146 @@
           "train_pf_eff": 2.0534160620810216,
           "train_trades": 31.0,
           "selected": true
+        },
+        {
+          "ts": "2025-11-09T05:27:47.196526",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 5.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 7.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T05:44:41.940241",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 4.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:06:06.942866",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 13.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 25.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T06:17:26.578201",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 23.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 39.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T06:38:31.156408",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 4.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:17:56.209498",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 14.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 26.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:27:29.082396",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 11.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 11.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:32:22.593418",
+          "forward_pf_eff": 1.6976354289311995,
+          "forward_winrate": 0.875,
+          "forward_trades": 8.0,
+          "train_pf_eff": 0.5620269772660877,
+          "train_trades": 11.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:45:04.155405",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 10.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 24.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:49:46.846166",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 4.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 20.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:50:36.792535",
+          "forward_pf_eff": 3.2097061072853323,
+          "forward_winrate": 0.6666666666666666,
+          "forward_trades": 3.0,
+          "train_pf_eff": 3.2097061072853315,
+          "train_trades": 9.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:50:56.912275",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 4.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 9.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:51:10.491766",
+          "forward_pf_eff": 0.7453989304623195,
+          "forward_winrate": 0.38095238095238093,
+          "forward_trades": 42.0,
+          "train_pf_eff": 0.8070397251316972,
+          "train_trades": 84.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:51:27.087137",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:51:44.371866",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
         }
       ],
-      "consecutive_miss": 0,
-      "low_priority": false,
-      "last_update": "2025-11-09T05:14:22.632438"
+      "consecutive_miss": 5,
+      "low_priority": true,
+      "last_update": "2025-11-09T07:51:44.371866"
     },
     "6098.T": {
       "history": [
@@ -2163,60 +2163,6 @@
     "6525.T": {
       "history": [
         {
-          "ts": "2025-11-08T22:00:43.429573",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T22:16:22.268776",
-          "forward_pf_eff": 6.546900893815759,
-          "forward_winrate": 0.9,
-          "forward_trades": 10.0,
-          "train_pf_eff": 6.546900887206944,
-          "train_trades": 30.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-08T22:36:52.347465",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T22:42:36.383778",
-          "forward_pf_eff": 9.057726926523467,
-          "forward_winrate": 0.8571428571428571,
-          "forward_trades": 7.0,
-          "train_pf_eff": 9.066937753299806,
-          "train_trades": 21.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-08T22:56:05.723930",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T23:15:50.549179",
-          "forward_pf_eff": 6.546900893815759,
-          "forward_winrate": 0.9,
-          "forward_trades": 10.0,
-          "train_pf_eff": 6.546900887206944,
-          "train_trades": 30.0,
-          "selected": true
-        },
-        {
           "ts": "2025-11-08T23:41:25.527991",
           "forward_pf_eff": 0.0,
           "forward_winrate": 0.0,
@@ -2341,11 +2287,65 @@
           "train_pf_eff": 999.0,
           "train_trades": 6.0,
           "selected": false
+        },
+        {
+          "ts": "2025-11-09T05:44:41.940241",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 3.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 9.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:06:06.942866",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 2.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 6.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:38:31.156408",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 3.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 9.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:17:56.209498",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 2.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 6.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:32:22.593418",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 2.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 6.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:45:04.155405",
+          "forward_pf_eff": 1.5163893057621318,
+          "forward_winrate": 0.5,
+          "forward_trades": 2.0,
+          "train_pf_eff": 1.5163893057621318,
+          "train_trades": 6.0,
+          "selected": false
         }
       ],
-      "consecutive_miss": 3,
+      "consecutive_miss": 9,
       "low_priority": true,
-      "last_update": "2025-11-09T05:14:22.632438"
+      "last_update": "2025-11-09T07:45:04.155405"
     },
     "6501.T": {
       "history": [
@@ -2454,123 +2454,6 @@
     "6526.T": {
       "history": [
         {
-          "ts": "2025-11-08T22:42:36.383778",
-          "forward_pf_eff": 9.949839218336603,
-          "forward_winrate": 0.8,
-          "forward_trades": 5.0,
-          "train_pf_eff": 0.34629171951059073,
-          "train_trades": 14.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T23:15:50.549179",
-          "forward_pf_eff": 8.87179345274906,
-          "forward_winrate": 0.8571428571428571,
-          "forward_trades": 14.0,
-          "train_pf_eff": 0.7371782682970085,
-          "train_trades": 126.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T23:47:39.949975",
-          "forward_pf_eff": 7.3503748544717045,
-          "forward_winrate": 0.8,
-          "forward_trades": 5.0,
-          "train_pf_eff": 0.5833214876296128,
-          "train_trades": 19.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:06:22.009574",
-          "forward_pf_eff": 5.964589400526317,
-          "forward_winrate": 0.7142857142857143,
-          "forward_trades": 7.0,
-          "train_pf_eff": 2.318044641349414,
-          "train_trades": 17.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T00:13:44.155743",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 6.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:18:26.157422",
-          "forward_pf_eff": 2.6382212131609255,
-          "forward_winrate": 0.6666666666666666,
-          "forward_trades": 6.0,
-          "train_pf_eff": 0.3458495077284802,
-          "train_trades": 22.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:23:20.840555",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:23:54.092290",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 2.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:24:15.561300",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 3.250857073354179,
-          "train_trades": 14.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T03:42:01.287560",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 2.0,
-          "train_pf_eff": 9.950748159011221,
-          "train_trades": 12.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T03:53:00.269557",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 5.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 29.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T03:57:57.030687",
-          "forward_pf_eff": 6.808987909097226,
-          "forward_winrate": 0.8571428571428571,
-          "forward_trades": 7.0,
-          "train_pf_eff": 5.427709747646616,
-          "train_trades": 25.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T04:03:13.092027",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 2.0,
-          "selected": false
-        },
-        {
           "ts": "2025-11-09T04:11:11.494087",
           "forward_pf_eff": 999.0,
           "forward_winrate": 1.0,
@@ -2632,11 +2515,128 @@
           "train_pf_eff": 5.791939477731177,
           "train_trades": 23.0,
           "selected": true
+        },
+        {
+          "ts": "2025-11-09T05:27:47.196526",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 2.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T05:44:41.940241",
+          "forward_pf_eff": 6.215333957541888,
+          "forward_winrate": 0.8461538461538461,
+          "forward_trades": 13.0,
+          "train_pf_eff": 1.0224342799271022,
+          "train_trades": 144.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T05:59:47.378970",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 4.357014935461775,
+          "train_trades": 30.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:06:06.942866",
+          "forward_pf_eff": 3.743504809308452,
+          "forward_winrate": 0.6666666666666666,
+          "forward_trades": 3.0,
+          "train_pf_eff": 0.4520432904860556,
+          "train_trades": 19.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:38:31.156408",
+          "forward_pf_eff": 6.215333957541888,
+          "forward_winrate": 0.8461538461538461,
+          "forward_trades": 13.0,
+          "train_pf_eff": 1.1131648379826435,
+          "train_trades": 194.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:11:02.600666",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 3.802227518660746,
+          "train_trades": 60.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:17:56.209498",
+          "forward_pf_eff": 3.743504809308452,
+          "forward_winrate": 0.6666666666666666,
+          "forward_trades": 3.0,
+          "train_pf_eff": 0.36450726808079537,
+          "train_trades": 23.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:32:22.593418",
+          "forward_pf_eff": 5.964589400526317,
+          "forward_winrate": 0.7142857142857143,
+          "forward_trades": 7.0,
+          "train_pf_eff": 2.318044641349414,
+          "train_trades": 17.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:40:08.302272",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 6.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:45:04.155405",
+          "forward_pf_eff": 2.6382212131609255,
+          "forward_winrate": 0.6666666666666666,
+          "forward_trades": 6.0,
+          "train_pf_eff": 0.3458495077284802,
+          "train_trades": 22.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:50:36.792535",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:50:56.912275",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 2.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:51:10.491766",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 3.250857073354179,
+          "train_trades": 14.0,
+          "selected": false
         }
       ],
-      "consecutive_miss": 0,
-      "low_priority": false,
-      "last_update": "2025-11-09T05:14:22.632438"
+      "consecutive_miss": 5,
+      "low_priority": true,
+      "last_update": "2025-11-09T07:51:10.491766"
     },
     "6758.T": {
       "history": [
@@ -2898,60 +2898,6 @@
     "7014.T": {
       "history": [
         {
-          "ts": "2025-11-08T09:38:37.014564",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T17:19:33.883436",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T20:24:58.931947",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T20:37:57.449253",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T20:48:39.783089",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T21:07:55.836307",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
           "ts": "2025-11-08T21:26:17.270840",
           "forward_pf_eff": 0.0,
           "forward_winrate": 0.0,
@@ -3076,25 +3022,151 @@
           "train_pf_eff": 0.0,
           "train_trades": 0.0,
           "selected": false
+        },
+        {
+          "ts": "2025-11-09T05:44:41.940241",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:06:06.942866",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:38:31.156408",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:17:56.209498",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:32:22.593418",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:45:04.155405",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
         }
       ],
-      "consecutive_miss": 85,
+      "consecutive_miss": 91,
       "low_priority": true,
-      "last_update": "2025-11-09T05:14:22.632438"
+      "last_update": "2025-11-09T07:45:04.155405"
     },
     "6857.T": {
       "history": [
         {
-          "ts": "2025-11-09T00:24:58.669411",
-          "forward_pf_eff": 2.7394093264058528,
-          "forward_winrate": 0.7142857142857143,
+          "ts": "2025-11-09T07:32:22.593418",
+          "forward_pf_eff": 5.526698645263791,
+          "forward_winrate": 0.7857142857142857,
           "forward_trades": 14.0,
-          "train_pf_eff": 1.677143591044357,
-          "train_trades": 45.0,
+          "train_pf_eff": 13.8021911980422,
+          "train_trades": 31.0,
           "selected": true
         },
         {
-          "ts": "2025-11-09T00:25:17.007545",
+          "ts": "2025-11-09T07:40:08.302272",
+          "forward_pf_eff": 6.314355711674339,
+          "forward_winrate": 0.9333333333333333,
+          "forward_trades": 15.0,
+          "train_pf_eff": 12.944103734595677,
+          "train_trades": 30.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:45:04.155405",
+          "forward_pf_eff": 3.9432276743906036,
+          "forward_winrate": 0.875,
+          "forward_trades": 8.0,
+          "train_pf_eff": 3.931020075986686,
+          "train_trades": 35.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:49:46.846166",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 6.0,
+          "train_pf_eff": 8.91842923566555,
+          "train_trades": 28.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:50:36.792535",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 1.0,
+          "train_pf_eff": 8.994194404982064,
+          "train_trades": 9.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:50:56.912275",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 1.0,
+          "train_pf_eff": 4.579413961523283,
+          "train_trades": 5.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:51:10.491766",
+          "forward_pf_eff": 0.7015768194128833,
+          "forward_winrate": 0.5,
+          "forward_trades": 46.0,
+          "train_pf_eff": 0.6987291775583856,
+          "train_trades": 126.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:51:27.087137",
+          "forward_pf_eff": 2.1860858846368627,
+          "forward_winrate": 0.6666666666666666,
+          "forward_trades": 9.0,
+          "train_pf_eff": 2.189905705030071,
+          "train_trades": 31.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:51:34.814523",
+          "forward_pf_eff": 3.000520379549116,
+          "forward_winrate": 0.7,
+          "forward_trades": 10.0,
+          "train_pf_eff": 1.9597357375629292,
+          "train_trades": 34.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:51:44.371866",
           "forward_pf_eff": 1.050715213718917,
           "forward_winrate": 0.5229357798165137,
           "forward_trades": 109.0,
@@ -3103,7 +3175,7 @@
           "selected": false
         },
         {
-          "ts": "2025-11-09T00:25:55.127340",
+          "ts": "2025-11-09T07:52:04.176953",
           "forward_pf_eff": 1.974060858194163,
           "forward_winrate": 0.7142857142857143,
           "forward_trades": 21.0,
@@ -3112,16 +3184,16 @@
           "selected": true
         },
         {
-          "ts": "2025-11-09T00:26:20.980591",
-          "forward_pf_eff": 3.2234657465758936,
+          "ts": "2025-11-09T07:52:18.523495",
+          "forward_pf_eff": 2.8557920752914887,
           "forward_winrate": 0.7058823529411765,
           "forward_trades": 17.0,
-          "train_pf_eff": 1.8678625446341013,
+          "train_pf_eff": 1.655470767924745,
           "train_trades": 53.0,
           "selected": true
         },
         {
-          "ts": "2025-11-09T00:26:42.337264",
+          "ts": "2025-11-09T07:52:29.943679",
           "forward_pf_eff": 0.9659014411096268,
           "forward_winrate": 0.5031055900621118,
           "forward_trades": 161.0,
@@ -3130,7 +3202,7 @@
           "selected": false
         },
         {
-          "ts": "2025-11-09T00:27:27.774217",
+          "ts": "2025-11-09T07:52:50.369574",
           "forward_pf_eff": 1.5224577487462059,
           "forward_winrate": 0.5714285714285714,
           "forward_trades": 28.0,
@@ -3139,16 +3211,16 @@
           "selected": true
         },
         {
-          "ts": "2025-11-09T00:27:55.552944",
-          "forward_pf_eff": 2.435527989243416,
-          "forward_winrate": 0.7142857142857143,
-          "forward_trades": 21.0,
-          "train_pf_eff": 1.807191509247567,
-          "train_trades": 64.0,
+          "ts": "2025-11-09T07:53:05.703503",
+          "forward_pf_eff": 2.8355609804052895,
+          "forward_winrate": 0.7272727272727273,
+          "forward_trades": 22.0,
+          "train_pf_eff": 1.8811569908827332,
+          "train_trades": 70.0,
           "selected": true
         },
         {
-          "ts": "2025-11-09T00:28:21.439104",
+          "ts": "2025-11-09T07:53:18.663439",
           "forward_pf_eff": 0.7668708810224266,
           "forward_winrate": 0.44680851063829785,
           "forward_trades": 235.0,
@@ -3157,16 +3229,16 @@
           "selected": false
         },
         {
-          "ts": "2025-11-09T00:29:13.438503",
+          "ts": "2025-11-09T07:53:45.925868",
           "forward_pf_eff": 0.838144424755611,
           "forward_winrate": 0.48148148148148145,
           "forward_trades": 27.0,
-          "train_pf_eff": 0.7649874068038749,
-          "train_trades": 87.0,
+          "train_pf_eff": 0.6356570543162171,
+          "train_trades": 72.0,
           "selected": false
         },
         {
-          "ts": "2025-11-09T00:30:01.525708",
+          "ts": "2025-11-09T07:54:10.203392",
           "forward_pf_eff": 0.8666578907095746,
           "forward_winrate": 0.47987616099071206,
           "forward_trades": 323.0,
@@ -3175,99 +3247,27 @@
           "selected": false
         },
         {
-          "ts": "2025-11-09T00:31:05.911913",
+          "ts": "2025-11-09T07:54:39.297622",
           "forward_pf_eff": 0.7718855192812109,
           "forward_winrate": 0.4444444444444444,
           "forward_trades": 36.0,
-          "train_pf_eff": 0.7116265631257016,
-          "train_trades": 109.0,
+          "train_pf_eff": 0.5917959526466476,
+          "train_trades": 87.0,
           "selected": false
         },
         {
-          "ts": "2025-11-09T00:31:51.885144",
+          "ts": "2025-11-09T07:55:03.555201",
           "forward_pf_eff": 0.7850781958897911,
           "forward_winrate": 0.4835164835164835,
           "forward_trades": 273.0,
           "train_pf_eff": 0.6080321302275087,
           "train_trades": 895.0,
           "selected": false
-        },
-        {
-          "ts": "2025-11-09T03:42:01.287560",
-          "forward_pf_eff": 0.4376434133910589,
-          "forward_winrate": 0.5,
-          "forward_trades": 4.0,
-          "train_pf_eff": 2.860944679506602,
-          "train_trades": 18.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T03:57:57.030687",
-          "forward_pf_eff": 0.8638772196601666,
-          "forward_winrate": 0.6666666666666666,
-          "forward_trades": 3.0,
-          "train_pf_eff": 3.0599474641086912,
-          "train_trades": 9.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T04:11:11.494087",
-          "forward_pf_eff": 1.6883707669097778,
-          "forward_winrate": 0.6666666666666666,
-          "forward_trades": 9.0,
-          "train_pf_eff": 1.2382037914249158,
-          "train_trades": 24.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T04:26:36.963815",
-          "forward_pf_eff": 2.781544079678507,
-          "forward_winrate": 0.6666666666666666,
-          "forward_trades": 3.0,
-          "train_pf_eff": 2.009812532078554,
-          "train_trades": 8.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T04:31:47.672349",
-          "forward_pf_eff": 1.9234506434393488,
-          "forward_winrate": 0.75,
-          "forward_trades": 8.0,
-          "train_pf_eff": 2.308561320404667,
-          "train_trades": 26.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T04:44:17.065332",
-          "forward_pf_eff": 5.535107191422777,
-          "forward_winrate": 0.7692307692307693,
-          "forward_trades": 13.0,
-          "train_pf_eff": 4.100645190232995,
-          "train_trades": 34.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T04:54:49.624689",
-          "forward_pf_eff": 0.60636242565385,
-          "forward_winrate": 0.5819672131147541,
-          "forward_trades": 122.0,
-          "train_pf_eff": 0.48152773315798264,
-          "train_trades": 340.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T05:14:22.632438",
-          "forward_pf_eff": 2.635235005208433,
-          "forward_winrate": 0.7777777777777778,
-          "forward_trades": 18.0,
-          "train_pf_eff": 1.9505179311502383,
-          "train_trades": 46.0,
-          "selected": true
         }
       ],
-      "consecutive_miss": 0,
-      "low_priority": false,
-      "last_update": "2025-11-09T05:14:22.632438"
+      "consecutive_miss": 5,
+      "low_priority": true,
+      "last_update": "2025-11-09T07:55:03.555201"
     },
     "7011.T": {
       "history": [
@@ -3527,105 +3527,6 @@
     "7012.T": {
       "history": [
         {
-          "ts": "2025-11-08T22:42:36.383778",
-          "forward_pf_eff": 4.080433702649956,
-          "forward_winrate": 0.8571428571428571,
-          "forward_trades": 14.0,
-          "train_pf_eff": 1.4884312869729284,
-          "train_trades": 40.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-08T22:56:05.723930",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 2.496544606309297,
-          "train_trades": 11.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T23:15:50.549179",
-          "forward_pf_eff": 0.5844535613342172,
-          "forward_winrate": 0.2710843373493976,
-          "forward_trades": 166.0,
-          "train_pf_eff": 0.6926213838458585,
-          "train_trades": 567.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T23:47:39.949975",
-          "forward_pf_eff": 1.9938079544944576,
-          "forward_winrate": 0.75,
-          "forward_trades": 16.0,
-          "train_pf_eff": 0.7345278984047212,
-          "train_trades": 46.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:06:22.009574",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 3.0,
-          "train_pf_eff": 15.656927511618317,
-          "train_trades": 15.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T00:13:44.155743",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:18:26.157422",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 4.0,
-          "train_pf_eff": 0.44510732651746376,
-          "train_trades": 23.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:23:20.840555",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 4.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:23:54.092290",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 2.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:24:15.561300",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 6.791146754528557,
-          "train_trades": 5.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T03:42:01.287560",
-          "forward_pf_eff": 17.611548569522967,
-          "forward_winrate": 0.9230769230769231,
-          "forward_trades": 13.0,
-          "train_pf_eff": 3.353079294038801,
-          "train_trades": 53.0,
-          "selected": true
-        },
-        {
           "ts": "2025-11-09T03:53:00.269557",
           "forward_pf_eff": 0.0,
           "forward_winrate": 0.0,
@@ -3705,11 +3606,110 @@
           "train_pf_eff": 2.564075071869915,
           "train_trades": 37.0,
           "selected": true
+        },
+        {
+          "ts": "2025-11-09T05:27:47.196526",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 3.217095707691706,
+          "train_trades": 3.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T05:44:41.940241",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 2.0,
+          "train_pf_eff": 0.19287885503460847,
+          "train_trades": 83.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:06:06.942866",
+          "forward_pf_eff": 4.453683215783673,
+          "forward_winrate": 0.9285714285714286,
+          "forward_trades": 14.0,
+          "train_pf_eff": 0.6458249981510455,
+          "train_trades": 39.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:38:31.156408",
+          "forward_pf_eff": 0.6072783756358887,
+          "forward_winrate": 0.3192771084337349,
+          "forward_trades": 166.0,
+          "train_pf_eff": 0.5784110358819502,
+          "train_trades": 580.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:17:56.209498",
+          "forward_pf_eff": 1.9938144251823549,
+          "forward_winrate": 0.75,
+          "forward_trades": 16.0,
+          "train_pf_eff": 0.7493936746966168,
+          "train_trades": 49.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:32:22.593418",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 3.0,
+          "train_pf_eff": 15.656927511618317,
+          "train_trades": 15.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:40:08.302272",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:45:04.155405",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 4.0,
+          "train_pf_eff": 0.44510732651746376,
+          "train_trades": 23.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:50:36.792535",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 4.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:50:56.912275",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 2.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:51:10.491766",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 6.791146754528557,
+          "train_trades": 5.0,
+          "selected": false
         }
       ],
-      "consecutive_miss": 0,
-      "low_priority": false,
-      "last_update": "2025-11-09T05:14:22.632438"
+      "consecutive_miss": 5,
+      "low_priority": true,
+      "last_update": "2025-11-09T07:51:10.491766"
     },
     "7453.T": {
       "history": [
@@ -4163,7 +4163,88 @@
     "8035.T": {
       "history": [
         {
-          "ts": "2025-11-09T00:27:27.774217",
+          "ts": "2025-11-09T07:50:56.912275",
+          "forward_pf_eff": 0.595403869412009,
+          "forward_winrate": 0.25,
+          "forward_trades": 4.0,
+          "train_pf_eff": 2.5373406401718914,
+          "train_trades": 16.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:51:10.491766",
+          "forward_pf_eff": 4.010522042793102,
+          "forward_winrate": 0.7777777777777778,
+          "forward_trades": 9.0,
+          "train_pf_eff": 1.436910700638449,
+          "train_trades": 38.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:51:19.646369",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 9.0,
+          "train_pf_eff": 0.8201740217176732,
+          "train_trades": 53.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:51:27.087137",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 3.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 6.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:51:44.371866",
+          "forward_pf_eff": 6.144540134089723,
+          "forward_winrate": 0.8571428571428571,
+          "forward_trades": 7.0,
+          "train_pf_eff": 1.1214903637228772,
+          "train_trades": 44.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:51:57.744317",
+          "forward_pf_eff": 7.94111087621354,
+          "forward_winrate": 0.9,
+          "forward_trades": 10.0,
+          "train_pf_eff": 0.8591591858952624,
+          "train_trades": 75.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:52:04.176953",
+          "forward_pf_eff": 7.115750972850871,
+          "forward_winrate": 0.8,
+          "forward_trades": 5.0,
+          "train_pf_eff": 1.9859243452453723,
+          "train_trades": 19.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:52:18.523495",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 7.0,
+          "train_pf_eff": 1.4924832029236712,
+          "train_trades": 25.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:52:29.943679",
+          "forward_pf_eff": 3.8570874449027306,
+          "forward_winrate": 0.75,
+          "forward_trades": 20.0,
+          "train_pf_eff": 0.7477523301726068,
+          "train_trades": 162.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:52:50.369574",
           "forward_pf_eff": 7.624971476029687,
           "forward_winrate": 0.8333333333333334,
           "forward_trades": 6.0,
@@ -4172,16 +4253,16 @@
           "selected": true
         },
         {
-          "ts": "2025-11-09T00:27:55.552944",
+          "ts": "2025-11-09T07:53:05.703503",
           "forward_pf_eff": 999.0,
           "forward_winrate": 1.0,
           "forward_trades": 7.0,
-          "train_pf_eff": 1.4605916418079496,
+          "train_pf_eff": 1.4176744897226623,
           "train_trades": 31.0,
           "selected": true
         },
         {
-          "ts": "2025-11-09T00:28:21.439104",
+          "ts": "2025-11-09T07:53:18.663439",
           "forward_pf_eff": 2.6376660021419216,
           "forward_winrate": 0.7142857142857143,
           "forward_trades": 35.0,
@@ -4190,16 +4271,16 @@
           "selected": false
         },
         {
-          "ts": "2025-11-09T00:29:01.626871",
-          "forward_pf_eff": 3.0195107171485995,
+          "ts": "2025-11-09T07:53:39.226173",
+          "forward_pf_eff": 2.9676580695810433,
           "forward_winrate": 0.7777777777777778,
           "forward_trades": 18.0,
-          "train_pf_eff": 0.6158934023141914,
+          "train_pf_eff": 0.6632683460182801,
           "train_trades": 162.0,
           "selected": false
         },
         {
-          "ts": "2025-11-09T00:29:13.438503",
+          "ts": "2025-11-09T07:53:45.925868",
           "forward_pf_eff": 4.937462668705237,
           "forward_winrate": 0.8,
           "forward_trades": 10.0,
@@ -4208,16 +4289,16 @@
           "selected": true
         },
         {
-          "ts": "2025-11-09T00:29:30.201567",
-          "forward_pf_eff": 8.3036272430204,
+          "ts": "2025-11-09T07:53:56.363794",
+          "forward_pf_eff": 8.390812604394053,
           "forward_winrate": 0.9,
           "forward_trades": 10.0,
-          "train_pf_eff": 1.2484405777336847,
+          "train_pf_eff": 1.2508446815811158,
           "train_trades": 43.0,
           "selected": true
         },
         {
-          "ts": "2025-11-09T00:30:01.525708",
+          "ts": "2025-11-09T07:54:10.203392",
           "forward_pf_eff": 1.3592653947752853,
           "forward_winrate": 0.6285714285714286,
           "forward_trades": 70.0,
@@ -4226,7 +4307,7 @@
           "selected": false
         },
         {
-          "ts": "2025-11-09T00:31:05.911913",
+          "ts": "2025-11-09T07:54:39.297622",
           "forward_pf_eff": 2.4537973087819593,
           "forward_winrate": 0.75,
           "forward_trades": 16.0,
@@ -4235,16 +4316,16 @@
           "selected": false
         },
         {
-          "ts": "2025-11-09T00:31:24.031884",
-          "forward_pf_eff": 3.808258797616168,
+          "ts": "2025-11-09T07:54:50.511420",
+          "forward_pf_eff": 4.267745822545332,
           "forward_winrate": 0.8461538461538461,
           "forward_trades": 13.0,
-          "train_pf_eff": 0.7163551844123804,
-          "train_trades": 40.0,
+          "train_pf_eff": 0.6777904215738985,
+          "train_trades": 43.0,
           "selected": false
         },
         {
-          "ts": "2025-11-09T00:31:51.885144",
+          "ts": "2025-11-09T07:55:03.555201",
           "forward_pf_eff": 0.403250237739067,
           "forward_winrate": 0.3305785123966942,
           "forward_trades": 121.0,
@@ -4253,99 +4334,18 @@
           "selected": false
         },
         {
-          "ts": "2025-11-09T00:31:59.674143",
-          "forward_pf_eff": 0.5309163174624901,
-          "forward_winrate": 0.35294117647058826,
-          "forward_trades": 17.0,
-          "train_pf_eff": 0.5015080076158812,
-          "train_trades": 43.0,
+          "ts": "2025-11-09T07:55:10.901115",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 6.0,
+          "train_pf_eff": 0.2317053287227056,
+          "train_trades": 26.0,
           "selected": false
-        },
-        {
-          "ts": "2025-11-09T03:42:01.287560",
-          "forward_pf_eff": 0.32996954434464554,
-          "forward_winrate": 0.14285714285714285,
-          "forward_trades": 7.0,
-          "train_pf_eff": 1.4735967697725503,
-          "train_trades": 34.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T03:57:57.030687",
-          "forward_pf_eff": 0.9308877983038899,
-          "forward_winrate": 0.25,
-          "forward_trades": 4.0,
-          "train_pf_eff": 3.12215719836928,
-          "train_trades": 21.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T04:11:11.494087",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 8.0,
-          "train_pf_eff": 6.393321668569059,
-          "train_trades": 38.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T04:26:36.963815",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 8.0,
-          "train_pf_eff": 25.446728974320493,
-          "train_trades": 38.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T04:31:47.672349",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 4.0,
-          "train_pf_eff": 15.885637993407965,
-          "train_trades": 13.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T04:44:17.065332",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 4.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 11.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T04:54:49.624689",
-          "forward_pf_eff": 4.7893656760234835,
-          "forward_winrate": 0.95,
-          "forward_trades": 20.0,
-          "train_pf_eff": 2.0694918135116183,
-          "train_trades": 93.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T05:08:32.253847",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 13.0,
-          "train_pf_eff": 3.8331703206922803,
-          "train_trades": 75.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T05:14:22.632438",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 5.0,
-          "train_pf_eff": 7.011896577053517,
-          "train_trades": 18.0,
-          "selected": true
         }
       ],
-      "consecutive_miss": 0,
-      "low_priority": false,
-      "last_update": "2025-11-09T05:14:22.632438"
+      "consecutive_miss": 5,
+      "low_priority": true,
+      "last_update": "2025-11-09T07:55:10.901115"
     },
     "8766.T": {
       "history": [
@@ -4429,150 +4429,6 @@
     "8136.T": {
       "history": [
         {
-          "ts": "2025-11-09T00:01:45.695432",
-          "forward_pf_eff": 2.5502929966835044,
-          "forward_winrate": 0.8421052631578947,
-          "forward_trades": 19.0,
-          "train_pf_eff": 1.072220868455045,
-          "train_trades": 79.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T00:06:22.009574",
-          "forward_pf_eff": 1.5998861606255774,
-          "forward_winrate": 0.45454545454545453,
-          "forward_trades": 11.0,
-          "train_pf_eff": 1.6244074583616708,
-          "train_trades": 31.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T00:13:44.155743",
-          "forward_pf_eff": 3.0931089265566194,
-          "forward_winrate": 0.875,
-          "forward_trades": 8.0,
-          "train_pf_eff": 0.5389264800457697,
-          "train_trades": 30.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:18:26.157422",
-          "forward_pf_eff": 6.525380400330176,
-          "forward_winrate": 0.8571428571428571,
-          "forward_trades": 7.0,
-          "train_pf_eff": 3.677597382236749,
-          "train_trades": 18.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T00:22:55.544125",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:23:20.840555",
-          "forward_pf_eff": 1.562104084004757,
-          "forward_winrate": 0.42857142857142855,
-          "forward_trades": 7.0,
-          "train_pf_eff": 1.2284735703550143,
-          "train_trades": 42.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T00:23:34.840041",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 6.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:23:54.092290",
-          "forward_pf_eff": 2.5283961360318377,
-          "forward_winrate": 0.6,
-          "forward_trades": 5.0,
-          "train_pf_eff": 0.355381105239502,
-          "train_trades": 18.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:24:15.561300",
-          "forward_pf_eff": 0.6613569107939397,
-          "forward_winrate": 0.4,
-          "forward_trades": 40.0,
-          "train_pf_eff": 0.7969054665859573,
-          "train_trades": 175.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:24:46.812384",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 1.5777411130495578,
-          "train_trades": 6.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:25:17.007545",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.12115713965836039,
-          "train_trades": 18.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T03:42:01.287560",
-          "forward_pf_eff": 2.9250382850664782,
-          "forward_winrate": 0.8,
-          "forward_trades": 5.0,
-          "train_pf_eff": 0.8038430681784184,
-          "train_trades": 34.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T03:53:00.269557",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 2.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 22.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T03:57:57.030687",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 4.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 15.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T04:03:13.092027",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 3.0,
-          "train_pf_eff": 3.6986834821726102,
-          "train_trades": 17.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T04:11:11.494087",
-          "forward_pf_eff": 0.8677583866847074,
-          "forward_winrate": 0.46,
-          "forward_trades": 50.0,
-          "train_pf_eff": 0.9437528663472952,
-          "train_trades": 204.0,
-          "selected": false
-        },
-        {
           "ts": "2025-11-09T04:31:47.672349",
           "forward_pf_eff": 6.949158289048307,
           "forward_winrate": 0.9090909090909091,
@@ -4607,11 +4463,155 @@
           "train_pf_eff": 0.8755976399679515,
           "train_trades": 48.0,
           "selected": false
+        },
+        {
+          "ts": "2025-11-09T05:27:47.196526",
+          "forward_pf_eff": 5.844976621198663,
+          "forward_winrate": 0.9230769230769231,
+          "forward_trades": 13.0,
+          "train_pf_eff": 1.4112533898006436,
+          "train_trades": 52.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T05:44:41.940241",
+          "forward_pf_eff": 0.4381545626341604,
+          "forward_winrate": 0.2980769230769231,
+          "forward_trades": 208.0,
+          "train_pf_eff": 0.5317994470267681,
+          "train_trades": 732.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:06:06.942866",
+          "forward_pf_eff": 1.6813720116706348,
+          "forward_winrate": 0.5555555555555556,
+          "forward_trades": 27.0,
+          "train_pf_eff": 1.3545572962623438,
+          "train_trades": 72.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T06:17:26.578201",
+          "forward_pf_eff": 1.6834964344033,
+          "forward_winrate": 0.75,
+          "forward_trades": 8.0,
+          "train_pf_eff": 0.6009574809690955,
+          "train_trades": 57.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:38:31.156408",
+          "forward_pf_eff": 0.42248440044394614,
+          "forward_winrate": 0.2936802973977695,
+          "forward_trades": 269.0,
+          "train_pf_eff": 0.48821885050409747,
+          "train_trades": 912.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:17:56.209498",
+          "forward_pf_eff": 1.1564955448623968,
+          "forward_winrate": 0.46875,
+          "forward_trades": 32.0,
+          "train_pf_eff": 1.362087705185162,
+          "train_trades": 77.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:32:22.593418",
+          "forward_pf_eff": 1.5998861606255774,
+          "forward_winrate": 0.45454545454545453,
+          "forward_trades": 11.0,
+          "train_pf_eff": 1.6244074583616708,
+          "train_trades": 31.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:40:08.302272",
+          "forward_pf_eff": 3.0931089265566194,
+          "forward_winrate": 0.875,
+          "forward_trades": 8.0,
+          "train_pf_eff": 0.5389264800457697,
+          "train_trades": 30.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:45:04.155405",
+          "forward_pf_eff": 6.525380400330176,
+          "forward_winrate": 0.8571428571428571,
+          "forward_trades": 7.0,
+          "train_pf_eff": 3.677597382236749,
+          "train_trades": 18.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:49:46.846166",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:50:36.792535",
+          "forward_pf_eff": 1.562104084004757,
+          "forward_winrate": 0.42857142857142855,
+          "forward_trades": 7.0,
+          "train_pf_eff": 1.2284735703550143,
+          "train_trades": 42.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:50:46.014243",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 8.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:50:56.912275",
+          "forward_pf_eff": 2.5283961360318377,
+          "forward_winrate": 0.6,
+          "forward_trades": 5.0,
+          "train_pf_eff": 0.355381105239502,
+          "train_trades": 18.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:51:10.491766",
+          "forward_pf_eff": 0.6613569107939397,
+          "forward_winrate": 0.4,
+          "forward_trades": 40.0,
+          "train_pf_eff": 0.7969054665859573,
+          "train_trades": 175.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:51:27.087137",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 1.5777411130495578,
+          "train_trades": 6.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:51:44.371866",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.12115713965836039,
+          "train_trades": 18.0,
+          "selected": false
         }
       ],
-      "consecutive_miss": 2,
-      "low_priority": false,
-      "last_update": "2025-11-09T05:14:22.632438"
+      "consecutive_miss": 5,
+      "low_priority": true,
+      "last_update": "2025-11-09T07:51:44.371866"
     },
     "8306.T": {
       "history": [
@@ -4676,96 +4676,6 @@
     },
     "8411.T": {
       "history": [
-        {
-          "ts": "2025-11-08T22:42:36.383778",
-          "forward_pf_eff": 6.4914716800901235,
-          "forward_winrate": 0.8181818181818182,
-          "forward_trades": 11.0,
-          "train_pf_eff": 2.9370325567768245,
-          "train_trades": 48.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-08T22:56:05.723930",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T23:15:50.549179",
-          "forward_pf_eff": 1.7122320345536644,
-          "forward_winrate": 0.5808383233532934,
-          "forward_trades": 167.0,
-          "train_pf_eff": 1.7008637519874734,
-          "train_trades": 690.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-08T23:41:25.527991",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T23:47:39.949975",
-          "forward_pf_eff": 4.504549304851477,
-          "forward_winrate": 0.7692307692307693,
-          "forward_trades": 13.0,
-          "train_pf_eff": 1.9341664254905542,
-          "train_trades": 59.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-09T00:01:45.695432",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:06:22.009574",
-          "forward_pf_eff": 0.08448446242543244,
-          "forward_winrate": 0.125,
-          "forward_trades": 8.0,
-          "train_pf_eff": 0.06984426971642595,
-          "train_trades": 29.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:18:26.157422",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 2.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 6.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:23:20.840555",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-09T00:23:54.092290",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
         {
           "ts": "2025-11-09T03:42:01.287560",
           "forward_pf_eff": 11.389297543769553,
@@ -4855,11 +4765,101 @@
           "train_pf_eff": 52.00318000077148,
           "train_trades": 19.0,
           "selected": true
+        },
+        {
+          "ts": "2025-11-09T05:27:47.196526",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T05:44:41.940241",
+          "forward_pf_eff": 2.075527554047293,
+          "forward_winrate": 0.6044776119402985,
+          "forward_trades": 134.0,
+          "train_pf_eff": 2.1618692144311784,
+          "train_trades": 516.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T06:06:06.942866",
+          "forward_pf_eff": 6.491471386341684,
+          "forward_winrate": 0.8181818181818182,
+          "forward_trades": 11.0,
+          "train_pf_eff": 4.35362042733579,
+          "train_trades": 42.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T06:38:31.156408",
+          "forward_pf_eff": 1.7117983027191783,
+          "forward_winrate": 0.5808383233532934,
+          "forward_trades": 167.0,
+          "train_pf_eff": 1.7946167518896896,
+          "train_trades": 620.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:17:56.209498",
+          "forward_pf_eff": 4.504549304841876,
+          "forward_winrate": 0.7692307692307693,
+          "forward_trades": 13.0,
+          "train_pf_eff": 2.481488426170637,
+          "train_trades": 49.0,
+          "selected": true
+        },
+        {
+          "ts": "2025-11-09T07:32:22.593418",
+          "forward_pf_eff": 0.08448446242543244,
+          "forward_winrate": 0.125,
+          "forward_trades": 8.0,
+          "train_pf_eff": 0.06984426971642595,
+          "train_trades": 29.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:45:04.155405",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 2.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 6.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:50:36.792535",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:50:56.912275",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:51:10.491766",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
         }
       ],
-      "consecutive_miss": 0,
-      "low_priority": false,
-      "last_update": "2025-11-09T05:14:22.632438"
+      "consecutive_miss": 5,
+      "low_priority": true,
+      "last_update": "2025-11-09T07:51:10.491766"
     },
     "9983.T": {
       "history": [
@@ -5527,60 +5527,6 @@
     "9432.T": {
       "history": [
         {
-          "ts": "2025-11-08T09:38:37.014564",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T17:19:33.883436",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T20:24:58.931947",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T20:37:57.449253",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T20:48:39.783089",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T21:07:55.836307",
-          "forward_pf_eff": 0.0,
-          "forward_winrate": 0.0,
-          "forward_trades": 0.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
           "ts": "2025-11-08T21:26:17.270840",
           "forward_pf_eff": 0.0,
           "forward_winrate": 0.0,
@@ -5705,11 +5651,65 @@
           "train_pf_eff": 0.0,
           "train_trades": 0.0,
           "selected": false
+        },
+        {
+          "ts": "2025-11-09T05:44:41.940241",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:06:06.942866",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:38:31.156408",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:17:56.209498",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:32:22.593418",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:45:04.155405",
+          "forward_pf_eff": 0.0,
+          "forward_winrate": 0.0,
+          "forward_trades": 0.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
         }
       ],
-      "consecutive_miss": 50,
+      "consecutive_miss": 56,
       "low_priority": true,
-      "last_update": "2025-11-09T05:14:22.632438"
+      "last_update": "2025-11-09T07:45:04.155405"
     },
     "6814.T": {
       "history": [
@@ -6520,60 +6520,6 @@
     "1357.T": {
       "history": [
         {
-          "ts": "2025-11-08T09:38:37.014564",
-          "forward_pf_eff": 0.6392087275093047,
-          "forward_winrate": 0.5645161290322581,
-          "forward_trades": 62.0,
-          "train_pf_eff": 2.5186629671548975,
-          "train_trades": 58.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T17:19:33.883436",
-          "forward_pf_eff": 2.8380280117076917,
-          "forward_winrate": 0.9166666666666666,
-          "forward_trades": 12.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 13.0,
-          "selected": true
-        },
-        {
-          "ts": "2025-11-08T20:24:58.931947",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 6.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 2.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T20:37:57.449253",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 2.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 2.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T20:48:39.783089",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 10.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T21:07:55.836307",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 4.0,
-          "train_pf_eff": 0.0,
-          "train_trades": 0.0,
-          "selected": false
-        },
-        {
           "ts": "2025-11-08T21:26:17.270840",
           "forward_pf_eff": 0.8539420814826488,
           "forward_winrate": 0.46,
@@ -6698,11 +6644,65 @@
           "train_pf_eff": 999.0,
           "train_trades": 4.0,
           "selected": false
+        },
+        {
+          "ts": "2025-11-09T05:44:41.940241",
+          "forward_pf_eff": 0.7239507403278087,
+          "forward_winrate": 0.48502994011976047,
+          "forward_trades": 167.0,
+          "train_pf_eff": 2.6144592947742646,
+          "train_trades": 124.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:06:06.942866",
+          "forward_pf_eff": 1.9741390941807089,
+          "forward_winrate": 0.6363636363636364,
+          "forward_trades": 11.0,
+          "train_pf_eff": 1.7729413008110255,
+          "train_trades": 5.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:38:31.156408",
+          "forward_pf_eff": 0.6376895226497641,
+          "forward_winrate": 0.4423076923076923,
+          "forward_trades": 208.0,
+          "train_pf_eff": 2.3185034176964736,
+          "train_trades": 138.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:17:56.209498",
+          "forward_pf_eff": 1.3226174376847466,
+          "forward_winrate": 0.5333333333333333,
+          "forward_trades": 15.0,
+          "train_pf_eff": 2.112709229241911,
+          "train_trades": 6.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:32:22.593418",
+          "forward_pf_eff": 0.27746970102316093,
+          "forward_winrate": 0.4444444444444444,
+          "forward_trades": 9.0,
+          "train_pf_eff": 0.45965451595985335,
+          "train_trades": 4.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:45:04.155405",
+          "forward_pf_eff": 1.7789761051932704,
+          "forward_winrate": 0.5,
+          "forward_trades": 2.0,
+          "train_pf_eff": 0.0,
+          "train_trades": 0.0,
+          "selected": false
         }
       ],
-      "consecutive_miss": 8,
+      "consecutive_miss": 14,
       "low_priority": true,
-      "last_update": "2025-11-09T05:14:22.632438"
+      "last_update": "2025-11-09T07:45:04.155405"
     },
     "1571.T": {
       "history": [
@@ -18811,60 +18811,6 @@
     "7735.T": {
       "history": [
         {
-          "ts": "2025-11-08T09:38:37.014564",
-          "forward_pf_eff": 0.8771536242321762,
-          "forward_winrate": 0.4230769230769231,
-          "forward_trades": 26.0,
-          "train_pf_eff": 0.8771536242321762,
-          "train_trades": 26.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T17:19:33.883436",
-          "forward_pf_eff": 3.119539655775283,
-          "forward_winrate": 0.8,
-          "forward_trades": 5.0,
-          "train_pf_eff": 3.119539655775283,
-          "train_trades": 5.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T20:24:58.931947",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 1.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 1.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T20:37:57.449253",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 1.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 1.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T20:48:39.783089",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 9.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 9.0,
-          "selected": false
-        },
-        {
-          "ts": "2025-11-08T21:07:55.836307",
-          "forward_pf_eff": 999.0,
-          "forward_winrate": 1.0,
-          "forward_trades": 3.0,
-          "train_pf_eff": 999.0,
-          "train_trades": 3.0,
-          "selected": false
-        },
-        {
           "ts": "2025-11-08T21:26:17.270840",
           "forward_pf_eff": 0.5894537187972126,
           "forward_winrate": 0.3333333333333333,
@@ -18989,11 +18935,65 @@
           "train_pf_eff": 2.068033299805023,
           "train_trades": 4.0,
           "selected": false
+        },
+        {
+          "ts": "2025-11-09T05:44:41.940241",
+          "forward_pf_eff": 0.20056690752660514,
+          "forward_winrate": 0.09803921568627451,
+          "forward_trades": 51.0,
+          "train_pf_eff": 0.20056690752660514,
+          "train_trades": 102.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:06:06.942866",
+          "forward_pf_eff": 2.068033299805023,
+          "forward_winrate": 0.5,
+          "forward_trades": 2.0,
+          "train_pf_eff": 2.068033299805023,
+          "train_trades": 4.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T06:38:31.156408",
+          "forward_pf_eff": 0.5091009603750783,
+          "forward_winrate": 0.2727272727272727,
+          "forward_trades": 66.0,
+          "train_pf_eff": 0.5091009603750783,
+          "train_trades": 132.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:17:56.209498",
+          "forward_pf_eff": 2.068033299805023,
+          "forward_winrate": 0.5,
+          "forward_trades": 2.0,
+          "train_pf_eff": 2.068033299805023,
+          "train_trades": 4.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:32:22.593418",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 2.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 4.0,
+          "selected": false
+        },
+        {
+          "ts": "2025-11-09T07:45:04.155405",
+          "forward_pf_eff": 999.0,
+          "forward_winrate": 1.0,
+          "forward_trades": 2.0,
+          "train_pf_eff": 999.0,
+          "train_trades": 4.0,
+          "selected": false
         }
       ],
-      "consecutive_miss": 3,
-      "low_priority": false,
-      "last_update": "2025-11-09T05:14:22.632438"
+      "consecutive_miss": 9,
+      "low_priority": true,
+      "last_update": "2025-11-09T07:45:04.155405"
     },
     "7951.T": {
       "history": [

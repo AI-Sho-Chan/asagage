@@ -1,0 +1,14 @@
+[2025-11-09 07:53:20] Run started
+[2025-11-09 07:53:20] Run type resolved to weekday
+[2025-11-09 07:53:20] Codes limited via output\bt30\NIGHTLY_20251109\RUN_coarse_AM1015_j-only\_TOP_CANDIDATES.csv: 2 tickers (was 20)
+[2025-11-09 07:53:21] Entry window marks set: 5298 rows flagged out of 23899
+[2025-11-09 07:53:21] Liquidity filter q=0.50 kept 2 tickers and 12081 rows
+[2025-11-09 07:53:21] Using 5 rolling slices (train=12, forward=4)
+[2025-11-09 07:53:21] Parameter grid size: 28 (mode=refine, signal=j-only)
+[2025-11-09 07:53:38] [1/2] 5016.T: best train_pf_eff=1.803, forward_pf_eff=1.924, trades=192/46
+[2025-11-09 07:53:39] [2/2] 8035.T: best train_pf_eff=0.663, forward_pf_eff=2.968, trades=162/18
+[2025-11-09 07:53:39] Cache reuse: 59/103 combos (57.3%) served from cache
+[2025-11-09 07:53:39] Bayesian refine trials executed: 47
+[2025-11-09 07:53:39] Refine candidates exported to output\excel\NIGHTLY_20251109\AM1015_j-only\candidates_20251109.csv
+[2025-11-09 07:53:39] Excel summary written to output\bt30\NIGHTLY_20251109\RUN_refine_AM1015_j-only\summary_20251109_075339.xlsx
+[2025-11-09 07:53:39] Run completed in 0.3 minutes

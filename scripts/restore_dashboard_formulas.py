@@ -4,7 +4,7 @@ from pathlib import Path
 
 import win32com.client  # type: ignore
 
-WB_PATH = Path("C:/AI/asagake/SHINSOKU.xlsm")
+WB_PATH = Path("C:/AI/asagake/ASAGAKE.xlsm")
 SHEET_NAME = "NewDashboard"
 START_ROW = 6
 ROWS = 600
@@ -51,7 +51,7 @@ def col_to_index(col: str) -> int:
 def main() -> int:
     # Create timestamped backup before any modification
     try:
-        backup = WB_PATH.with_name(f"SHINSOKU_backup_{__import__('datetime').datetime.now():%Y%m%d_%H%M%S}.xlsm")
+        backup = WB_PATH.with_name(f"ASAGAKE_backup_{__import__('datetime').datetime.now():%Y%m%d_%H%M%S}.xlsm")
         import shutil
         shutil.copy2(WB_PATH, backup)
     except Exception:

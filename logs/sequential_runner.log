@@ -46,3 +46,7 @@
 [2025-11-09T00:32:04] Sequential runner completed
 [2025-11-09T03:35:52] Sequential runner started
 [2025-11-09T03:35:53] Starting WEEKEND batch (10 windows + R&D windows)
+[2025-11-09T07:50:24] WEEKEND batch exit code: 0
+[2025-11-09T07:50:24] Starting NIGHTLY batch (weekday mode)
+[2025-11-09T08:25:50] NIGHTLY batch exit code: 0
+[2025-11-09T08:25:50] Sequential runner completed

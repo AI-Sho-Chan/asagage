@@ -52,7 +52,7 @@ $args = @(
     '--lookback','60','--chunk-days','5','--train-days','12','--forward-days','4',
     '--min-train-trades','12','--min-forward-trades','5','--forward-pf-min','1.3','--min-forward-ci','0.65',
     '--gap-guard-abs-bp','80.0','--gap-guard-dir-bp','40.0','--slipbp','4.0','--feebp','4.0',
-    '--liquidity-quantile','0.5','--jobs','6','--enable-asha','--enable-bayes','--bayes-trials','24','--bayes-timeout','600',
+    '--liquidity-quantile','0.3','--jobs','6','--enable-asha','--enable-bayes','--bayes-trials','24','--bayes-timeout','600',
     '--mask-ineffective','--mask-window','20','--mask-threshold','1.05',
     '--enable-market-features','--excel-summary','--analysis-ledger','--refine-quick-grid'
 )
@@ -79,6 +79,16 @@ $args = @(
     Write-Status 'aggregate' "weekly candidates: $($aggJson.rows) rows -> $written"
   }
 
+  # Pre-fetch minute cache for listed tickers to ensure 'ts' exists
+  $cacheArgs = @(
+    'tools/update_minute_cache.py',
+    '--codes-file',$weeklyOut,
+    '--history-days','8'
+  )
+  & $Python $cacheArgs
+  if ($LASTEXITCODE -ne 0) { throw "minute cache update failed ($LASTEXITCODE)" }
+
+  # Compute dashboard coefficients with guarded merge
   $coeffArgs = @(
     'tools/compute_dashboard_coeffs.py',
     '--codes-file',$weeklyOut,
@@ -101,3 +111,4 @@ catch {
   Write-Status 'error' ($_.Exception.Message)
   throw
 }
+

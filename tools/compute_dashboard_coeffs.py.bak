@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Compute per-ticker dashboard coefficients (Bias/GAP/Corr slopes)."""
 
 from __future__ import annotations
@@ -160,7 +160,6 @@ def compute_coefficients(tickers: List[str], root: Path, history_days: int, nky_
     end = days[-1]
     nky_df = fetch_index_minutes(nky_symbol, start, end)
     nky_minute, nky_daily = compute_day_stats(nky_df)
-    # Index minute returns for merge; guard empty frames
     nky_ret = nky_minute.rename(columns={"ret": "nk_ret"}).reset_index(drop=True)
 
     records: List[Dict[str, float]] = []
@@ -170,9 +169,6 @@ def compute_coefficients(tickers: List[str], root: Path, history_days: int, nky_
             continue
         minute_df, daily_df = compute_day_stats(data)
         if minute_df.empty:
-            continue
-        # Safety: skip if required timestamp column is missing due to upstream data gaps
-        if "ts" not in minute_df.columns or "ts" not in nky_ret.columns:
             continue
         merged = minute_df.merge(nky_ret, on="ts", how="inner")
         bias_slope = slope(merged["nk_ret"].to_numpy(), merged["ret"].to_numpy())
@@ -242,3 +238,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
