@@ -2239,25 +2239,60 @@ End Sub
 Private Sub EnsureParamFormulas(ByVal ws As Worksheet)
     On Error Resume Next
     ws.Cells(2, 1).Value = "N225"
-    ws.Cells(2, 2).Formula = "=IF($A$2="""","""",IFERROR(RssIndexMarket($A$2,""現在値""),""""))"
-    ws.Cells(2, 3).Formula = "=IF($A$2="""","""",IFERROR(RssIndexMarket($A$2,""前日比""),""""))"
     ws.Cells(2, 4).Value = "TOPX"
-    ws.Cells(2, 5).Formula = "=IF($D$2="""","""",IFERROR(RssIndexMarket($D$2,""現在値""),""""))"
-    ws.Cells(2, 6).Formula = "=IF($D$2="""","""",IFERROR(RssIndexMarket($D$2,""前日比""),""""))"
+    ws.Cells(2, 2).Formula = "=IF(A2="""","""",IFERROR(RssIndexMarket(A2,""現在値""),""""))"
+    ws.Cells(2, 3).Formula = "=IF(A2="""","""",IFERROR(RssIndexMarket(A2,""前日比""),""""))"
+    ws.Cells(2, 5).Formula = "=IF(D2="""","""",IFERROR(RssIndexMarket(D2,""現在値""),""""))"
+    ws.Cells(2, 6).Formula = "=IF(D2="""","""",IFERROR(RssIndexMarket(D2,""前日比""),""""))"
+    Dim paramHeaders As Variant
+    paramHeaders = Array( _
+        Array(1, "指標コード(日経平均)", "楽天RSSに渡す指標コード。通常はN225固定です"), _
+        Array(2, "日経平均 現在値", ""), _
+        Array(3, "日経平均 前日比", ""), _
+        Array(4, "指標コード(TOPIX)", "楽天RSSに渡すTOPIXコード。通常はTOPXです"), _
+        Array(5, "TOPIX 現在値", ""), _
+        Array(6, "TOPIX 前日比", ""), _
+        Array(7, "バイアス閾値(bp)", "J補正をBAN扱いにする絶対値閾値"), _
+        Array(8, "Bias補正係数", "日経平均との方向差で加算する係数"), _
+        Array(9, "Gap補正係数", "ギャップ量に応じた補正係数"), _
+        Array(10, "Gap BAN 閾値(%)", "この割合を超えるギャップは自動BAN"), _
+        Array(11, "取引停止分数", "AutoTrader再開までのクールダウン（分）"), _
+        Array(12, "TP/J (全体)", ""), _
+        Array(13, "SL/J (全体)", ""), _
+        Array(14, "Trail/J (全体)", ""), _
+        Array(15, "相関補正係数", "NKY/TOPIX相関でJ_thを補正する係数"), _
+        Array(16, "銘柄別予算(円)", ""), _
+        Array(17, "ロットサイズ", ""), _
+        Array(18, "NKY日足トレンド", ""), _
+        Array(19, "NKY窓トレンド", ""), _
+        Array(20, "NKY許容サイド", ""), _
+        Array(21, "TOPIX日足トレンド", ""), _
+        Array(22, "TOPIX窓トレンド", ""), _
+        Array(23, "TOPIX許容サイド", "") _
+    )
+    Dim headerInfo As Variant
+    For Each headerInfo In paramHeaders
+        ws.Cells(1, headerInfo(0)).Value = headerInfo(1)
+        If UBound(headerInfo) >= 2 Then
+            If Len(headerInfo(2)) > 0 Then
+                SetHeaderComment ws, headerInfo(0), headerInfo(2)
+            End If
+        End If
+    Next headerInfo
     Dim noteItems As Variant
     noteItems = Array( _
-        Array(13, "TP_per_J: Global take-profit multiplier per unit J (fallback when row-specific entry is blank)."), _
-        Array(14, "SL_per_J: Global stop-loss multiplier per unit J."), _
-        Array(15, "Trail_per_J: Global trailing width per unit J."), _
-        Array(16, "CorrSlope: Coefficient applied to driver correlation when adjusting J_th."), _
-        Array(17, "BudgetPerTicker: Max capital (JPY) allocated per ticker."), _
-        Array(18, "LotSize: Trading lot size (shares) used when sizing orders."), _
-        Array(19, "NKY_TrendDay: Override for NKY day-trend (RSS driven)."), _
-        Array(20, "NKY_TrendWindow: Override for NKY intraday/window trend."), _
-        Array(21, "NKY_AllowedSide: Allowed side for NKY-aligned trades (BUY/SELL/BOTH)."), _
-        Array(22, "TOPIX_TrendDay: Override for TOPIX day-trend (RSS driven)."), _
-        Array(23, "TOPIX_TrendWindow: Override for TOPIX intraday/window trend."), _
-        Array(24, "TOPIX_AllowedSide: Allowed side for TOPIX-aligned trades (BUY/SELL/BOTH).") _
+        Array(13, "TP/J グローバル設定。銘柄行が空欄の場合に利確幅として使用します。"), _
+        Array(14, "SL/J グローバル設定。銘柄行が空欄の場合の損切幅です。"), _
+        Array(15, "Trail/J グローバル設定。トレーリング幅（J値基準）。"), _
+        Array(16, "CorrSlope: 相関係数による J_th 補正係数。"), _
+        Array(17, "BudgetPerTicker: 銘柄ごとの最大投下資金（円）。"), _
+        Array(18, "LotSize: 1 取引あたりの株数。"), _
+        Array(19, "NKY_TrendDay: 日経平均の日足トレンド（上書き用）。"), _
+        Array(20, "NKY_TrendWindow: 日経平均の短期トレンド。"), _
+        Array(21, "NKY_AllowedSide: 日経連動時に許可する方向。"), _
+        Array(22, "TOPIX_TrendDay: TOPIX 日足トレンド。"), _
+        Array(23, "TOPIX_TrendWindow: TOPIX 短期トレンド。"), _
+        Array(24, "TOPIX_AllowedSide: TOPIX 連動時の許可方向。") _
     )
     Dim entry As Variant
     For Each entry In noteItems

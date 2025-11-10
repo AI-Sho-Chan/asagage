@@ -50,7 +50,7 @@ PARAM_DEFAULTS = [
     "N225",
     "",
     0.0,
-    "3TOPX",
+    "TOPX",
     "",
     0.0,
     0.0,
@@ -71,6 +71,32 @@ PARAM_DEFAULTS = [
     "",
     "BOTH",
 ]
+
+PARAM_LABELS = {
+    "NKY_Code": ("指標コード(日経平均)", "楽天RSSに渡す指標コード。通常はN225固定です"),
+    "NKY_Last": ("日経平均 現在値", "RssIndexMarket(\"現在値\")で取得した値を表示します"),
+    "NKY_ChgPct": ("日経平均 前日比", "RssIndexMarket(\"前日比\")の結果を表示します"),
+    "TOPIX_Code": ("指標コード(TOPIX)", "楽天RSSに渡すTOPIXコード。通常はTOPXです"),
+    "TOPIX_Last": ("TOPIX 現在値", "RssIndexMarket(\"現在値\")で取得したTOPIXの値"),
+    "TOPIX_ChgPct": ("TOPIX 前日比", "RssIndexMarket(\"前日比\")の結果"),
+    "Bias_bp": ("バイアス閾値(bp)", "J補正をBAN扱いにする絶対値閾値"),
+    "BiasSlope": ("Bias補正係数", "日経平均との方向差で加算する係数"),
+    "GapSlope": ("Gap補正係数", "ギャップ量に応じた補正係数"),
+    "GapBanPct": ("Gap BAN 閾値(%)", "この割合を超えるギャップは自動BAN"),
+    "NoTradeMin": ("取引停止分数", "AutoTrader が再開するまでのクールダウン（分）"),
+    "TP_per_J": ("TP/J (全体)", "銘柄個別値が空欄の際に参照するTP/J"),
+    "SL_per_J": ("SL/J (全体)", "銘柄個別値が空欄の際に参照するSL/J"),
+    "Trail_per_J": ("Trail/J (全体)", "銘柄個別値が空欄の際に参照するTrail/J"),
+    "CorrSlope": ("相関補正係数", "NKY/TOPIX相関でJ_thを補正する係数"),
+    "BudgetPerTicker": ("銘柄別予算(円)", "1銘柄あたりの最大投入額"),
+    "LotSize": ("ロットサイズ", "1ポジションあたりの株数"),
+    "NKY_TrendDay": ("NKY日足トレンド", "AutoTraderAdvanced算出の方向（BUY/SELL/flat）"),
+    "NKY_TrendWindow": ("NKY窓トレンド", "短期窓の方向判定"),
+    "NKY_AllowedSide": ("NKY許容サイド", "方向フィルタで許容されるサイド"),
+    "TOPIX_TrendDay": ("TOPIX日足トレンド", "TOPIXベースの日足方向"),
+    "TOPIX_TrendWindow": ("TOPIX窓トレンド", "TOPIXベースの短期方向"),
+    "TOPIX_AllowedSide": ("TOPIX許容サイド", "TOPIXベースで許容される方向"),
+}
 
 PARAM_INDEX = {name: idx for idx, name in enumerate(PARAM_HEADERS, start=1)}
 
@@ -160,6 +186,10 @@ def col_letter(col: int) -> str:
     return result
 
 
+def param_ref(name: str) -> str:
+    return f"R2C{PARAM_INDEX[name]}"
+
+
 def rgb(red: int, green: int, blue: int) -> int:
     return red + (green << 8) + (blue << 16)
 
@@ -229,15 +259,20 @@ def build_dashboard(excel_path: Path) -> None:
             ws.Name = "NewDashboardV2"
 
         for idx, title in enumerate(PARAM_HEADERS, start=1):
-            ws.Cells(1, idx).Value = title
-            if ws.Cells(2, idx).Value in ("", None):
+            jp_label, jp_comment = PARAM_LABELS.get(title, (title, ""))
+            ws.Cells(1, idx).Value = jp_label
+            if jp_comment:
+                set_comment(ws.Cells(1, idx), jp_comment)
+            force_default = title in {"NKY_Code", "TOPIX_Code"}
+            if force_default:
+                ws.Cells(2, idx).Value = PARAM_DEFAULTS[idx - 1]
+            elif ws.Cells(2, idx).Value in ("", None):
                 ws.Cells(2, idx).Value = PARAM_DEFAULTS[idx - 1]
 
         # Ensure NKY related formulas persist (RSS index depends on code in A2)
         try:
             ws.Cells(2, 2).FormulaR1C1Local = '=IF(RC[-1]="", "", IFERROR(RssIndexMarket(RC[-1],"現在値"),""))'
-            ws.Cells(2, 3).FormulaR1C1Local = '=IF(RC[-2]="", "", IFERROR(RssIndexMarket(RC[-2],"騰落率"),""))'
-            ws.Cells(2, 4).FormulaR1C1 = "=(RC[-1])*100"
+            ws.Cells(2, 3).FormulaR1C1Local = '=IF(RC[-2]="", "", IFERROR(RssIndexMarket(RC[-2],"前日比"),""))'
         except Exception:
             pass
         try:
@@ -245,7 +280,7 @@ def build_dashboard(excel_path: Path) -> None:
             topix_last_idx = PARAM_HEADERS.index("TOPIX_Last") + 1
             topix_chg_idx = PARAM_HEADERS.index("TOPIX_ChgPct") + 1
             ws.Cells(2, topix_last_idx).FormulaR1C1Local = '=IF(RC[-1]="", "", IFERROR(RssIndexMarket(RC[-1],"現在値"),""))'
-            ws.Cells(2, topix_chg_idx).FormulaR1C1Local = '=IF(RC[-2]="", "", IFERROR(RssIndexMarket(RC[-2],"騰落率"),""))'
+            ws.Cells(2, topix_chg_idx).FormulaR1C1Local = '=IF(RC[-2]="", "", IFERROR(RssIndexMarket(RC[-2],"前日比"),""))'
         except Exception:
             pass
 
@@ -332,7 +367,7 @@ def build_dashboard(excel_path: Path) -> None:
             ws,
             COL_INDEX["J_th"],
             (
-                f'=IF(OR(ABS(N({rc_relative(COL_INDEX["J_th"], COL_INDEX["Gap_bp"])}))/100>R2C7,'
+                f'=IF(OR(ABS(N({rc_relative(COL_INDEX["J_th"], COL_INDEX["Gap_bp"])}))/100>{param_ref("Bias_bp")},'
                 f'AND({rc_relative(COL_INDEX["J_th"], COL_INDEX["trend_allowed_policy"])}<>"",'
                 f'UPPER({rc_relative(COL_INDEX["J_th"], COL_INDEX["trend_allowed_policy"])})="ALIGNED_ONLY",'
                 f'{rc_relative(COL_INDEX["J_th"], COL_INDEX["EntrySide"])}<>"",'
@@ -341,9 +376,9 @@ def build_dashboard(excel_path: Path) -> None:
                 f'UPPER({rc_relative(COL_INDEX["J_th"], COL_INDEX["driver_allowed_side"])})<>UPPER({rc_relative(COL_INDEX["J_th"], COL_INDEX["EntrySide"])})'
                 f')), "BAN",'
                 f'{rc_relative(COL_INDEX["J_th"], COL_INDEX["J_th_base"])}+'
-                f'IF({rc_relative(COL_INDEX["J_th"], COL_INDEX["BiasSlope_row"])}="",R2C5,{rc_relative(COL_INDEX["J_th"], COL_INDEX["BiasSlope_row"])})*R2C4/100+'
-                f'IF({rc_relative(COL_INDEX["J_th"], COL_INDEX["GapSlope_row"])}="",R2C6,{rc_relative(COL_INDEX["J_th"], COL_INDEX["GapSlope_row"])})*ABS(N({rc_relative(COL_INDEX["J_th"], COL_INDEX["Gap_bp"])}))/100+'
-                f'IF({rc_relative(COL_INDEX["J_th"], COL_INDEX["CorrSlope_row"])}="",R2C12,{rc_relative(COL_INDEX["J_th"], COL_INDEX["CorrSlope_row"])})*N({rc_relative(COL_INDEX["J_th"], COL_INDEX["CorrNKY"])})*R2C4/100)'
+                f'IF({rc_relative(COL_INDEX["J_th"], COL_INDEX["BiasSlope_row"])}="",{param_ref("BiasSlope")},{rc_relative(COL_INDEX["J_th"], COL_INDEX["BiasSlope_row"])})*{param_ref("NKY_ChgPct")}/100+'
+                f'IF({rc_relative(COL_INDEX["J_th"], COL_INDEX["GapSlope_row"])}="",{param_ref("GapSlope")},{rc_relative(COL_INDEX["J_th"], COL_INDEX["GapSlope_row"])})*ABS(N({rc_relative(COL_INDEX["J_th"], COL_INDEX["Gap_bp"])}))/100+'
+                f'IF({rc_relative(COL_INDEX["J_th"], COL_INDEX["CorrSlope_row"])}="",{param_ref("CorrSlope")},{rc_relative(COL_INDEX["J_th"], COL_INDEX["CorrSlope_row"])})*N({rc_relative(COL_INDEX["J_th"], COL_INDEX["CorrNKY"])})*{param_ref("NKY_ChgPct")}/100)'
             ),
         )
         fill_formula(
