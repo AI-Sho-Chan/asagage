@@ -54,7 +54,7 @@ $args = @(
     '--gap-guard-abs-bp','80.0','--gap-guard-dir-bp','40.0','--slipbp','4.0','--feebp','4.0',
     '--liquidity-quantile','0.3','--jobs','6','--enable-asha','--enable-bayes','--bayes-trials','24','--bayes-timeout','600',
     '--mask-ineffective','--mask-window','20','--mask-threshold','1.05',
-    '--enable-market-features','--excel-summary','--analysis-ledger','--refine-quick-grid'
+    '--enable-market-features','--excel-summary','--analysis-ledger','--refine-quick-grid','--headless'
 )
   $p = Start-Process -FilePath $Python -ArgumentList $args -WorkingDirectory $Repo -NoNewWindow -PassThru -Wait
   if ($p.ExitCode -ne 0) { throw "weekly coarse/refine failed ($($p.ExitCode))" }
@@ -115,6 +115,14 @@ $args = @(
   catch {
     Write-Status 'analysis_error' $_.Exception.Message
   }
+
+  try {
+    & $Python @('scripts/auto_repair_asagake.py','--excel','C:/AI/asagake/ASAGAKE.xlsm') | Out-Null
+    Write-Status 'repair' 'auto_repair_asagake completed'
+  }
+  catch {
+    Write-Status 'repair_error' $_.Exception.Message
+  }
 }
 catch {
   Write-Status 'error' ($_.Exception.Message)
@@ -122,7 +130,9 @@ catch {
 }
 
 try {
-  & C:\\Python313\\python.exe scripts\\register_boardlogger_task.ps1 | Out-Null
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\register_boardlogger_task.ps1 | Out-Null
   Write-Status 'boardlogger' 'registered'
 } catch { Write-Status 'boardlogger_error' .Exception.Message }
+
+
 

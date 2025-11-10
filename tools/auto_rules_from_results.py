@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import argparse
+from collections import OrderedDict
 from pathlib import Path
-import configparser
+from typing import Iterable
+
 import pandas as pd
 
 
@@ -11,87 +13,97 @@ def load_session_mode_summary(path: Path) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame()
     try:
-        df = pd.read_csv(path)
-        return df
+        return pd.read_csv(path)
     except Exception:
         return pd.DataFrame()
 
 
+def _column_lookup(df: pd.DataFrame, candidates: Iterable[str]) -> str | None:
+    cols = {c.lower(): c for c in df.columns}
+    for name in candidates:
+        col = cols.get(name.lower())
+        if col:
+            return col
+    return None
+
+
 def decide_am1000_sell_enable(df: pd.DataFrame) -> bool:
+    """Return True when AM1000×j-cross×SELL shows strong, stable stats."""
     if df.empty:
         return False
-    # 期待する列例: session, signal_mode, side, forward_pf, forward_winrate, forward_trades
-    cols = {c.lower(): c for c in df.columns}
-    def lc(name: str) -> str:
-        key = name.lower()
-        return cols.get(key, name)
 
-    if lc("session") not in df.columns:
+    session_col = _column_lookup(df, ("session",))
+    mode_col = _column_lookup(df, ("signal_mode",))
+    side_col = _column_lookup(df, ("side",))
+    if not session_col or not mode_col or not side_col:
         return False
 
     sub = df.copy()
-    # 正規化
-    for c in ("session", "signal_mode", "side"):
-        if lc(c) in sub.columns:
-            sub[lc(c)] = sub[lc(c)].astype(str)
+    for col in (session_col, mode_col, side_col):
+        sub[col] = sub[col].astype(str)
 
-    # AM1000 × j-cross × SELL のみ
     mask = (
-        (sub[lc("session")].str.contains("AM1000", case=False, na=False)) &
-        (lc("signal_mode") in sub.columns and sub[lc("signal_mode")].str.contains("j-cross", case=False, na=False)) &
-        (lc("side") in sub.columns and sub[lc("side")].str.upper() == "SELL")
+        sub[session_col].str.contains("AM1000", case=False, na=False)
+        & sub[mode_col].str.contains("j-cross", case=False, na=False)
+        & (sub[side_col].str.upper() == "SELL")
     )
     sub = sub[mask]
     if sub.empty:
         return False
 
-    # 閾値: PF>=1.50, 勝率>=0.65, 取引数>=8（直近集計）
-    pf_col = lc("forward_pf") if lc("forward_pf") in sub.columns else lc("forward_pf_eff")
-    win_col = lc("forward_winrate")
-    n_col = lc("forward_trades")
-    if pf_col not in sub.columns or win_col not in sub.columns or n_col not in sub.columns:
+    pf_col = _column_lookup(sub, ("forward_pf_eff", "forward_pf", "pf"))
+    win_col = _column_lookup(sub, ("forward_winrate", "win_rate"))
+    bp_col = _column_lookup(sub, ("expected_bp", "mean"))
+    trades_col = _column_lookup(sub, ("forward_trades", "count"))
+    if not win_col or not bp_col or not trades_col:
         return False
 
-    row = sub.sort_values(pf_col, ascending=False).iloc[0]
-    try:
-        pf = float(row[pf_col])
-        win = float(row[win_col])
-        n = float(row[n_col])
-    except Exception:
+    numeric_cols = [win_col, bp_col, trades_col]
+    if pf_col:
+        numeric_cols.append(pf_col)
+    sub[numeric_cols] = sub[numeric_cols].apply(pd.to_numeric, errors="coerce")
+    sub = sub.dropna(subset=[win_col, bp_col, trades_col])
+    if pf_col:
+        sub = sub.dropna(subset=[pf_col])
+    if sub.empty:
         return False
-    return (pf >= 1.50) and (win >= 0.65) and (n >= 8)
+
+    sort_cols = [c for c in (pf_col, win_col, bp_col) if c]
+    row = sub.sort_values(sort_cols, ascending=False).iloc[0]
+
+    pf = float(row[pf_col]) if pf_col else None
+    win = float(row[win_col])
+    bp = float(row[bp_col])
+    trades = float(row[trades_col])
+    pf_ok = True if pf is None else pf >= 1.50
+    return pf_ok and win >= 0.65 and bp >= 8.0 and trades >= 8
 
 
 def update_rules(rules_path: Path, *, enable_am1000_sell: bool) -> None:
-    rules = configparser.ConfigParser()
-    rules.optionxform = str
-    # INI(=key=value) をセクション無しで扱う
-    content = {}
+    content: "OrderedDict[str, str]" = OrderedDict()
     if rules_path.exists():
-        text = rules_path.read_text(encoding="utf-8")
-        for line in text.splitlines():
-            if not line.strip() or line.strip().startswith("#"):
+        for line in rules_path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in stripped:
                 continue
-            if "=" in line:
-                k, v = line.split("=", 1)
-                content[k.strip()] = v.strip()
-    # 既存値を保ちつつ追記/更新
+            key, value = stripped.split("=", 1)
+            content[key.strip()] = value.strip()
+
     content["am1000_sell_enabled"] = "1" if enable_am1000_sell else "0"
-    # 既定のSELLゲートは厳しめ継続
-    if "jcross_sell_require_nky_down" not in content:
-        content["jcross_sell_require_nky_down"] = "1"
-    if "jcross_sell_min_gap_bp" not in content:
-        content["jcross_sell_min_gap_bp"] = "20"
-    # 保存
-    lines = [f"{k}={v}" for k, v in content.items()]
-    rules_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    content.setdefault("jcross_sell_require_nky_down", "1")
+    content.setdefault("jcross_sell_min_gap_bp", "20")
+
+    rules_path.write_text(
+        "\n".join(f"{key}={value}" for key, value in content.items()) + "\n",
+        encoding="utf-8",
+    )
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--summary", default="analysis/session_mode_summary.csv")
-    ap.add_argument("--rules", default="state/strategy_rules.ini")
-    args = ap.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--summary", default="analysis/session_mode_summary.csv")
+    parser.add_argument("--rules", default="state/strategy_rules.ini")
+    args = parser.parse_args()
 
     df = load_session_mode_summary(Path(args.summary))
     flag = decide_am1000_sell_enable(df)
@@ -101,4 +113,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

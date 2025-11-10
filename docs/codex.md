@@ -5,6 +5,7 @@
 - When changes are required, take a timestamped copy (e.g. `SHINSOKU_work_YYYYMMDD_HHMMSS.xlsm`). Modify XML or `.bas` files offline (zip/unzip), validate, then replace the production file and keep the previous version as backup.
 - Use `python scripts/repair_realtime_formulas.py` to reapply dashboard formulas (I/J/K/N/O/P/Q/R/S/T columns) whenever formulas are lost.
 - When AutoTrader.bas is updated, import via `python scripts/excel_install_macros.py C:/AI/asagake/SHINSOKU.xlsm C:/AI/asagake/AutoTrader.bas` instead of using the VBA editor.
+- Run `python scripts/auto_repair_asagake.py --skip-formulas` after batches to reapply the dashboard layout and re-import AutoTraderAdvanced / cDashboardWatcher without opening Excel.
 - For dashboard構成の修正や V2 レイアウト更新は、必ず `python scripts/repair_asagake_dashboard.py --excel C:/AI/asagake/ASAGAKE.xlsm` → `python scripts/excel_install_macros.py C:/AI/asagake/ASAGAKE.xlsm excel/AutoTraderAdvanced.bas excel/cDashboardWatcher.cls` の手順で行い、Excel/VBE は開かない（貼付エラー防止のため）。
 - Excel を閉じた状態で `repair_asagake_dashboard.py` と `excel_install_macros.py` を実行し、完了後に Excel を再起動して反映を確認すること。ASAGAKE.xlsm の更新時刻と `cDashboardWatcher` が VBAProject に存在するかを確認する。
 - NewDashboardV2 の AP～AT 行タイトルが文字化けした場合は、`scripts/repair_asagake_dashboard.py` の `JP_MAP` を UTF-8 で修正したうえで repair → macro install の順に再実行する。旧 `JP_MAP`（mojibake）のままだと今回のように変更が反映されない。

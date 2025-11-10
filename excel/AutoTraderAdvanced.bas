@@ -1,4 +1,4 @@
-Attribute VB_Name = "AutoTraderAdvanced"
+﻿Attribute VB_Name = "AutoTraderAdvanced"
 
 Option Explicit
 
@@ -25,6 +25,7 @@ Private Const MsoAlignCenter As Long = -4108
 Private Const DEFAULT_NKY_INITIAL_BP As Double = 10#
 Private Const DEFAULT_NKY_STEADY_BP As Double = 15#
 Private Const DEFAULT_ALERT_COOLDOWN_MIN As Double = 10#
+Private Const SPIKE_RATIO_THRESHOLD As Double = 3#
 
 Private gDashboardWatcher As cDashboardWatcher
 Private gThresholdState As Object
@@ -80,6 +81,22 @@ Private Function FindParamColumn(ByVal ws As Worksheet, ByVal headerName As Stri
     Next c
     FindParamColumn = 0
 End Function
+
+Private Sub AppendSpikeEvent(ByVal ticker As String, ByVal session As String, ByVal ratioVal As Double)
+    On Error GoTo ExitSub
+    Dim logPath As String
+    logPath = ThisWorkbook.Path & "\analysis\j_spike_events.csv"
+    Dim f As Integer
+    f = FreeFile
+    Dim needsHeader As Boolean
+    needsHeader = (Dir$(logPath) = "")
+    Open logPath For Append As #f
+    If needsHeader Then Print #f, "ts,ticker,session,ratio"
+    Print #f, Format$(Now, "yyyy-mm-dd HH:nn:ss") & "," & ticker & "," & session & "," & Format$(ratioVal, "0.000")
+ExitSub:
+    On Error Resume Next
+    If f <> 0 Then Close #f
+End Sub
 
 Private Function GetParamDouble(ByVal ws As Worksheet, ByVal col As Long, ByVal defaultValue As Double) As Double
     On Error GoTo Fail
@@ -155,7 +172,7 @@ Private Sub AddDriverConfig(ByVal driverName As String, ByVal codeHeader As Stri
     cfg("trend_day_col") = 0
     cfg("trend_window_col") = 0
     cfg("allowed_col") = 0
-    gDriverConfigs(driverName) = cfg
+    Set gDriverConfigs(driverName) = cfg
 End Sub
 
 Private Function EnsureDriverState(ByVal driverName As String) As Object
@@ -168,13 +185,13 @@ Private Function EnsureDriverState(ByVal driverName As String) As Object
         Set state = CreateObject("Scripting.Dictionary")
         state("session_date") = 0#
         state("session_open") = 0#
-        state("history_prices") = Nothing
+        Set state("history_prices") = CreateObject("Scripting.Dictionary")
         state("last_history_record") = 0#
         state("trend_day") = ""
         state("trend_window") = ""
         state("allowed_side") = "BOTH"
         state("last_allowed_side") = ""
-        gDriverRuntime(driverName) = state
+        Set gDriverRuntime(driverName) = state
     End If
     Set EnsureDriverState = gDriverRuntime(driverName)
 End Function
@@ -953,9 +970,8 @@ Public Sub InstallRealtimeFormulasV2()
 
         Dim f As String
 
-        f = "=IF(OR(RC[" & (vwapCol - gapCol) & "]=" & DQ & DQ & ",RC[" & (prevCol - gapCol) & "]=" & DQ & DQ & ")," & DQ & DQ & "," & _
-
-            "(RC[" & (vwapCol - gapCol) & "]-RC[" & (prevCol - gapCol) & "])/RC[" & (prevCol - gapCol) & "]*10000)"
+        ' Single-line (use DQ constant for literal quotes)
+        f = "=IF(OR(RC[" & CStr(vwapCol - gapCol) & "]=" & DQ & DQ & ",RC[" & CStr(prevCol - gapCol) & "]=" & DQ & DQ & ")," & DQ & DQ & ",(RC[" & CStr(vwapCol - gapCol) & "]-RC[" & CStr(prevCol - gapCol) & "])/RC[" & CStr(prevCol - gapCol) & "]*10000)"
 
         SetColumnFormula ws, gapCol, lastRow, f
 
@@ -1205,6 +1221,8 @@ Public Sub ApplyDynamicSignalsV2()
     Dim driverDayCol As Long: driverDayCol = FindColumn(ws, DASH2_HEADER_ROW, "driver_day_trend")
     Dim driverWindowCol2 As Long: driverWindowCol2 = FindColumn(ws, DASH2_HEADER_ROW, "driver_window_trend")
     Dim driverAllowedCol As Long: driverAllowedCol = FindColumn(ws, DASH2_HEADER_ROW, "driver_allowed_side")
+    Dim sessionCol As Long: sessionCol = FindColumn(ws, DASH2_HEADER_ROW, "session")
+    Dim modeCol As Long: modeCol = FindColumn(ws, DASH2_HEADER_ROW, "SignalMode")
 
     If tickerCol = 0 Or jCol = 0 Or jthCol = 0 Or jthBaseCol = 0 Then Exit Sub
 
@@ -1314,7 +1332,7 @@ Public Sub ApplyDynamicSignalsV2()
         Dim tickerVal As String
         If tickerCol > 0 Then tickerVal = Trim$(CStr(ws.Cells(r, tickerCol).Value))
         Dim sessionVal As String
-        If colSession > 0 Then sessionVal = Trim$(CStr(ws.Cells(r, colSession).Value))
+        If sessionCol > 0 Then sessionVal = Trim$(CStr(ws.Cells(r, sessionCol).Value))
         Dim driverVal As String
         If trendDriverCol > 0 Then
             driverVal = NormalizeDriverName(CStr(ws.Cells(r, trendDriverCol).Value))
@@ -1341,7 +1359,7 @@ Public Sub ApplyDynamicSignalsV2()
         Dim batchKindVal As String
         If batchKindCol > 0 Then batchKindVal = Trim$(CStr(ws.Cells(r, batchKindCol).Value))
         Dim signalModeVal As String
-        If colMode > 0 Then signalModeVal = Trim$(CStr(ws.Cells(r, colMode).Value))
+        If modeCol > 0 Then signalModeVal = Trim$(CStr(ws.Cells(r, modeCol).Value))
         Dim filterSide As String
         filterSide = allowedSideState
         If Len(filterSide) = 0 Then filterSide = "BOTH"
@@ -1369,6 +1387,11 @@ Public Sub ApplyDynamicSignalsV2()
                 End If
             End If
         End If
+        If blockReason = "" And ratioVal >= SPIKE_RATIO_THRESHOLD Then
+            blockReason = "BLOCKED_SPIKE"
+            AppendSpikeEvent tickerVal, sessionVal, ratioVal
+        End If
+
         If blockReason = "" And bbBlocked Then
             blockReason = "BLOCKED_BB"
         End If
@@ -2204,6 +2227,8 @@ Public Sub ImportCandidatesV2()
 
     End If
 
+    EnsureParamFormulas ws
+    InstallRealtimeFormulasV2
     ws.Calculate
     ApplyDynamicSignalsV2
     PreplaceOrdersV2
@@ -2213,8 +2238,38 @@ End Sub
 
 Private Sub EnsureParamFormulas(ByVal ws As Worksheet)
     On Error Resume Next
-    ws.Cells(2, 2).FormulaR1C1Local = '=IF(RC[-1]="", "", IFERROR(RssIndexMarket(RC[-1],"現在値"),""))'
-    ws.Cells(2, 3).FormulaR1C1Local = '=IF(RC[-2]="", "", IFERROR(RssIndexMarket(RC[-2],"騰落率"),""))'
-    ws.Cells(2, 4).FormulaR1C1 = "=(RC[-1])*100"
+    ws.Cells(2, 1).Value = "N225"
+    ws.Cells(2, 2).Formula = "=IF($A$2="""","""",IFERROR(RssIndexMarket($A$2,""現在値""),""""))"
+    ws.Cells(2, 3).Formula = "=IF($A$2="""","""",IFERROR(RssIndexMarket($A$2,""前日比""),""""))"
+    ws.Cells(2, 4).Value = "TOPX"
+    ws.Cells(2, 5).Formula = "=IF($D$2="""","""",IFERROR(RssIndexMarket($D$2,""現在値""),""""))"
+    ws.Cells(2, 6).Formula = "=IF($D$2="""","""",IFERROR(RssIndexMarket($D$2,""前日比""),""""))"
+    Dim noteItems As Variant
+    noteItems = Array( _
+        Array(13, "TP_per_J: Global take-profit multiplier per unit J (fallback when row-specific entry is blank)."), _
+        Array(14, "SL_per_J: Global stop-loss multiplier per unit J."), _
+        Array(15, "Trail_per_J: Global trailing width per unit J."), _
+        Array(16, "CorrSlope: Coefficient applied to driver correlation when adjusting J_th."), _
+        Array(17, "BudgetPerTicker: Max capital (JPY) allocated per ticker."), _
+        Array(18, "LotSize: Trading lot size (shares) used when sizing orders."), _
+        Array(19, "NKY_TrendDay: Override for NKY day-trend (RSS driven)."), _
+        Array(20, "NKY_TrendWindow: Override for NKY intraday/window trend."), _
+        Array(21, "NKY_AllowedSide: Allowed side for NKY-aligned trades (BUY/SELL/BOTH)."), _
+        Array(22, "TOPIX_TrendDay: Override for TOPIX day-trend (RSS driven)."), _
+        Array(23, "TOPIX_TrendWindow: Override for TOPIX intraday/window trend."), _
+        Array(24, "TOPIX_AllowedSide: Allowed side for TOPIX-aligned trades (BUY/SELL/BOTH).") _
+    )
+    Dim entry As Variant
+    For Each entry In noteItems
+        SetHeaderComment ws, entry(0), entry(1)
+    Next entry
     On Error GoTo 0
+End Sub
+
+Private Sub SetHeaderComment(ByVal ws As Worksheet, ByVal col As Long, ByVal text As String)
+    On Error Resume Next
+    ws.Cells(1, col).Comment.Delete
+    On Error GoTo 0
+    ws.Cells(1, col).AddComment text
+    ws.Cells(1, col).Comment.Visible = False
 End Sub

@@ -28,7 +28,7 @@ function Register-WithSchTasksExe {
     Set-Content -Path $TaskCmd -Value "@echo off`r`ncd /d $Repo`r`n$Cmd`r`n" -Encoding ASCII
   }
   try { schtasks.exe /Delete /F /TN $TaskName | Out-Null } catch {}
-  $args = @('/Create','/F','/TN',$TaskName,'/SC','MINUTE','/MO','5','/ST','09:00','/DU','06:35','/TR',$TaskCmdQuoted)
+  $args = @('/Create','/F','/TN',$TaskName,'/SC','DAILY','/ST','09:00','/DU','06:35','/RI','5','/TR',$TaskCmdQuoted)
   schtasks.exe @args | Out-Null
 }
 

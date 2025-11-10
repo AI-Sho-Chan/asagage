@@ -432,6 +432,7 @@ def _main_impl() -> None:
     ap.add_argument("--gap-guard-abs-bp", type=float, default=80.0)
     ap.add_argument("--gap-guard-dir-bp", type=float, default=40.0)
     ap.add_argument("--min-forward-winrate", type=float, default=0.0, help="Optional min forward winrate filter in aggregation (e.g., 0.60)")
+    ap.add_argument("--headless", action="store_true", help="Skip Excel/COM work (do not open ASAGAKE.xlsm)")
     ap.add_argument("--slipbp", type=float, default=4.0)
     ap.add_argument("--feebp", type=float, default=4.0)
     ap.add_argument("--liquidity-quantile", type=float, default=0.5)
@@ -633,6 +634,21 @@ def _main_impl() -> None:
                     message="Using Excel ticker sheet as Yahoo base",
                     universe_base=len(base_codes),
                 )
+        if not base_codes:
+            fallback_csv = Path("output/excel/candidates_nextday.csv")
+            if fallback_csv.exists():
+                try:
+                    df_fallback = pd.read_csv(fallback_csv)
+                    if "Ticker" in df_fallback.columns:
+                        base_codes = df_fallback["Ticker"].dropna().astype(str).tolist()
+                        write_status(
+                            state="running",
+                            step="universe",
+                            message="Using candidates_nextday.csv as Yahoo base",
+                            universe_base=len(base_codes),
+                        )
+                except Exception:
+                    base_codes = []
 
         if not base_codes:
             write_status(
@@ -1046,19 +1062,20 @@ def _main_impl() -> None:
     enrich_dashboard_columns(out_all, coeff_latest)
     apply_trend_preferences(out_all, (repo_root / args.trend_pref).resolve(), args.trend_bp_th)
 
-    ensure_dashboard_formulas(repo_root, excel_path)
-    try:
-        run(
-            [
-                sys.executable,
-                "scripts/run_macros_on_copy.py",
-                "--excel",
-                str(excel_path),
-            ],
-            cwd=repo_root,
-        )
-    except SystemExit:
-        pass
+    if not args.headless:
+        ensure_dashboard_formulas(repo_root, excel_path)
+        try:
+            run(
+                [
+                    sys.executable,
+                    "scripts/run_macros_on_copy.py",
+                    "--excel",
+                    str(excel_path),
+                ],
+                cwd=repo_root,
+            )
+        except SystemExit:
+            pass
 
     write_status(
         state="success",

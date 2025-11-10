@@ -1,0 +1,25 @@
+[2025-11-10 16:30:59] Run started
+[2025-11-10 16:30:59] Run type resolved to weekday
+[2025-11-10 16:31:00] Low-priority gating removed 5 tickers (remaining 15)
+[2025-11-10 16:31:05] Entry window marks set: 5806 rows flagged out of 162593
+[2025-11-10 16:31:05] Liquidity filter q=0.50 kept 13 tickers and 85416 rows
+[2025-11-10 16:31:05] Using 5 rolling slices (train=12, forward=4)
+[2025-11-10 16:31:05] Parameter grid size: 28 (mode=coarse, signal=j-cross)
+[2025-11-10 16:31:05] Ineffective-band mask removed 4 combos for J_th values [0.3, 0.4, 0.7, 0.8]
+[2025-11-10 16:31:09] [1/13] 285A.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=9/4
+[2025-11-10 16:31:09] [2/13] 1357.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/2
+[2025-11-10 16:31:13] [3/13] 5801.T: best train_pf_eff=0.860, forward_pf_eff=0.551, trades=11/5
+[2025-11-10 16:31:13] [4/13] 5016.T: best train_pf_eff=1.268, forward_pf_eff=3.307, trades=11/3
+[2025-11-10 16:31:15] [5/13] 6525.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-10 16:31:17] [6/13] 6526.T: best train_pf_eff=5.958, forward_pf_eff=1.541, trades=7/3
+[2025-11-10 16:31:17] [7/13] 7735.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-10 16:31:18] [8/13] 6857.T: best train_pf_eff=4.580, forward_pf_eff=0.000, trades=5/1
+[2025-11-10 16:31:23] [9/13] 7012.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=6/3
+[2025-11-10 16:31:23] [10/13] 8035.T: best train_pf_eff=3.109, forward_pf_eff=0.000, trades=10/1
+[2025-11-10 16:31:23] [11/13] 8411.T: best train_pf_eff=999.000, forward_pf_eff=0.000, trades=6/0
+[2025-11-10 16:31:23] [12/13] 9432.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-10 16:31:24] [13/13] 8136.T: best train_pf_eff=1.078, forward_pf_eff=999.000, trades=20/3
+[2025-11-10 16:31:24] Cache reuse: 38/104 combos (36.5%) served from cache
+[2025-11-10 16:31:24] ASHA pruned 208 parameter combos prior to full evaluation
+[2025-11-10 16:31:24] Excel summary written to output\bt30\NIGHTLY_20251110\RUN_coarse_AM15_j-cross\summary_20251110_163124.xlsx
+[2025-11-10 16:31:24] Run completed in 0.4 minutes

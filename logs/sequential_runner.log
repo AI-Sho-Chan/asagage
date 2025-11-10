@@ -50,3 +50,27 @@
 [2025-11-09T07:50:24] Starting NIGHTLY batch (weekday mode)
 [2025-11-09T08:25:50] NIGHTLY batch exit code: 0
 [2025-11-09T08:25:50] Sequential runner completed
+[2025-11-09T16:26:29] Sequential runner started
+[2025-11-09T16:26:31] Starting WEEKEND batch (10 windows + R&D windows)
+[2025-11-09T16:26:38] WEEKEND batch exit code: 1
+[2025-11-09T16:26:38] Starting NIGHTLY batch (weekday mode)
+[2025-11-09T16:26:42] NIGHTLY batch exit code: 1
+[2025-11-09T16:26:42] Sequential runner completed
+[2025-11-09T16:27:30] Sequential runner started
+[2025-11-09T16:27:31] Starting WEEKEND batch (10 windows + R&D windows)
+[2025-11-09T16:27:35] WEEKEND batch exit code: 1
+[2025-11-09T16:27:35] Starting NIGHTLY batch (weekday mode)
+[2025-11-09T16:27:39] NIGHTLY batch exit code: 1
+[2025-11-09T16:27:39] Sequential runner completed
+[2025-11-09T23:28:43] Sequential runner started
+[2025-11-09T23:28:44] Starting WEEKEND batch (10 windows + R&D windows)
+[2025-11-10T01:30:17] Sequential runner started
+[2025-11-10T01:30:19] Starting WEEKEND batch (10 windows + R&D windows)
+[2025-11-10T01:50:14] Sequential runner started
+[2025-11-10T01:50:16] Starting WEEKEND batch (10 windows + R&D windows)
+[2025-11-10T09:08:20] WEEKEND batch exit code: 0
+[2025-11-10T09:08:20] Starting NIGHTLY batch (weekday mode)
+[2025-11-10T09:30:21] NIGHTLY batch exit code: 0
+[2025-11-10T09:30:21] Sequential runner completed
+[2025-11-10T14:37:56] Sequential runner started
+[2025-11-10T14:37:59] Starting WEEKEND batch (10 windows + R&D windows)

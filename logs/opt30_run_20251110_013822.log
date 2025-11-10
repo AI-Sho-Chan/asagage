@@ -1,0 +1,9 @@
+[2025-11-10 01:38:22] Run started
+[2025-11-10 01:38:22] Run type resolved to weekend
+[2025-11-10 01:38:23] Codes loaded from output\bt30\NIGHTLY_20251110\RUN_coarse_AM15_j-only\_TOP_CANDIDATES.csv: 13 tickers
+[2025-11-10 01:38:28] Entry window marks set: 5081 rows flagged out of 142481
+[2025-11-10 01:38:28] Liquidity filter q=0.30 kept 12 tickers and 99729 rows
+[2025-11-10 01:38:28] Using 5 rolling slices (train=12, forward=4)
+[2025-11-10 01:38:28] Parameter grid size: 720 (mode=refine, signal=j-only)
+[2025-11-10 01:44:27] [1/12] 5706.T: best train_pf_eff=2.044, forward_pf_eff=999.000, trades=6/1
+[2025-11-10 01:48:02] [2/12] 1357.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=3/7

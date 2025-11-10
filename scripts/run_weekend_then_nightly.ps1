@@ -35,7 +35,7 @@ function Run-Weekend() {
     '--liquidity-quantile','0.3','--jobs',"$Jobs",'--run-type','weekend','--plan-profile','weekend',
     '--enable-asha','--enable-bayes','--bayes-trials',"$BayesTrialsWeekend",'--bayes-timeout','600',
     '--mask-ineffective','--mask-window','20','--mask-threshold','1.05','--cache-refresh-weekend',
-    '--enable-rd-windows','--enable-market-features'
+    '--enable-rd-windows','--enable-market-features','--headless'
   )
   $p = Start-Process -FilePath $Py -ArgumentList $args -WorkingDirectory $Repo -PassThru -Wait
   Write-SeqLog ("WEEKEND batch exit code: {0}" -f $p.ExitCode)
@@ -50,18 +50,29 @@ function Run-Nightly() {
     '--run-type','weekday','--plan-profile','weekday',
     '--enable-asha','--enable-bayes','--bayes-trials',"$BayesTrialsNightly",'--bayes-timeout','300',
     '--mask-ineffective',
-    '--mask-ineffective','--enable-market-features'
+    '--mask-ineffective','--enable-market-features','--min-forward-winrate','0.60','--headless'
   )
   $p = Start-Process -FilePath $Py -ArgumentList $args -WorkingDirectory $Repo -PassThru -Wait
   Write-SeqLog ("NIGHTLY batch exit code: {0}" -f $p.ExitCode)
+}
+
+function Repair-AsagakeWorkbook() {
+  try {
+    Write-SeqLog 'Running auto workbook repair'
+    & $Py @('scripts/auto_repair_asagake.py','--excel','C:/AI/asagake/ASAGAKE.xlsm') | Out-Null
+  }
+  catch {
+    Write-SeqLog ("auto repair failed: {0}" -f $_.Exception.Message)
+  }
 }
 
 Write-SeqLog 'Sequential runner started'
 Kill-OldRuns
 Run-Weekend
 Run-Nightly
+Repair-AsagakeWorkbook
 Write-SeqLog 'Sequential runner completed'
 try {
-  & C:\\Python313\\python.exe scripts\\register_boardlogger_task.ps1 | Out-Null
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\register_boardlogger_task.ps1 | Out-Null
 } catch {}
 

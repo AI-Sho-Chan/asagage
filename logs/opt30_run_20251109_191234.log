@@ -1,0 +1,24 @@
+[2025-11-09 19:12:34] Run started
+[2025-11-09 19:12:34] Run type resolved to weekend
+[2025-11-09 19:12:35] Codes loaded from output\bt30\NIGHTLY_20251109\RUN_coarse_AM0945_j-cross\_TOP_CANDIDATES.csv: 14 tickers
+[2025-11-09 19:12:47] Entry window marks set: 20138 rows flagged out of 158150
+[2025-11-09 19:12:47] Liquidity filter q=0.30 kept 13 tickers and 110955 rows
+[2025-11-09 19:12:47] Using 5 rolling slices (train=12, forward=4)
+[2025-11-09 19:12:47] Parameter grid size: 720 (mode=refine, signal=j-cross)
+[2025-11-09 19:19:35] [1/13] 5706.T: best train_pf_eff=3.963, forward_pf_eff=3.963, trades=9/3
+[2025-11-09 19:24:46] [2/13] 1357.T: best train_pf_eff=999.000, forward_pf_eff=2.706, trades=7/10
+[2025-11-09 19:27:00] [3/13] 285A.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=7/5
+[2025-11-09 19:27:13] [4/13] 6525.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=6/2
+[2025-11-09 19:30:22] [5/13] 5801.T: best train_pf_eff=12.279, forward_pf_eff=7.831, trades=7/5
+[2025-11-09 19:30:36] [6/13] 6526.T: best train_pf_eff=1.643, forward_pf_eff=5.214, trades=23/6
+[2025-11-09 19:30:44] [7/13] 6857.T: best train_pf_eff=2.060, forward_pf_eff=4.694, trades=41/17
+[2025-11-09 19:31:00] [8/13] 5016.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=23/6
+[2025-11-09 19:32:50] [9/13] 9432.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-09 19:34:51] [10/13] 7012.T: best train_pf_eff=1.064, forward_pf_eff=999.000, trades=22/8
+[2025-11-09 19:36:47] [11/13] 8035.T: best train_pf_eff=5.765, forward_pf_eff=999.000, trades=23/7
+[2025-11-09 19:37:04] [12/13] 8411.T: best train_pf_eff=52.003, forward_pf_eff=999.000, trades=19/6
+[2025-11-09 19:37:21] [13/13] 8136.T: best train_pf_eff=0.876, forward_pf_eff=6.017, trades=48/17
+[2025-11-09 19:37:21] Cache reuse: 0/9818 combos (0.0%) served from cache
+[2025-11-09 19:37:21] Bayesian refine trials executed: 458
+[2025-11-09 19:37:21] Refine candidates exported to output\excel\NIGHTLY_20251109\AM0945_j-cross\candidates_20251109.csv
+[2025-11-09 19:37:21] Run completed in 24.8 minutes

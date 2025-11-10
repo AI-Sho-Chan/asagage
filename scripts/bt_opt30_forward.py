@@ -499,10 +499,28 @@ def load_tickers_from_excel(path: Path) -> List[str]:
             if not series.empty:
                 return series.tolist()
 
+    fallback_csv = Path("output/excel/candidates_nextday.csv")
+    if fallback_csv.exists():
+        try:
+            df = pd.read_csv(fallback_csv)
+            for col in ("Ticker", "code", "Code"):
+                if col in df.columns:
+                    series = (
+                        df[col]
+                        .dropna()
+                        .astype(str)
+                        .map(lambda x: x.strip())
+                    )
+                    series = series[series != ""]
+                    if not series.empty:
+                        return series.tolist()
+        except Exception:
+            pass
+
     raise ValueError(
         "Ticker list could not be located. "
         "Ensure the workbook has either a 'Ticker' sheet with a 'Code' column, "
-        "or a sheet containing a 'Ticker' column."
+        "or a sheet containing a 'Ticker' column (or provide output/excel/candidates_nextday.csv)."
     )
 
 
@@ -1338,6 +1356,17 @@ def build_param_grid(mode: str, signal_mode: str, run_type: str | None) -> Dict[
         grid = coarse_defaults
     else:
         grid = refine_defaults
+        if signal_mode and signal_mode.lower() == "j-cross":
+            fine_tp = [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.8, 2.0, 2.2, 2.5, 3.0]
+            fine_sl = [0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 2.0]
+            if "TPk" in grid:
+                grid["TPk"] = sorted(set(grid["TPk"] + fine_tp))
+            else:
+                grid["TPk"] = fine_tp
+            if "SLk" in grid:
+                grid["SLk"] = sorted(set(grid["SLk"] + fine_sl))
+            else:
+                grid["SLk"] = fine_sl
 
     if signal_mode == "full":
         grid.setdefault("dJ_th", [0.0])
@@ -2045,6 +2074,11 @@ def main() -> None:
     )
     if filtered.empty:
         raise RuntimeError("All rows dropped by filters; adjust session or liquidity settings")
+
+    if not bool(filtered["is_entry"].sum()):
+        logger.log(
+            "Warning: no bars inside session window after liquidity filter; continuing with day-level data"
+        )
 
     slices = build_slices(
         sorted(filtered["date"].unique()),

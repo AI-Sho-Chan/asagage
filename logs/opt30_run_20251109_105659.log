@@ -1,0 +1,11 @@
+[2025-11-09 10:56:59] Run started
+[2025-11-09 10:56:59] Run type resolved to weekday
+[2025-11-09 10:56:59] Codes loaded from output/temp_codes.csv: 21 tickers
+[2025-11-09 10:56:59] Low-priority gating removed 20 tickers (remaining 1)
+[2025-11-09 10:57:02] Entry window marks set: 438 rows flagged out of 11824
+[2025-11-09 10:57:02] Liquidity filter q=0.30 kept 1 tickers and 11824 rows
+[2025-11-09 10:57:02] Using 5 rolling slices (train=12, forward=4)
+[2025-11-09 10:57:02] Parameter grid size: 28 (mode=coarse, signal=j-only)
+[2025-11-09 10:57:07] [1/1] 5016.T: best train_pf_eff=1.623, forward_pf_eff=2.075, trades=20/5
+[2025-11-09 10:57:07] Cache reuse: 0/28 combos (0.0%) served from cache
+[2025-11-09 10:57:07] Run completed in 0.1 minutes

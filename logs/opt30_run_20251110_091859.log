@@ -1,0 +1,19 @@
+[2025-11-10 09:18:59] Run started
+[2025-11-10 09:18:59] Run type resolved to weekday
+[2025-11-10 09:19:00] Low-priority gating removed 10 tickers (remaining 11)
+[2025-11-10 09:19:05] Entry window marks set: 20949 rows flagged out of 120082
+[2025-11-10 09:19:05] Liquidity filter q=0.50 kept 8 tickers and 65910 rows
+[2025-11-10 09:19:05] Using 5 rolling slices (train=12, forward=4)
+[2025-11-10 09:19:05] Parameter grid size: 28 (mode=coarse, signal=j-cross)
+[2025-11-10 09:19:15] [1/8] 1357.T: best train_pf_eff=0.000, forward_pf_eff=2.130, trades=0/3
+[2025-11-10 09:19:15] [2/8] 7735.T: best train_pf_eff=0.000, forward_pf_eff=0.000, trades=0/0
+[2025-11-10 09:19:32] [3/8] 7012.T: best train_pf_eff=0.898, forward_pf_eff=1.500, trades=27/19
+[2025-11-10 09:19:33] [4/8] 8035.T: best train_pf_eff=1.253, forward_pf_eff=2.028, trades=50/17
+[2025-11-10 09:19:34] [5/8] 5016.T: best train_pf_eff=1.164, forward_pf_eff=3.506, trades=50/15
+[2025-11-10 09:19:34] [6/8] 5801.T: best train_pf_eff=0.642, forward_pf_eff=0.439, trades=33/14
+[2025-11-10 09:19:35] [7/8] 6526.T: best train_pf_eff=1.655, forward_pf_eff=2.592, trades=35/10
+[2025-11-10 09:19:35] [8/8] 6857.T: best train_pf_eff=1.552, forward_pf_eff=2.138, trades=53/19
+[2025-11-10 09:19:35] Cache reuse: 0/80 combos (0.0%) served from cache
+[2025-11-10 09:19:35] ASHA pruned 144 parameter combos prior to full evaluation
+[2025-11-10 09:19:35] Excel summary written to output\bt30\NIGHTLY_20251110\RUN_coarse_AM1000_j-cross\summary_20251110_091935.xlsx
+[2025-11-10 09:19:35] Run completed in 0.6 minutes

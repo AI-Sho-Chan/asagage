@@ -1,0 +1,23 @@
+[2025-11-10 02:51:50] Run started
+[2025-11-10 02:51:50] Run type resolved to weekend
+[2025-11-10 02:51:50] Codes loaded from output\bt30\NIGHTLY_20251110\RUN_coarse_AM0930_j-only\_TOP_CANDIDATES.csv: 14 tickers
+[2025-11-10 02:51:54] Entry window marks set: 12630 rows flagged out of 154615
+[2025-11-10 02:51:55] Liquidity filter q=0.30 kept 12 tickers and 108743 rows
+[2025-11-10 02:51:55] Using 5 rolling slices (train=12, forward=4)
+[2025-11-10 02:51:55] Parameter grid size: 720 (mode=refine, signal=j-only)
+[2025-11-10 03:02:04] [1/12] 5706.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=42/24
+[2025-11-10 03:06:48] [2/12] 1357.T: best train_pf_eff=0.000, forward_pf_eff=999.000, trades=0/13
+[2025-11-10 03:10:39] [3/12] 6525.T: best train_pf_eff=4.169, forward_pf_eff=6.215, trades=45/23
+[2025-11-10 03:13:39] [4/12] 6857.T: best train_pf_eff=1.854, forward_pf_eff=2.782, trades=7/3
+[2025-11-10 03:13:50] [5/12] 6526.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=13/2
+[2025-11-10 03:13:55] [6/12] 7012.T: best train_pf_eff=1.519, forward_pf_eff=999.000, trades=62/11
+[2025-11-10 03:13:57] [7/12] 5801.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=30/12
+[2025-11-10 03:14:08] [8/12] 5016.T: best train_pf_eff=6.161, forward_pf_eff=999.000, trades=62/14
+[2025-11-10 03:19:32] [9/12] 8035.T: best train_pf_eff=8.858, forward_pf_eff=999.000, trades=38/8
+[2025-11-10 03:21:30] [10/12] 9432.T: best train_pf_eff=999.000, forward_pf_eff=999.000, trades=6/17
+[2025-11-10 03:21:38] [11/12] 8136.T: best train_pf_eff=0.915, forward_pf_eff=999.000, trades=210/26
+[2025-11-10 03:21:59] [12/12] 8411.T: best train_pf_eff=65.237, forward_pf_eff=999.000, trades=26/9
+[2025-11-10 03:21:59] Cache reuse: 0/9071 combos (0.0%) served from cache
+[2025-11-10 03:21:59] Bayesian refine trials executed: 431
+[2025-11-10 03:21:59] Refine candidates exported to output\excel\NIGHTLY_20251110\AM0930_j-only\candidates_20251110.csv
+[2025-11-10 03:21:59] Run completed in 30.2 minutes
