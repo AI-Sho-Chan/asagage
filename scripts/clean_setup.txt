@@ -1,0 +1,99 @@
+Sub SetupDashboardUIV2()
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
+    On Error GoTo 0
+    If ws Is Nothing Then Exit Sub
+
+    ' --- CLEANUP OLD BUTTONS ---
+    ' Delete ALL buttons to ensure no duplicates/ghosts remain behind new ones.
+    On Error Resume Next
+    ws.Buttons.Delete
+    On Error GoTo 0
+
+    ' Recreate Buttons (Standard V2 Layout)
+    ' Row 3 only. Height fits in Row 3.
+    Dim r3 As Range
+    Set r3 = ws.Rows(3)
+    Dim btnHeight As Double
+    btnHeight = r3.Height * 0.9 ' Slightly smaller than row height
+    Dim btnTop As Double
+    btnTop = r3.Top + (r3.Height - btnHeight) / 2
+    
+    ' Layout: Start from F3 (Col 6) as requested.
+    ' Spacing: Every 2 columns (F, H, J, L, N, P)
+    
+    CreateButton ws, "btn_live_stop", "Live Stop", 3, 6, "AutoTraderAdvanced.StopLive", btnTop, btnHeight
+    CreateButton ws, "btn_demo_start", "Demo Start", 3, 8, "AutoTraderAdvanced.StartDemo", btnTop, btnHeight
+    CreateButton ws, "btn_demo_stop", "Demo Stop", 3, 10, "AutoTraderAdvanced.StopDemo", btnTop, btnHeight
+    ' Use ImportCandidatesV2 if it exists
+    CreateButton ws, "btn_import", "Import Candidates", 3, 12, "AutoTraderAdvanced.ImportCandidatesV2", btnTop, btnHeight
+    ' Use RefreshTrendsV2 for Recalc
+    CreateButton ws, "btn_recalc", "方向再計算", 3, 14, "AutoTraderAdvanced.RefreshTrendsV2", btnTop, btnHeight
+    ' Use ClearBBBlocks (existing)
+    CreateButton ws, "btn_clear_bb", "BBブロック解除", 3, 16, "AutoTraderAdvanced.ClearBBBlocks", btnTop, btnHeight
+    
+    ApplyJapaneseLabelsV2 ws
+    ReorderHeadersV2 ws
+    EnsureParamFormulas ws
+    SetupHeartbeatCell ws
+    UpdateTrendIndicators ws
+    
+    With ws.Range("A3")
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .Font.Bold = True
+        .Font.Size = 14
+    End With
+End Sub
+
+Private Sub CreateButton(ByVal ws As Worksheet, ByVal name As String, ByVal caption As String, ByVal rowIdx As Long, ByVal colIdx As Long, ByVal macroName As String, ByVal topPos As Double, ByVal height As Double)
+    Dim btn As Button
+    Dim rng As Range
+    Dim leftPos As Double, width As Double
+    
+    On Error Resume Next
+    ws.Buttons(name).Delete
+    On Error GoTo 0
+    
+    Set rng = ws.Cells(rowIdx, colIdx)
+    leftPos = rng.Left
+    width = rng.Width * 1.8 ' Slightly wider than 1 cell if needed, or adjust col span
+    
+    Set btn = ws.Buttons.Add(leftPos, topPos, width, height)
+    With btn
+        .name = name
+        .caption = caption
+        .OnAction = macroName
+        .Font.Size = 9
+        .Font.Bold = True
+    End With
+End Sub
+
+' --- CONTROL MACROS ---
+
+Sub StartLive()
+    Dim ws As Worksheet: Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
+    ws.Range("A3").Value = "LIVE_RUNNING"
+    ws.Range("A3").Interior.Color = RGB(255, 200, 200)
+    CheckRssHeartbeat
+End Sub
+
+Sub StopLive()
+    Dim ws As Worksheet: Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
+    ws.Range("A3").Value = "IDLE"
+    ws.Range("A3").Interior.Color = xlNone
+End Sub
+
+Sub StartDemo()
+    Dim ws As Worksheet: Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
+    ws.Range("A3").Value = "DEMO_RUNNING"
+    ws.Range("A3").Interior.Color = RGB(200, 255, 200)
+    CheckRssHeartbeat
+End Sub
+
+Sub StopDemo()
+    Dim ws As Worksheet: Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
+    ws.Range("A3").Value = "IDLE"
+    ws.Range("A3").Interior.Color = xlNone
+End Sub

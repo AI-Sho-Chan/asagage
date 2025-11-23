@@ -1,0 +1,76 @@
+Private Sub LogPreOrder(ByVal ws As Worksheet, ByVal Sh As Worksheet, ByVal rowIndex As Long, _
+    ByVal includeBuy As Boolean, ByVal includeSell As Boolean, _
+    ByVal eBuyCol As Long, ByVal eSellCol As Long, ByVal qtyCol As Long, _
+    ByVal tpCol As Long, ByVal slCol As Long, ByVal modeCol As Long, _
+    ByVal sessionCol As Long, ByVal tickerCol As Long, _
+    ByVal bufferFrac As Double, ByVal noteExtra As String)
+
+    Dim nextRow As Long
+    nextRow = Sh.Cells(Sh.Rows.Count, 1).End(xlUp).Row + 1
+    
+    Dim sheetToken As String
+    sheetToken = "'" & ws.name & "'!"
+    
+    Dim tickerRef As String
+    tickerRef = sheetToken & ws.Cells(rowIndex, tickerCol).address(True, True)
+    
+    Dim qtyRef As String
+    qtyRef = sheetToken & ws.Cells(rowIndex, qtyCol).address(True, True)
+    
+    Dim tpRef As String
+    If tpCol > 0 Then tpRef = sheetToken & ws.Cells(rowIndex, tpCol).address(True, True)
+    Dim slRef As String
+    If slCol > 0 Then slRef = sheetToken & ws.Cells(rowIndex, slCol).address(True, True)
+    
+    Dim noteFormula As String
+    noteFormula = ""
+    If Len(noteExtra) > 0 Then
+        noteFormula = "=""" & noteExtra & """"
+    End If
+
+    If includeBuy Then
+        Dim buyRef As String
+        buyRef = sheetToken & ws.Cells(rowIndex, eBuyCol).address(True, True)
+        
+        Sh.Cells(nextRow, 1).value = Format$(Now, "yyyy-mm-dd hh:nn:ss")
+        Sh.Cells(nextRow, 2).Formula = "=" & tickerRef
+        Sh.Cells(nextRow, 3).value = "BUY"
+        Sh.Cells(nextRow, 4).Formula = "=" & buyRef
+        Sh.Cells(nextRow, 5).Formula = "=" & qtyRef
+        Sh.Cells(nextRow, 6).value = "PREPLACE"
+        Sh.Cells(nextRow, 7).value = "PENDING"
+        If noteFormula <> "" Then
+            Sh.Cells(nextRow, 8).Formula = noteFormula
+        Else
+            Sh.Cells(nextRow, 8).value = ""
+        End If
+        
+        If tpRef <> "" Then Sh.Cells(nextRow, 9).Formula = "=" & tpRef
+        If slRef <> "" Then Sh.Cells(nextRow, 10).Formula = "=" & slRef
+        
+        nextRow = nextRow + 1
+    End If
+
+    If includeSell Then
+        Dim sellRef As String
+        sellRef = sheetToken & ws.Cells(rowIndex, eSellCol).address(True, True)
+        
+        Sh.Cells(nextRow, 1).value = Format$(Now, "yyyy-mm-dd hh:nn:ss")
+        Sh.Cells(nextRow, 2).Formula = "=" & tickerRef
+        Sh.Cells(nextRow, 3).value = "SELL"
+        Sh.Cells(nextRow, 4).Formula = "=" & sellRef
+        Sh.Cells(nextRow, 5).Formula = "=" & qtyRef
+        Sh.Cells(nextRow, 6).value = "PREPLACE"
+        Sh.Cells(nextRow, 7).value = "PENDING"
+        If noteFormula <> "" Then
+            Sh.Cells(nextRow, 8).Formula = noteFormula
+        Else
+            Sh.Cells(nextRow, 8).value = ""
+        End If
+        
+        If tpRef <> "" Then Sh.Cells(nextRow, 9).Formula = "=" & tpRef
+        If slRef <> "" Then Sh.Cells(nextRow, 10).Formula = "=" & slRef
+        
+        nextRow = nextRow + 1
+    End If
+End Sub

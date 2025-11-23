@@ -1,0 +1,63 @@
+Private Sub EnsureParamFormulas(ByVal ws As Worksheet)
+    On Error Resume Next
+    ws.Cells(2, 1).value = "N225"
+    ws.Cells(2, 4).value = "TOPX"
+    ws.Cells(2, 2).Formula = "=IF(A2="""","""",IFERROR(RssIndexMarket(A2,""現在値""),""""))"
+    ws.Cells(2, 3).Formula = "=IF(A2="""","""",IFERROR(RssIndexMarket(A2,""前日比率""),""""))"
+    ws.Cells(2, 5).Formula = "=IF(D2="""","""",IFERROR(RssIndexMarket(D2,""現在値""),""""))"
+    ws.Cells(2, 6).Formula = "=IF(D2="""","""",IFERROR(RssIndexMarket(D2,""前日比率""),""""))"
+    
+    ' Set default for Order Update Threshold (Col 24) if empty
+    If IsEmpty(ws.Cells(2, 24).value) Or ws.Cells(2, 24).value = "" Then
+        ws.Cells(2, 24).value = 2
+    End If
+    
+    ' Split params into two arrays to avoid line continuation limit
+    Dim p1 As Variant, p2 As Variant
+    p1 = Array( _
+        Array(1, "指標コード(日経平均)", "楽天RSSに渡す指標コード。通常はN225固定です"), _
+        Array(2, "日経平均 現在値", ""), _
+        Array(3, "日経平均 前日比率", ""), _
+        Array(4, "指標コード(TOPIX)", "楽天RSSに渡すTOPIXコード。通常はTOPXです"), _
+        Array(5, "TOPIX 現在値", ""), _
+        Array(6, "TOPIX 前日比率", ""), _
+        Array(7, "バイアス閾値(bp)", "J補正をBAN扱いにする絶対値閾値"), _
+        Array(8, "Bias補正係数", "日経平均との方向差で加算する係数"), _
+        Array(9, "Gap補正係数", "ギャップ量に応じた補正係数"), _
+        Array(10, "Gap BAN 閾値(%)", "この割合を超えるギャップは自動BAN"), _
+        Array(11, "取引停止分数", "AutoTrader再開までのクールダウン（分）"), _
+        Array(12, "TP/J (全体)", "") _
+    )
+    p2 = Array( _
+        Array(13, "SL/J (全体)", ""), _
+        Array(14, "Trail/J (全体)", ""), _
+        Array(15, "相関補正係数", "NKY/TOPIX相関でJ_thを補正する係数"), _
+        Array(16, "銘柄別予算(円)", ""), _
+        Array(17, "ロットサイズ", ""), _
+        Array(18, "NKY日足トレンド", ""), _
+        Array(19, "NKY窓トレンド", ""), _
+        Array(20, "NKY許容サイド", ""), _
+        Array(21, "TOPIX日足トレンド", ""), _
+        Array(22, "TOPIX窓トレンド", ""), _
+        Array(23, "TOPIX許容サイド", ""), _
+        Array(24, "注文訂正閾値(tick)", "Preplace/決済注文を訂正する最小乖離幅") _
+    )
+    
+    Dim headerInfo As Variant
+    Dim i As Long
+    For i = LBound(p1) To UBound(p1)
+        headerInfo = p1(i)
+        ws.Cells(1, headerInfo(0)).value = headerInfo(1)
+        If UBound(headerInfo) >= 2 Then
+            If Len(headerInfo(2)) > 0 Then SetHeaderComment ws, CLng(headerInfo(0)), CStr(headerInfo(2))
+        End If
+    Next i
+    For i = LBound(p2) To UBound(p2)
+        headerInfo = p2(i)
+        ws.Cells(1, headerInfo(0)).value = headerInfo(1)
+        If UBound(headerInfo) >= 2 Then
+            If Len(headerInfo(2)) > 0 Then SetHeaderComment ws, CLng(headerInfo(0)), CStr(headerInfo(2))
+        End If
+    Next i
+    On Error GoTo 0
+End Sub
