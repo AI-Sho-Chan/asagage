@@ -907,8 +907,22 @@ def _main_impl() -> None:
                 dfu = pd.read_csv(src_path)
                 if "code" in dfu.columns:
                     base_codes = dfu["code"].dropna().astype(str).tolist()
-            except Exception:
+                write_status(
+                    state="running",
+                    step="universe",
+                    message="Loaded universe from universe-source CSV",
+                    universe_base=len(base_codes),
+                    universe_source=universe_source_note,
+                )
+            except Exception as exc:
                 base_codes = []
+                write_status(
+                    state="running",
+                    step="universe",
+                    message=f"Failed to read universe-source CSV: {exc}",
+                    universe_base=0,
+                    universe_source=universe_source_note or args.universe_source,
+                )
 
         if not base_codes:
             base_codes = load_codes_from_excel(Path(args.excel), args.excel_ticker_sheet)
