@@ -1645,7 +1645,6 @@ def _main_impl() -> None:
             run([sys.executable, "tools/aggregate_candidates_today.py", "--output", str(out_all)], cwd=repo_root)
             # best-effort stats refresh
             try:
-                import pandas as pd  # type: ignore
                 df_out = pd.read_csv(out_all)
                 summary.update(
                     {
