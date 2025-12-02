@@ -874,6 +874,7 @@ def _main_impl() -> None:
     codes_file_for_runs: Optional[Path] = None
     base_codes: List[str] = []
     universe_source_note = ""
+    universe_diag: List[str] = []
     if args.universe_mode == "yahoo-top":
         write_status(
             state="running",
@@ -884,6 +885,8 @@ def _main_impl() -> None:
         )
 
         src_path = Path(args.universe_source)
+        universe_diag.append(f"args.universe_source={args.universe_source}")
+        universe_diag.append(f"initial_src={src_path}")
         if "*" in src_path.name or "?" in src_path.name:
             parent = src_path.parent if src_path.parent != Path("") else Path(".")
             matches = sorted(parent.glob(src_path.name))
@@ -901,12 +904,16 @@ def _main_impl() -> None:
                 if non_test:
                     matches = sorted(non_test)
                 src_path = matches[-1]
+        universe_diag.append(f"resolved_src={src_path} exists={src_path.exists()}")
         if src_path.exists():
             universe_source_note = str(src_path)
             try:
                 dfu = pd.read_csv(src_path)
                 if "code" in dfu.columns:
                     base_codes = dfu["code"].dropna().astype(str).tolist()
+                universe_diag.append(
+                    f"src_path_ok rows={len(dfu)} cols={list(dfu.columns)} base={len(base_codes)}"
+                )
                 write_status(
                     state="running",
                     step="universe",
@@ -916,6 +923,7 @@ def _main_impl() -> None:
                 )
             except Exception as exc:
                 base_codes = []
+                universe_diag.append(f"src_path_error={exc!r}")
                 write_status(
                     state="running",
                     step="universe",
@@ -924,9 +932,71 @@ def _main_impl() -> None:
                     universe_source=universe_source_note or args.universe_source,
                 )
 
+        # Fallback: in case base_codes is still empty (e.g. unexpected path handling),
+        # try reading args.universe_source as a CSV relative to repo_root.
+        if not base_codes:
+            alt_path = Path(args.universe_source)
+            if not alt_path.is_absolute():
+                alt_path = (repo_root / alt_path).resolve()
+            if alt_path.exists():
+                try:
+                    dfu_alt = pd.read_csv(alt_path)
+                    if "code" in dfu_alt.columns:
+                        base_codes = dfu_alt["code"].dropna().astype(str).tolist()
+                        universe_source_note = str(alt_path)
+                        write_status(
+                            state="running",
+                            step="universe",
+                            message="Recovered universe from args.universe-source CSV",
+                            universe_base=len(base_codes),
+                            universe_source=universe_source_note,
+                        )
+                except Exception as exc:
+                    write_status(
+                        state="running",
+                        step="universe",
+                        message=f"Fallback universe-source CSV read failed: {exc}",
+                        universe_base=0,
+                        universe_source=universe_source_note or str(alt_path),
+                    )
+
+        # Fallback: in case base_codes is still empty (e.g. unexpected path handling),
+        # try reading args.universe_source as a CSV relative to repo_root.
+        if not base_codes:
+            alt_path = Path(args.universe_source)
+            if not alt_path.is_absolute():
+                alt_path = (repo_root / alt_path).resolve()
+            universe_diag.append(f"alt_path={alt_path} exists={alt_path.exists()}")
+            if alt_path.exists():
+                try:
+                    dfu_alt = pd.read_csv(alt_path)
+                    if "code" in dfu_alt.columns:
+                        base_codes = dfu_alt["code"].dropna().astype(str).tolist()
+                        universe_source_note = str(alt_path)
+                        universe_diag.append(
+                            f"alt_path_ok rows={len(dfu_alt)} cols={list(dfu_alt.columns)} base={len(base_codes)}"
+                        )
+                        write_status(
+                            state="running",
+                            step="universe",
+                            message="Recovered universe from args.universe-source CSV",
+                            universe_base=len(base_codes),
+                            universe_source=universe_source_note,
+                        )
+                except Exception as exc:
+                    universe_diag.append(f"alt_path_error={exc!r}")
+                    write_status(
+                        state="running",
+                        step="universe",
+                        message=f"Fallback universe-source CSV read failed: {exc}",
+                        universe_base=0,
+                        universe_source=universe_source_note or str(alt_path),
+                    )
+
         if not base_codes:
             base_codes = load_codes_from_excel(Path(args.excel), args.excel_ticker_sheet)
             if base_codes:
+                universe_diag.append(f"excel_sheet_base={len(base_codes)}")
                 write_status(
                     state="running",
                     step="universe",
@@ -940,6 +1010,7 @@ def _main_impl() -> None:
                     df_fallback = pd.read_csv(fallback_csv)
                     if "Ticker" in df_fallback.columns:
                         base_codes = df_fallback["Ticker"].dropna().astype(str).tolist()
+                        universe_diag.append(f"fallback_candidates_base={len(base_codes)}")
                         write_status(
                             state="running",
                             step="universe",
@@ -956,6 +1027,7 @@ def _main_impl() -> None:
                 message="No universe codes available for yahoo-top; aborting",
                 universe_base=0,
                 universe_source=universe_source_note or "none",
+                universe_diag="|".join(universe_diag),
             )
             raise SystemExit("No universe codes available for yahoo-top; aborting")
         try:
