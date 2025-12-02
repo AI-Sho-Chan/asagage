@@ -908,7 +908,8 @@ def _main_impl() -> None:
         if src_path.exists():
             universe_source_note = str(src_path)
             try:
-                dfu = pd.read_csv(src_path)
+                import pandas as _pd  # local import to avoid any shadowing issues
+                dfu = _pd.read_csv(src_path)
                 if "code" in dfu.columns:
                     base_codes = dfu["code"].dropna().astype(str).tolist()
                 universe_diag.append(
@@ -969,7 +970,8 @@ def _main_impl() -> None:
             universe_diag.append(f"alt_path={alt_path} exists={alt_path.exists()}")
             if alt_path.exists():
                 try:
-                    dfu_alt = pd.read_csv(alt_path)
+                    import pandas as _pd  # local import to avoid any shadowing issues
+                    dfu_alt = _pd.read_csv(alt_path)
                     if "code" in dfu_alt.columns:
                         base_codes = dfu_alt["code"].dropna().astype(str).tolist()
                         universe_source_note = str(alt_path)
