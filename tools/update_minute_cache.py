@@ -123,8 +123,15 @@ def save_day_history(df: pd.DataFrame, day: dt.date) -> int:
             directory = DATA_ROOT / str(symbol)
             ensure_directory(directory)
             out_path = directory / f"{day:%Y-%m-%d}.parquet"
-            local.set_index("ts").to_parquet(out_path)
-            saved += 1
+            try:
+                local.set_index("ts").to_parquet(out_path)
+                saved += 1
+            except ImportError as exc:
+                # parquet engine (pyarrow/fastparquet) not available; skip saving but do not abort the batch
+                print(f"[update_minute_cache] parquet disabled for {symbol} {day}: {exc}")
+            except Exception as exc:
+                # any other failure should be logged but not crash the caller
+                print(f"[update_minute_cache] failed to save parquet for {symbol} {day}: {exc}")
     else:
         frame = normalize_history_frame(df.reset_index())
         if "code" not in frame.columns:
@@ -136,8 +143,13 @@ def save_day_history(df: pd.DataFrame, day: dt.date) -> int:
             directory = DATA_ROOT / str(symbol)
             ensure_directory(directory)
             out_path = directory / f"{day:%Y-%m-%d}.parquet"
-            local.set_index("ts").to_parquet(out_path)
-            saved += 1
+            try:
+                local.set_index("ts").to_parquet(out_path)
+                saved += 1
+            except ImportError as exc:
+                print(f"[update_minute_cache] parquet disabled for {symbol} {day}: {exc}")
+            except Exception as exc:
+                print(f"[update_minute_cache] failed to save parquet for {symbol} {day}: {exc}")
     return saved
 
 
