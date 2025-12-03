@@ -460,7 +460,26 @@ class IneffectiveBandTracker:
 
 
 def load_tickers_from_excel(path: Path) -> List[str]:
-    """Return list of tickers from Excel, accepting multiple sheet/column conventions."""
+    """Return list of tickers, preferring the latest candidates CSV when available."""
+    # Always prefer the latest candidates CSV so Linux/VM ランナーが Excel に依存しなくても動く
+    fallback_csv = Path("output/excel/candidates_nextday.csv")
+    if fallback_csv.exists():
+        try:
+            df = pd.read_csv(fallback_csv)
+            for col in ("Ticker", "code", "Code"):
+                if col in df.columns:
+                    series = (
+                        df[col]
+                        .dropna()
+                        .astype(str)
+                        .map(lambda x: x.strip())
+                    )
+                    series = series[series != ""]
+                    if not series.empty:
+                        return series.tolist()
+        except Exception:
+            pass
+
     if not path.exists():
         raise FileNotFoundError(f"Excel workbook not found: {path}")
 
@@ -498,24 +517,6 @@ def load_tickers_from_excel(path: Path) -> List[str]:
             )
             if not series.empty:
                 return series.tolist()
-
-    fallback_csv = Path("output/excel/candidates_nextday.csv")
-    if fallback_csv.exists():
-        try:
-            df = pd.read_csv(fallback_csv)
-            for col in ("Ticker", "code", "Code"):
-                if col in df.columns:
-                    series = (
-                        df[col]
-                        .dropna()
-                        .astype(str)
-                        .map(lambda x: x.strip())
-                    )
-                    series = series[series != ""]
-                    if not series.empty:
-                        return series.tolist()
-        except Exception:
-            pass
 
     raise ValueError(
         "Ticker list could not be located. "
@@ -1985,17 +1986,30 @@ def main() -> None:
         tickers = load_tickers_from_excel(Path(args.excel))
         original_count = len(tickers)
     excluded_codes: List[str] = []
+    restored_codes: List[str] = []
     if lp_manager and run_type == "weekday":
         low_priority_codes = set(lp_manager.get_low_priority())
         if low_priority_codes:
             excluded_codes = [code for code in tickers if code in low_priority_codes]
             if excluded_codes:
-                tickers = [code for code in tickers if code not in low_priority_codes]
-                lp_manager.register_skip(excluded_codes)
-                logger.log(
-                    f"Low-priority gating removed {len(excluded_codes)} tickers "
-                    f"(remaining {len(tickers)})"
-                )
+                remaining = [code for code in tickers if code not in low_priority_codes]
+                if not remaining:
+                    restore_budget = min(len(excluded_codes), max(1, min(3, original_count or 1)))
+                    restored_codes = excluded_codes[:restore_budget]
+                    remaining = restored_codes.copy()
+                    excluded_codes = excluded_codes[restore_budget:]
+                    logger.log(
+                        "Low-priority gating would remove all tickers; "
+                        f"restoring {len(restored_codes)} fallback tickers ({', '.join(restored_codes)})"
+                    )
+                else:
+                    logger.log(
+                        f"Low-priority gating removed {len(excluded_codes)} tickers "
+                        f"(remaining {len(remaining)})"
+                    )
+                tickers = remaining
+                if excluded_codes:
+                    lp_manager.register_skip(excluded_codes)
     if not tickers:
         raise RuntimeError("No tickers available for evaluation")
 
@@ -2040,9 +2054,12 @@ def main() -> None:
 
     days = sorted(data["date"].unique())
     if len(days) < args.train_days + args.forward_days:
-        raise RuntimeError(
-            f"Insufficient distinct days ({len(days)}) for train={args.train_days} + forward={args.forward_days}"
+        # Not enough distinct days to perform a full walk-forward; log and skip gracefully.
+        logger.log(
+            f"Insufficient distinct days ({len(days)}) for train={args.train_days} "
+            f"+ forward={args.forward_days}; skipping run"
         )
+        return
 
     session_start = parse_hhmm(args.session_start)
     session_end = parse_hhmm(args.session_end)
