@@ -14,3 +14,8 @@
 ```
 python -c "import win32com.client as win32; xl=win32.DispatchEx('Excel.Application'); wb=xl.Workbooks.Open(r'C:\AI\asagake\SHINSOKU.xlsm'); xl.Visible=False; xl.DisplayAlerts=False; xl.Run('AutoTrader.PlaceOrderDryRun','9999.T','BUY',1234.5,100,'TEST'); wb.Save(); wb.Close(); xl.Quit()"
 ```
+- [ ] ZbVPF/bp̃j^OpA򉻂viAM1015/PM1Ȃǁjו܂͈ꎞ~
+- [ ] OrdersV[g̋L^̓_bV{[h艻ƃ[U[F܂ŊwK/~ϏɎgȂiۑ͍sWvEwK͕ۗj
+
+- [ ] TODO: ATRレンジ拡張の検証（AM=2/3維持, RD/PM=2/3/5 追加方針）
+- [ ] TODO: セッション別PF/勝率のヘルスチェック自動化（analysis/session_mode_summary.csv 等を監視）

@@ -75,10 +75,10 @@ PARAM_DEFAULTS = [
 PARAM_LABELS = {
     "NKY_Code": ("指標コード(日経平均)", "楽天RSSに渡す指標コード。通常はN225固定です"),
     "NKY_Last": ("日経平均 現在値", "RssIndexMarket(\"現在値\")で取得した値を表示します"),
-    "NKY_ChgPct": ("日経平均 前日比", "RssIndexMarket(\"前日比\")の結果を表示します"),
+    "NKY_ChgPct": ("日経平均 前日比率", "RssIndexMarket(\"前日比率\")の結果を表示します"),
     "TOPIX_Code": ("指標コード(TOPIX)", "楽天RSSに渡すTOPIXコード。通常はTOPXです"),
     "TOPIX_Last": ("TOPIX 現在値", "RssIndexMarket(\"現在値\")で取得したTOPIXの値"),
-    "TOPIX_ChgPct": ("TOPIX 前日比", "RssIndexMarket(\"前日比\")の結果"),
+    "TOPIX_ChgPct": ("TOPIX 前日比率", "RssIndexMarket(\"前日比率\")の結果"),
     "Bias_bp": ("バイアス閾値(bp)", "J補正をBAN扱いにする絶対値閾値"),
     "BiasSlope": ("Bias補正係数", "日経平均との方向差で加算する係数"),
     "GapSlope": ("Gap補正係数", "ギャップ量に応じた補正係数"),
@@ -113,7 +113,7 @@ JP_MAP = {
     "EntryBuyPx": ("買指値", "VWAPを基準にJ_thで算出"),
     "EntrySellPx": ("売指値", "VWAPを基準にJ_thで算出"),
     "EntrySide": ("サイド", "J値の符号でBUY/SELL"),
-    "EntryStatus": ("発注ステータス", "発注処理で書き込み"),
+    "EntryStatus": ("発注ステータス", "BLOCKED_* = 各種BAN理由（DIR=方向不一致, BB=板監視, ALERT=手動停止, SPIKE=急変など）。PENDING=先回り発注, FILLED=約定, CANCELLED=取消、RUNNING=実行中。VBAが自動更新。"),
     "TP_price": ("利確指値", "J値×TP_per_J"),
     "SL_price": ("損切指値", "J値×SL_per_J"),
     "StopTrail": ("トレーリング", "トレーリング用セル（必要時にVBAが更新）"),
@@ -122,6 +122,7 @@ JP_MAP = {
     "BestAsk": ("最良売気配値", "RssMarket(\"最良売気配値\")"),
     "Gap_bp": ("ギャップ(bp)", "(中値?前日終値)/前日終値×10000"),
     "CorrNKY": ("相関(NKY)", "銘柄と日経平均の相関係数"),
+    "CorrTOPIX": ("相関(TOPIX)", "銘柄とTOPIXの相関係数"),
     "PrevClose": ("前日終値", "RssMarket(\"前日終値\")"),
     "ForwardPfEff": ("フォワードPF効率", "週末/ナイト結果"),
     "WinCiLow": ("勝率CI下限", "週末/ナイト結果"),
@@ -158,11 +159,13 @@ JP_MAP = {
 }
 
 BUTTONS = [
-    ("btn_live_start", "本番取引開始", 3, 4, "AutoTraderAdvanced.StartLiveV2"),
-    ("btn_live_stop", "本番取引停止", 3, 6, "AutoTraderAdvanced.StopLiveV2"),
-    ("btn_demo_start", "デモ取引開始", 3, 8, "AutoTraderAdvanced.StartDemoV2"),
-    ("btn_demo_stop", "デモ取引停止", 3, 10, "AutoTraderAdvanced.StopDemoV2"),
-    ("btn_import", "候補銘柄取込", 3, 12, "AutoTraderAdvanced.ImportCandidatesV2"),
+    ("btn_live_start", "本番取引開始", 3, 6, "AutoTraderAdvanced.StartLiveV2"),
+    ("btn_live_stop", "本番取引停止", 3, 8, "AutoTraderAdvanced.StopLiveV2"),
+    ("btn_demo_start", "デモ取引開始", 3, 10, "AutoTraderAdvanced.StartDemoV2"),
+    ("btn_demo_stop", "デモ取引停止", 3, 12, "AutoTraderAdvanced.StopDemoV2"),
+    ("btn_import", "候補銘柄取込", 3, 14, "AutoTraderAdvanced.ImportCandidatesV2"),
+    ("btn_refresh_trend", "方向再計算", 3, 16, "AutoTraderAdvanced.RefreshTrendsV2"),
+    ("btn_clear_bb", "BBブロック解除", 3, 18, "AutoTraderAdvanced.ClearBBBlocks"),
 ]
 
 ORDER_HEADERS = list(JP_MAP.keys())
@@ -170,7 +173,7 @@ COL_INDEX = {name: idx for idx, name in enumerate(ORDER_HEADERS, start=1)}
 
 DATA_START_ROW = 6
 DATA_END_ROW = 605
-STATUS_RANGE = "A3:B3"
+STATUS_RANGE = "A3"
 
 
 def backup_path(path: Path) -> Path:
@@ -224,6 +227,26 @@ def create_button(ws, name: str, caption: str, row: int, col: int, macro: str) -
     shape.OnAction = macro
 
 
+def setup_indicator_cells(ws) -> None:
+    _setup_indicator(ws, "B3:C3", "NKY方向", "NKYTrendCell")
+    _setup_indicator(ws, "D3:E3", "TOPIX方向", "TOPIXTrendCell")
+
+
+def _setup_indicator(ws, address: str, label: str, name: str) -> None:
+    rng = ws.Range(address)
+    try:
+        ws.Parent.Names(name).Delete()
+    except Exception:
+        pass
+    rng.Merge()
+    rng.HorizontalAlignment = -4108
+    rng.VerticalAlignment = -4108
+    rng.Font.Bold = True
+    rng.Interior.Color = rgb(240, 240, 240)
+    rng.Value = f"{label}\n---"
+    rng.Name = name
+
+
 def rc_relative(current: int, target: int) -> str:
     delta = target - current
     if delta == 0:
@@ -239,7 +262,7 @@ def fill_formula(ws, col: int, formula: str) -> None:
         rng.FormulaR1C1Local = formula
 
 
-def build_dashboard(excel_path: Path) -> None:
+def build_dashboard(excel_path: Path, force: bool = False) -> None:
     import win32com.client  # type: ignore
     from win32com.client import constants  # type: ignore
     xl_expression = getattr(constants, "xlExpression", 2)
@@ -252,6 +275,11 @@ def build_dashboard(excel_path: Path) -> None:
     excel.DisplayAlerts = False
     try:
         wb = excel.Workbooks.Open(str(work_copy))
+        if force:
+            try:
+                wb.Worksheets("NewDashboardV2").Delete()
+            except Exception:
+                pass
         try:
             ws = wb.Worksheets("NewDashboardV2")
         except Exception:
@@ -272,7 +300,7 @@ def build_dashboard(excel_path: Path) -> None:
         # Ensure NKY related formulas persist (RSS index depends on code in A2)
         try:
             ws.Cells(2, 2).FormulaR1C1Local = '=IF(RC[-1]="", "", IFERROR(RssIndexMarket(RC[-1],"現在値"),""))'
-            ws.Cells(2, 3).FormulaR1C1Local = '=IF(RC[-2]="", "", IFERROR(RssIndexMarket(RC[-2],"前日比"),""))'
+            ws.Cells(2, 3).FormulaR1C1Local = '=IF(RC[-2]="", "", IFERROR(RssIndexMarket(RC[-2],"前日比率"),""))'
         except Exception:
             pass
         try:
@@ -280,12 +308,11 @@ def build_dashboard(excel_path: Path) -> None:
             topix_last_idx = PARAM_HEADERS.index("TOPIX_Last") + 1
             topix_chg_idx = PARAM_HEADERS.index("TOPIX_ChgPct") + 1
             ws.Cells(2, topix_last_idx).FormulaR1C1Local = '=IF(RC[-1]="", "", IFERROR(RssIndexMarket(RC[-1],"現在値"),""))'
-            ws.Cells(2, topix_chg_idx).FormulaR1C1Local = '=IF(RC[-2]="", "", IFERROR(RssIndexMarket(RC[-2],"前日比"),""))'
+            ws.Cells(2, topix_chg_idx).FormulaR1C1Local = '=IF(RC[-2]="", "", IFERROR(RssIndexMarket(RC[-2],"前日比率"),""))'
         except Exception:
             pass
 
         status_rng = ws.Range(STATUS_RANGE)
-        status_rng.Merge()
         status_rng.HorizontalAlignment = -4108
         status_rng.VerticalAlignment = -4108
         status_rng.Font.Bold = True
@@ -302,6 +329,7 @@ def build_dashboard(excel_path: Path) -> None:
                 shape.Delete()
         for name, caption, row, col, macro in BUTTONS:
             create_button(ws, name, caption, row, col, macro)
+        setup_indicator_cells(ws)
 
         last_col = col_letter(len(ORDER_HEADERS))
         for idx, header in enumerate(ORDER_HEADERS, start=1):
@@ -363,6 +391,14 @@ def build_dashboard(excel_path: Path) -> None:
             ),
         )
 
+        driver_ref = rc_relative(COL_INDEX["J_th"], COL_INDEX["trend_driver"])
+        corr_expr = (
+            f'IF(UPPER({driver_ref})="TOPIX",{rc_relative(COL_INDEX["J_th"], COL_INDEX["CorrTOPIX"])},'
+            f'{rc_relative(COL_INDEX["J_th"], COL_INDEX["CorrNKY"])})'
+        )
+        trend_bp_expr = (
+            f'IF(UPPER({driver_ref})="TOPIX",{param_ref("TOPIX_ChgPct")},{param_ref("NKY_ChgPct")})'
+        )
         fill_formula(
             ws,
             COL_INDEX["J_th"],
@@ -376,9 +412,9 @@ def build_dashboard(excel_path: Path) -> None:
                 f'UPPER({rc_relative(COL_INDEX["J_th"], COL_INDEX["driver_allowed_side"])})<>UPPER({rc_relative(COL_INDEX["J_th"], COL_INDEX["EntrySide"])})'
                 f')), "BAN",'
                 f'{rc_relative(COL_INDEX["J_th"], COL_INDEX["J_th_base"])}+'
-                f'IF({rc_relative(COL_INDEX["J_th"], COL_INDEX["BiasSlope_row"])}="",{param_ref("BiasSlope")},{rc_relative(COL_INDEX["J_th"], COL_INDEX["BiasSlope_row"])})*{param_ref("NKY_ChgPct")}/100+'
+                f'IF({rc_relative(COL_INDEX["J_th"], COL_INDEX["BiasSlope_row"])}="",{param_ref("BiasSlope")},{rc_relative(COL_INDEX["J_th"], COL_INDEX["BiasSlope_row"])})*{trend_bp_expr}/100+'
                 f'IF({rc_relative(COL_INDEX["J_th"], COL_INDEX["GapSlope_row"])}="",{param_ref("GapSlope")},{rc_relative(COL_INDEX["J_th"], COL_INDEX["GapSlope_row"])})*ABS(N({rc_relative(COL_INDEX["J_th"], COL_INDEX["Gap_bp"])}))/100+'
-                f'IF({rc_relative(COL_INDEX["J_th"], COL_INDEX["CorrSlope_row"])}="",{param_ref("CorrSlope")},{rc_relative(COL_INDEX["J_th"], COL_INDEX["CorrSlope_row"])})*N({rc_relative(COL_INDEX["J_th"], COL_INDEX["CorrNKY"])})*{param_ref("NKY_ChgPct")}/100)'
+                f'IF({rc_relative(COL_INDEX["J_th"], COL_INDEX["CorrSlope_row"])}="",{param_ref("CorrSlope")},{rc_relative(COL_INDEX["J_th"], COL_INDEX["CorrSlope_row"])})*N({corr_expr})*{trend_bp_expr}/100)'
             ),
         )
         fill_formula(
@@ -405,8 +441,10 @@ def build_dashboard(excel_path: Path) -> None:
             COL_INDEX["OrderQtyPlan"],
             (
                 f'=IF(OR({rc_relative(COL_INDEX["OrderQtyPlan"], COL_INDEX["Last"])}="",'
-                f'{rc_relative(COL_INDEX["OrderQtyPlan"], COL_INDEX["Last"])}=0), "",'
-                f'MAX(0,INT(R2C13/{rc_relative(COL_INDEX["OrderQtyPlan"], COL_INDEX["Last"])}/R2C14)*R2C14))'
+                f'N({rc_relative(COL_INDEX["OrderQtyPlan"], COL_INDEX["Last"])} )<=0,'
+                f'{param_ref("BudgetPerTicker")}<=0,{param_ref("LotSize")}<=0),0,'
+                f'MAX(0,INT({param_ref("BudgetPerTicker")}/{rc_relative(COL_INDEX["OrderQtyPlan"], COL_INDEX["Last"])}/'
+                f'{param_ref("LotSize")})*{param_ref("LotSize")}))'
             ),
         )
         fill_formula(
@@ -458,11 +496,13 @@ def build_dashboard(excel_path: Path) -> None:
                 f'=IF(OR({rc_relative(COL_INDEX["TP_price"], COL_INDEX["J_th"])}="BAN",'
                 f'{rc_relative(COL_INDEX["TP_price"], COL_INDEX["EntrySide"])}=""),"",'
                 f'IF({rc_relative(COL_INDEX["TP_price"], COL_INDEX["EntrySide"])}="BUY",'
-                f'{rc_relative(COL_INDEX["TP_price"], COL_INDEX["Last"])}*(1+N(IF({rc_relative(COL_INDEX["TP_price"], COL_INDEX["TP_per_J_eff"])}="",R2C9,'
-                f'{rc_relative(COL_INDEX["TP_price"], COL_INDEX["TP_per_J_eff"])}))*ABS({rc_relative(COL_INDEX["TP_price"], COL_INDEX["J"])})/100),'
+                f'IF({rc_relative(COL_INDEX["TP_price"], COL_INDEX["EntryBuyPx"])}="", "",'
+                f'{rc_relative(COL_INDEX["TP_price"], COL_INDEX["EntryBuyPx"])}*(1+N(IF({rc_relative(COL_INDEX["TP_price"], COL_INDEX["TP_per_J_eff"])}="",{param_ref("TP_per_J")},'
+                f'{rc_relative(COL_INDEX["TP_price"], COL_INDEX["TP_per_J_eff"])}))*ABS({rc_relative(COL_INDEX["TP_price"], COL_INDEX["J"])})/100)),'
                 f'IF({rc_relative(COL_INDEX["TP_price"], COL_INDEX["EntrySide"])}="SELL",'
-                f'{rc_relative(COL_INDEX["TP_price"], COL_INDEX["Last"])}*(1-N(IF({rc_relative(COL_INDEX["TP_price"], COL_INDEX["TP_per_J_eff"])}="",R2C9,'
-                f'{rc_relative(COL_INDEX["TP_price"], COL_INDEX["TP_per_J_eff"])}))*ABS({rc_relative(COL_INDEX["TP_price"], COL_INDEX["J"])})/100),"")))'
+                f'IF({rc_relative(COL_INDEX["TP_price"], COL_INDEX["EntrySellPx"])}="", "",'
+                f'{rc_relative(COL_INDEX["TP_price"], COL_INDEX["EntrySellPx"])}*(1-N(IF({rc_relative(COL_INDEX["TP_price"], COL_INDEX["TP_per_J_eff"])}="",{param_ref("TP_per_J")},'
+                f'{rc_relative(COL_INDEX["TP_price"], COL_INDEX["TP_per_J_eff"])}))*ABS({rc_relative(COL_INDEX["TP_price"], COL_INDEX["J"])})/100)),"")))'
             ),
         )
         fill_formula(
@@ -472,11 +512,13 @@ def build_dashboard(excel_path: Path) -> None:
                 f'=IF(OR({rc_relative(COL_INDEX["SL_price"], COL_INDEX["J_th"])}="BAN",'
                 f'{rc_relative(COL_INDEX["SL_price"], COL_INDEX["EntrySide"])}=""),"",'
                 f'IF({rc_relative(COL_INDEX["SL_price"], COL_INDEX["EntrySide"])}="BUY",'
-                f'{rc_relative(COL_INDEX["SL_price"], COL_INDEX["Last"])}*(1-N(IF({rc_relative(COL_INDEX["SL_price"], COL_INDEX["SL_per_J_eff"])}="",R2C10,'
-                f'{rc_relative(COL_INDEX["SL_price"], COL_INDEX["SL_per_J_eff"])}))*ABS({rc_relative(COL_INDEX["SL_price"], COL_INDEX["J"])})/100),'
+                f'IF({rc_relative(COL_INDEX["SL_price"], COL_INDEX["EntryBuyPx"])}="", "",'
+                f'{rc_relative(COL_INDEX["SL_price"], COL_INDEX["EntryBuyPx"])}*(1-N(IF({rc_relative(COL_INDEX["SL_price"], COL_INDEX["SL_per_J_eff"])}="",{param_ref("SL_per_J")},'
+                f'{rc_relative(COL_INDEX["SL_price"], COL_INDEX["SL_per_J_eff"])}))*ABS({rc_relative(COL_INDEX["SL_price"], COL_INDEX["J"])})/100)),'
                 f'IF({rc_relative(COL_INDEX["SL_price"], COL_INDEX["EntrySide"])}="SELL",'
-                f'{rc_relative(COL_INDEX["SL_price"], COL_INDEX["Last"])}*(1+N(IF({rc_relative(COL_INDEX["SL_price"], COL_INDEX["SL_per_J_eff"])}="",R2C10,'
-                f'{rc_relative(COL_INDEX["SL_price"], COL_INDEX["SL_per_J_eff"])}))*ABS({rc_relative(COL_INDEX["SL_price"], COL_INDEX["J"])})/100),"")))'
+                f'IF({rc_relative(COL_INDEX["SL_price"], COL_INDEX["EntrySellPx"])}="", "",'
+                f'{rc_relative(COL_INDEX["SL_price"], COL_INDEX["EntrySellPx"])}*(1+N(IF({rc_relative(COL_INDEX["SL_price"], COL_INDEX["SL_per_J_eff"])}="",{param_ref("SL_per_J")},'
+                f'{rc_relative(COL_INDEX["SL_price"], COL_INDEX["SL_per_J_eff"])}))*ABS({rc_relative(COL_INDEX["SL_price"], COL_INDEX["J"])})/100)),"")))'
             ),
         )
         fill_formula(
@@ -561,8 +603,9 @@ def build_dashboard(excel_path: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--excel", default=r"C:/AI/asagake/ASAGAKE.xlsm")
+    parser.add_argument("--force", action="store_true", help="Delete and rebuild NewDashboardV2 sheet")
     args = parser.parse_args()
-    build_dashboard(Path(args.excel).resolve())
+    build_dashboard(Path(args.excel).resolve(), force=args.force)
 
 
 if __name__ == "__main__":

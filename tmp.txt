@@ -1,1 +1,141 @@
-証券
+        Dim ticker As String
+        ticker = Trim$(CStr(ws.Cells(r, tickerCol).Value))
+        If Len(ticker) = 0 Then Exit For
+        Dim entrySide As String
+        entrySide = Trim$(CStr(ws.Cells(r, sideCol).Value))
+        If Len(entrySide) = 0 Then
+            Dim jVal As Double: jVal = ToDouble(ws.Cells(r, jCol).Value, 0#)
+            If jVal < 0# Then
+                entrySide = "BUY"
+            ElseIf jVal > 0# Then
+                entrySide = "SELL"
+            Else
+                entrySide = ""
+            End If
+        End If
+        If Len(entrySide) = 0 Then GoTo ContinueLoop
+        Dim ratio As Double
+        ratio = ToDouble(ws.Cells(r, ratioCol).Value, 0#)
+        Dim key As String
+        key = ticker & "|" & entrySide
+        Dim prevAbove As Boolean
+        prevAbove = False
+        If gThresholdState.Exists(key) Then
+            prevAbove = CBool(gThresholdState(key))
+        End If
+        Dim nowAbove As Boolean
+        nowAbove = (ratio >= 1#)
+        If nowAbove Then
+            If Not prevAbove Then
+                If CanFireAlert(key) Then
+                    RaiseThresholdAlert ws, r, ticker, entrySide, ratio
+                End If
+            End If
+            gThresholdState(key) = True
+        Else
+            gThresholdState(key) = False
+        End If
+ContinueLoop:
+    Next r
+End Sub
+
+Private Sub UpdateAllDriverTrends(ByVal ws As Worksheet)
+    EnsureDriverConfigs ws
+    If gDriverConfigs Is Nothing Then Exit Sub
+    Dim driverName As Variant
+    For Each driverName In gDriverConfigs.Keys
+        UpdateDriverTrend ws, CStr(driverName)
+    Next driverName
+End Sub
+
+Private Sub UpdateDriverTrend(ByVal ws As Worksheet, ByVal driverName As String)
+    EnsureDriverConfigs ws
+    If gDriverConfigs Is Nothing Then Exit Sub
+    If Not gDriverConfigs.Exists(driverName) Then Exit Sub
+    Dim cfg As Object
+    Set cfg = gDriverConfigs(driverName)
+    Dim lastCol As Long
+    lastCol = GetDriverColumn(ws, cfg, "last_col", "last_header")
+    If lastCol <= 0 Then Exit Sub
+    Dim currentPrice As Double
+    currentPrice = ToDouble(ws.Cells(2, lastCol).Value, 0#)
+    If currentPrice <= 0# Then Exit Sub
+
+    Dim state As Object
+    Set state = EnsureDriverState(driverName)
+    Dim sessionDate As Variant
+    Dim sessionOpen As Double
+    sessionOpen = 0#
+    On Error Resume Next
+    sessionDate = state("session_date")
+    sessionOpen = CDbl(state("session_open"))
+    On Error GoTo 0
+    If IsEmpty(sessionDate) Then sessionDate = 0#
+    If sessionDate <> Date Or sessionOpen <= 0# Then
+        state("session_date") = Date
+        state("session_open") = currentPrice
+        On Error Resume Next
+        Set state("history_prices") = Nothing
+        On Error GoTo 0
+        state("last_history_record") = 0#
+        sessionOpen = currentPrice
+    End If
+
+    Dim historyPrices As Collection
+    On Error Resume Next
+    Set historyPrices = state("history_prices")
+    On Error GoTo 0
+    If historyPrices Is Nothing Then
+        Set historyPrices = New Collection
+    End If
+
+    Dim lastRec As Date
+    On Error Resume Next
+    lastRec = state("last_history_record")
+    On Error GoTo 0
+    Dim shouldAppend As Boolean
+    If lastRec = 0# Then
+        shouldAppend = True
+    ElseIf Now - lastRec >= TimeSerial(0, 1, 0) Then
+        shouldAppend = True
+    End If
+    If shouldAppend Then
+        historyPrices.Add currentPrice
+        state("last_history_record") = Now
+    End If
+    Do While historyPrices.Count > 15
+        historyPrices.Remove 1
+    Loop
+    Set state("history_prices") = historyPrices
+
+    Dim openRet As Double
+    If sessionOpen > 0# Then
+        openRet = (currentPrice - sessionOpen) / sessionOpen * 10000#
+    Else
+        openRet = 0#
+    End If
+
+    Dim historyCount As Long
+    historyCount = historyPrices.Count
+
+    Dim earliestPrice As Double
+    If historyCount >= 1 Then
+        earliestPrice = ToDouble(historyPrices(1), currentPrice)
+    Else
+        earliestPrice = sessionOpen
+    End If
+
+    Dim windowRet As Double
+    If earliestPrice > 0# Then
+        windowRet = (currentPrice - earliestPrice) / earliestPrice * 10000#
+    Else
+        windowRet = openRet
+    End If
+
+    Dim initialThreshold As Double
+    initialThreshold = GetStrategyRuleDouble("nky_initial_bp", DEFAULT_NKY_INITIAL_BP)
+    Dim steadyThreshold As Double
+    steadyThreshold = GetStrategyRuleDouble("nky_steady_bp", DEFAULT_NKY_STEADY_BP)
+    Dim threshold As Double
+    If historyCount < 15 Then
+        threshold = initialThreshold

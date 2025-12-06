@@ -24,9 +24,8 @@ function Register-WithScheduledTaskModule {
 function Register-WithSchTasksExe {
   param()
   # 09:00~15:35 の間に5分おきで起動するタスクを登録（schtasks版）
-  if (-not (Test-Path $TaskCmd)) {
-    Set-Content -Path $TaskCmd -Value "@echo off`r`ncd /d $Repo`r`n$Cmd`r`n" -Encoding ASCII
-  }
+  # 既存の CMD が壊れているケースを避けるため、毎回内容を上書き生成する
+  Set-Content -Path $TaskCmd -Value "@echo off`r`ncd /d $Repo`r`n$Cmd`r`n" -Encoding ASCII
   try { schtasks.exe /Delete /F /TN $TaskName | Out-Null } catch {}
   $args = @('/Create','/F','/TN',$TaskName,'/SC','DAILY','/ST','09:00','/DU','06:35','/RI','5','/TR',$TaskCmdQuoted)
   schtasks.exe @args | Out-Null

@@ -74,3 +74,15 @@
 [2025-11-10T09:30:21] Sequential runner completed
 [2025-11-10T14:37:56] Sequential runner started
 [2025-11-10T14:37:59] Starting WEEKEND batch (10 windows + R&D windows)
+[2025-11-11T03:41:26] WEEKEND batch exit code: 0
+[2025-11-11T03:41:26] Starting NIGHTLY batch (weekday mode)
+[2025-11-14T16:30:03] Sequential runner started
+[2025-11-14T16:30:05] Starting WEEKEND batch (10 windows + R&D windows)
+[2025-11-14T19:45:07] WEEKEND batch exit code: 1
+[2025-11-14T19:45:07] Starting NIGHTLY batch (weekday mode)
+[2025-11-14T20:37:21] NIGHTLY batch exit code: 0
+[2025-11-14T20:37:21] Running auto workbook repair
+[2025-11-14T20:37:21] Sequential runner completed
+[2025-11-15T00:29:00] Sequential runner started
+[2025-11-15T00:29:03] WEEKEND batch starting (timeout 240m)
+[2025-11-15T14:21:54] Manual nightly batch executed via direct python command

@@ -28,3 +28,12 @@ Guardrails for contributions:
 - If you need to touch formulas, prefer the established VBA/COM paths and log steps in a new `docs/handover_YYYYMMDD.md` entry.
 - Use `scripts/restore_dashboard_formulas.py` when the I-V columns lose their formulas. This script reapplies the canonical `RssMarket` expressions over 600 rows (Q="最良買気配値", R="最良売気配値"、Ticker の `.T` サフィックスを除去して数値化) and re-protects the sheet.
 - L/M 列はシート側で `Selected=1` かつ `|J| >= |J_th|` のときに BUY/SELL とモード（例: `BUY / j-only`）を表示し、必要な価格がない場合は `NO_PRICE` を警告する数式を設定済み。VBA が別途書き込む際はその値が優先される。
+
+ASAGAKE V2 Operational Rules:
+- **Live/Demo Buttons**:
+  - `Live Start`: Sets status to `LIVE_RUNNING`. Executes REAL trades via `RssOrder`.
+  - `Demo Start`: Sets status to `DEMO_RUNNING`. Logs trades to `Orders` sheet only. NO execution.
+- **Thresholds**:
+  - `Order Update Threshold` (tick): Configurable on Dashboard. Controls when to modify existing Preplace/TP/SL orders. Default: 2 ticks.
+- **RSS Heartbeat**:
+  - System monitors RSS updates. If frozen for >60s, auto-trading stops (`IDLE`).

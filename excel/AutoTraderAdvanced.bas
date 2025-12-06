@@ -11,6 +11,7 @@ Private Const DASH2_SHEET As String = "NewDashboardV2"
 Private Const DASH2_HEADER_ROW As Long = 5
 
 Private Const DASH2_DATA_START As Long = 6
+Private Const DASH2_HIGHLIGHT_LAST_COL As Long = 30
 
 
 
@@ -34,9 +35,17 @@ Private gDriverConfigs As Object
 Private gDriverRuntime As Object
 Private gStrategyRules As Object
 Private gJStats As Object
+Private gBbBlockCache As Object
 Private Const J_STATS_PATH As String = "state\j_stats.csv"
 Private Const DRIVER_NKY As String = "NKY"
 Private Const DRIVER_TOPIX As String = "TOPIX"
+Private Const BB_DEFAULT_BLOCK_MINUTES As Double = 3#
+
+Private Enum BbRiskLevel
+    bbRiskNone = 0
+    bbRiskWarn = 1
+    bbRiskBlock = 2
+End Enum
 
 
 Private Function HeaderTickerJP() As String: HeaderTickerJP = "Ticker": End Function
@@ -72,14 +81,230 @@ End Function
 
 Private Function FindParamColumn(ByVal ws As Worksheet, ByVal headerName As String) As Long
     Dim c As Range
+    Dim aliasName As String: aliasName = GetParamHeaderAlias(headerName)
     For Each c In ws.Rows(1).Cells
-        If Len(Trim$(CStr(c.Value))) = 0 And c.Column > 60 Then Exit For
-        If StrComp(Trim$(CStr(c.Value)), headerName, vbTextCompare) = 0 Then
+        Dim cellVal As String
+        cellVal = Trim$(CStr(c.Value))
+        If Len(cellVal) = 0 And c.Column > 60 Then Exit For
+        If StrComp(cellVal, headerName, vbTextCompare) = 0 _
+            Or (aliasName <> "" And StrComp(cellVal, aliasName, vbTextCompare) = 0) Then
             FindParamColumn = c.Column
             Exit Function
         End If
     Next c
     FindParamColumn = 0
+End Function
+
+Private Function GetParamHeaderAlias(ByVal headerName As String) As String
+    Select Case headerName
+        Case "NKY_Code": GetParamHeaderAlias = "指標コード(日経平均)"
+        Case "NKY_Last": GetParamHeaderAlias = "日経平均 現在値"
+        Case "NKY_ChgPct": GetParamHeaderAlias = "日経平均 前日比率"
+        Case "TOPIX_Code": GetParamHeaderAlias = "指標コード(TOPIX)"
+        Case "TOPIX_Last": GetParamHeaderAlias = "TOPIX 現在値"
+        Case "TOPIX_ChgPct": GetParamHeaderAlias = "TOPIX 前日比率"
+        Case "Bias_bp": GetParamHeaderAlias = "バイアス閾値(bp)"
+        Case "BiasSlope": GetParamHeaderAlias = "Bias補正係数"
+        Case "GapSlope": GetParamHeaderAlias = "Gap補正係数"
+        Case "GapBanPct": GetParamHeaderAlias = "Gap BAN 閾値(%)"
+        Case "NoTradeMin": GetParamHeaderAlias = "取引停止分数"
+        Case "TP_per_J": GetParamHeaderAlias = "TP/J (全体)"
+        Case "SL_per_J": GetParamHeaderAlias = "SL/J (全体)"
+        Case "Trail_per_J": GetParamHeaderAlias = "Trail/J (全体)"
+        Case "CorrSlope": GetParamHeaderAlias = "相関補正係数"
+        Case "BudgetPerTicker": GetParamHeaderAlias = "銘柄別予算(円)"
+        Case "LotSize": GetParamHeaderAlias = "ロットサイズ"
+        Case "NKY_TrendDay": GetParamHeaderAlias = "NKY日足トレンド"
+        Case "NKY_TrendWindow": GetParamHeaderAlias = "NKY窓トレンド"
+        Case "NKY_AllowedSide": GetParamHeaderAlias = "NKY許容サイド"
+        Case "TOPIX_TrendDay": GetParamHeaderAlias = "TOPIX日足トレンド"
+        Case "TOPIX_TrendWindow": GetParamHeaderAlias = "TOPIX窓トレンド"
+        Case "TOPIX_AllowedSide": GetParamHeaderAlias = "TOPIX許容サイド"
+        Case Else: GetParamHeaderAlias = ""
+    End Select
+End Function
+
+Private Sub ApplyDirectionHighlight(ByVal ws As Worksheet, ByVal rowIndex As Long, ByVal entrySide As String, ByVal allowedSide As String)
+    On Error Resume Next
+    Dim lastCol As Long: lastCol = DASH2_HIGHLIGHT_LAST_COL
+    If lastCol <= 0 Then lastCol = 30
+    Dim rng As Range
+    Set rng = ws.Range(ws.Cells(rowIndex, 1), ws.Cells(rowIndex, lastCol))
+    rng.Interior.ColorIndex = xlColorIndexNone
+    If Len(entrySide) = 0 Then Exit Sub
+    If Len(allowedSide) = 0 Or UCase$(allowedSide) = "BOTH" Then Exit Sub
+    If StrComp(entrySide, allowedSide, vbTextCompare) = 0 Then
+        rng.Interior.Color = RGB(235, 250, 238)
+    Else
+        rng.Interior.Color = RGB(255, 236, 239)
+    End If
+    On Error GoTo 0
+End Sub
+
+Private Sub LogVbaEvent(ByVal tag As String, ByVal message As String)
+    On Error Resume Next
+    Dim logPath As String
+    logPath = ThisWorkbook.Path & "\logs\vba_events.log"
+    Dim f As Integer: f = FreeFile
+    Open logPath For Append As #f
+    Print #f, Format$(Now, "yyyy-mm-dd hh:nn:ss") & " [" & tag & "] " & message
+    Close #f
+End Sub
+
+Private Function ResolveDriverCorrelation(ByVal ws As Worksheet, ByVal rowIndex As Long, ByVal driverVal As String, ByVal corrNkyCol As Long, ByVal corrTopixCol As Long) As Double
+    Dim driverUpper As String
+    driverUpper = UCase$(Trim$(driverVal))
+    If driverUpper = DRIVER_TOPIX And corrTopixCol > 0 Then
+        ResolveDriverCorrelation = ToDouble(ws.Cells(rowIndex, corrTopixCol).Value, 0#)
+    Else
+        ResolveDriverCorrelation = ToDouble(ws.Cells(rowIndex, corrNkyCol).Value, 0#)
+    End If
+End Function
+
+Private Sub SetupTrendIndicatorCells(ByVal ws As Worksheet)
+    SetupSingleTrendIndicator ws, "B3:C3", "NKY方向", "NKYTrendCell"
+    SetupSingleTrendIndicator ws, "D3:E3", "TOPIX方向", "TOPIXTrendCell"
+End Sub
+
+Private Sub SetupSingleTrendIndicator(ByVal ws As Worksheet, ByVal address As String, ByVal label As String, ByVal rangeName As String)
+    Dim rng As Range
+    Set rng = ws.Range(address)
+    On Error Resume Next
+    ws.Parent.Names(rangeName).Delete
+    On Error GoTo 0
+    With rng
+        .Merge
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .Font.Bold = True
+        .WrapText = True
+        .Interior.Color = RGB(240, 240, 240)
+        .Value = label & vbCrLf & "---"
+        .Name = rangeName
+    End With
+End Sub
+
+Private Sub UpdateTrendIndicators(ByVal ws As Worksheet)
+    Dim nkyDayCol As Long: nkyDayCol = FindParamColumn(ws, "NKY_TrendDay")
+    Dim nkyWindowCol As Long: nkyWindowCol = FindParamColumn(ws, "NKY_TrendWindow")
+    Dim nkyAllowedCol As Long: nkyAllowedCol = FindParamColumn(ws, "NKY_AllowedSide")
+    Dim topixDayCol As Long: topixDayCol = FindParamColumn(ws, "TOPIX_TrendDay")
+    Dim topixWindowCol As Long: topixWindowCol = FindParamColumn(ws, "TOPIX_TrendWindow")
+    Dim topixAllowedCol As Long: topixAllowedCol = FindParamColumn(ws, "TOPIX_AllowedSide")
+
+    Dim nkyDay As String: If nkyDayCol > 0 Then nkyDay = NormalizeTrendState(ws.Cells(2, nkyDayCol).Value)
+    Dim nkyWindow As String: If nkyWindowCol > 0 Then nkyWindow = NormalizeTrendState(ws.Cells(2, nkyWindowCol).Value)
+    Dim nkyAllowed As String: If nkyAllowedCol > 0 Then nkyAllowed = UCase$(Trim$(CStr(ws.Cells(2, nkyAllowedCol).Value)))
+
+    Dim topixDay As String: If topixDayCol > 0 Then topixDay = NormalizeTrendState(ws.Cells(2, topixDayCol).Value)
+    Dim topixWindow As String: If topixWindowCol > 0 Then topixWindow = NormalizeTrendState(ws.Cells(2, topixWindowCol).Value)
+    Dim topixAllowed As String: If topixAllowedCol > 0 Then topixAllowed = UCase$(Trim$(CStr(ws.Cells(2, topixAllowedCol).Value)))
+
+    UpdateTrendIndicatorVisual ws, "NKYTrendCell", "btn_dir_nky", "NKY", nkyDay, nkyWindow, nkyAllowed
+    UpdateTrendIndicatorVisual ws, "TOPIXTrendCell", "btn_dir_topix", "TOPIX", topixDay, topixWindow, topixAllowed
+End Sub
+
+Private Sub UpdateTrendIndicatorVisual(ByVal ws As Worksheet, ByVal rangeName As String, ByVal shapeName As String, ByVal label As String, ByVal dayState As String, ByVal windowState As String, ByVal allowedState As String)
+    Dim displayText As String
+    displayText = label & ": " & TrendStateLabel(dayState)
+    If Len(windowState) > 0 Then
+        displayText = displayText & " / 窓 " & TrendStateLabel(windowState)
+    End If
+    If Len(allowedState) > 0 Then
+        displayText = displayText & " / 許容 " & allowedState
+    End If
+    Dim fillColor As Long
+    fillColor = TrendFillColor(dayState)
+
+    On Error Resume Next
+    Dim rng As Range
+    Set rng = ws.Range(rangeName)
+    If Not rng Is Nothing Then
+        rng.Value = displayText
+        rng.Interior.Color = fillColor
+    End If
+    On Error GoTo 0
+End Sub
+
+Private Function NormalizeTrendState(ByVal raw As Variant) As String
+    Dim val As String
+    val = UCase$(Trim$(CStr(raw)))
+    Select Case val
+        Case "BUY", "SELL", "FLAT"
+            NormalizeTrendState = val
+        Case "UP", "UPTREND"
+            NormalizeTrendState = "BUY"
+        Case "DOWN", "DOWNTREND"
+            NormalizeTrendState = "SELL"
+        Case Else
+            NormalizeTrendState = "FLAT"
+    End Select
+End Function
+
+Private Function TrendStateLabel(ByVal state As String) As String
+    Select Case UCase$(state)
+        Case "BUY"
+            TrendStateLabel = "上昇"
+        Case "SELL"
+            TrendStateLabel = "下落"
+        Case Else
+            TrendStateLabel = "フラット"
+    End Select
+End Function
+
+Private Function TrendArrow(ByVal state As String) As String
+    Select Case UCase$(state)
+        Case "BUY"
+            TrendArrow = "▲"
+        Case "SELL"
+            TrendArrow = "▼"
+        Case Else
+            TrendArrow = "↔"
+    End Select
+End Function
+
+Private Function TrendFillColor(ByVal state As String) As Long
+    Select Case UCase$(state)
+        Case "BUY"
+            TrendFillColor = RGB(198, 239, 206)
+        Case "SELL"
+            TrendFillColor = RGB(255, 199, 206)
+        Case Else
+            TrendFillColor = RGB(235, 235, 235)
+    End Select
+End Function
+
+Private Function GetBbBlockKey(ByVal ticker As String, ByVal session As String) As String
+    GetBbBlockKey = UCase$(Trim$(ticker)) & "|" & UCase$(Trim$(session))
+End Function
+
+Private Sub EnsureBbBlockCache()
+    If gBbBlockCache Is Nothing Then
+        Set gBbBlockCache = CreateObject("Scripting.Dictionary")
+    End If
+End Sub
+
+Private Sub ResetBbBlockCache()
+    Set gBbBlockCache = Nothing
+End Sub
+
+Private Sub ActivateBbBlock(ByVal key As String)
+    Dim minutes As Double
+    minutes = GetStrategyRuleDouble("bb_block_minutes", BB_DEFAULT_BLOCK_MINUTES)
+    If minutes <= 0# Then minutes = BB_DEFAULT_BLOCK_MINUTES
+    EnsureBbBlockCache
+    gBbBlockCache(key) = Now + minutes / (24# * 60#)
+End Sub
+
+Private Function IsBbBlockActive(ByVal key As String) As Boolean
+    EnsureBbBlockCache
+    If gBbBlockCache.Exists(key) Then
+        If gBbBlockCache(key) > Now Then
+            IsBbBlockActive = True
+        Else
+            gBbBlockCache.Remove key
+        End If
+    End If
 End Function
 
 Private Sub AppendSpikeEvent(ByVal ticker As String, ByVal session As String, ByVal ratioVal As Double)
@@ -277,12 +502,25 @@ Private Sub ClearRowDynamicCells(ByVal ws As Worksheet, ByVal rowIndex As Long, 
     Dim i As Long
     For i = LBound(cols) To UBound(cols)
         If IsNumeric(cols(i)) Then
-            If CLng(cols(i)) > 0 Then
-                ws.Cells(rowIndex, CLng(cols(i))).ClearContents
+            Dim c As Long: c = CLng(cols(i))
+            If c > 0 Then
+                With ws.Cells(rowIndex, c)
+                    If Not .HasFormula Then
+                        .ClearContents
+                    End If
+                End With
             End If
         End If
     Next i
 End Sub
+
+Private Function CanWriteCell(ByVal ws As Worksheet, ByVal rowIndex As Long, ByVal colIndex As Long) As Boolean
+    If colIndex <= 0 Then
+        CanWriteCell = False
+    Else
+        CanWriteCell = Not ws.Cells(rowIndex, colIndex).HasFormula
+    End If
+End Function
 
 Private Sub EnsureJStatsLoaded()
     On Error GoTo FailLoad
@@ -331,8 +569,8 @@ Private Function GetJStatsKey(ByVal ticker As String, ByVal session As String) A
     GetJStatsKey = UCase$(Trim$(ticker)) & "|" & UCase$(Trim$(session))
 End Function
 
-Private Function ShouldBlockByBollinger(ByVal ticker As String, ByVal session As String, ByVal trendWindow As String, ByVal ratioVal As Double) As Boolean
-    ShouldBlockByBollinger = False
+Private Function EvaluateBbRisk(ByVal ticker As String, ByVal session As String, ByVal trendWindow As String, ByVal ratioVal As Double) As BbRiskLevel
+    EvaluateBbRisk = bbRiskNone
     If ratioVal <= 0# Then Exit Function
     If Len(Trim$(ticker)) = 0 Or Len(Trim$(session)) = 0 Then Exit Function
     EnsureJStatsLoaded
@@ -355,9 +593,21 @@ Private Function ShouldBlockByBollinger(ByVal ticker As String, ByVal session As
     Else
         k = GetStrategyRuleDouble("bb_trend_k", 1.3)
     End If
-    Dim threshold As Double
-    threshold = mu + k * sigma
-    ShouldBlockByBollinger = (ratioVal < threshold)
+    Dim fatalThreshold As Double
+    fatalThreshold = mu + k * sigma
+    Dim warnMargin As Double
+    warnMargin = GetStrategyRuleDouble("bb_warn_margin", 0.05)
+    Dim blockCap As Double
+    blockCap = GetStrategyRuleDouble("bb_block_ratio_cap", 0.85)
+    If ratioVal < fatalThreshold Then
+        If ratioVal < blockCap Then
+            EvaluateBbRisk = bbRiskBlock
+        Else
+            EvaluateBbRisk = bbRiskWarn
+        End If
+    ElseIf ratioVal < fatalThreshold + warnMargin Then
+        EvaluateBbRisk = bbRiskWarn
+    End If
 End Function
 
 Private Function ComputeVolFactor(ByVal gapAbsPct As Double, ByVal jAbs As Double, ByVal atrVal As Double) As Double
@@ -1195,6 +1445,7 @@ Public Sub ApplyDynamicSignalsV2()
     Dim lastCol As Long: lastCol = FindColumn(ws, DASH2_HEADER_ROW, "Last")
     Dim gapCol As Long: gapCol = FindColumn(ws, DASH2_HEADER_ROW, "Gap_bp")
     Dim corrCol As Long: corrCol = FindColumn(ws, DASH2_HEADER_ROW, "CorrNKY")
+    Dim corrTopixCol As Long: corrTopixCol = FindColumn(ws, DASH2_HEADER_ROW, "CorrTOPIX")
     Dim atrCol As Long: atrCol = FindColumn(ws, DASH2_HEADER_ROW, "ATR_n")
     Dim eBuyCol As Long: eBuyCol = FindColumn(ws, DASH2_HEADER_ROW, "EntryBuyPx")
     Dim eSellCol As Long: eSellCol = FindColumn(ws, DASH2_HEADER_ROW, "EntrySellPx")
@@ -1257,24 +1508,37 @@ Public Sub ApplyDynamicSignalsV2()
     For r = DASH2_DATA_START To lastRow
         Dim ticker As String: ticker = Trim$(CStr(ws.Cells(r, tickerCol).Value))
         If ticker = "" Then
-            ws.Cells(r, jthCol).Value = ""
+            If CanWriteCell(ws, r, jthCol) Then ws.Cells(r, jthCol).Value = ""
             ClearRowDynamicCells ws, r, eBuyCol, eSellCol, sideCol, tpEffCol, slEffCol, trailEffCol, qtyCol, volTagCol
             GoTo ContinueLoop
         End If
 
         Dim baseJ As Double: baseJ = ToDouble(ws.Cells(r, jthBaseCol).Value, 0#)
         If baseJ = 0# And Trim$(CStr(ws.Cells(r, jthBaseCol).Value)) = "" Then
-            ws.Cells(r, jthCol).Value = ""
+            If CanWriteCell(ws, r, jthCol) Then ws.Cells(r, jthCol).Value = ""
             ClearRowDynamicCells ws, r, eBuyCol, eSellCol, sideCol, tpEffCol, slEffCol, trailEffCol, qtyCol, volTagCol
             GoTo ContinueLoop
         End If
 
+        Dim tickerVal As String
+        If tickerCol > 0 Then tickerVal = Trim$(CStr(ws.Cells(r, tickerCol).Value))
+        Dim sessionVal As String
+        If sessionCol > 0 Then sessionVal = Trim$(CStr(ws.Cells(r, sessionCol).Value))
+        Dim driverVal As String
+        driverVal = DRIVER_NKY
+        If trendDriverCol > 0 Then
+            Dim driverRaw As String
+            driverRaw = NormalizeDriverName(CStr(ws.Cells(r, trendDriverCol).Value))
+            If Len(driverRaw) > 0 Then
+                driverVal = driverRaw
+            End If
+        End If
         Dim gapVal As Double: gapVal = ToDouble(ws.Cells(r, gapCol).Value, 0#)
-        Dim corrVal As Double: corrVal = ToDouble(ws.Cells(r, corrCol).Value, 0#)
+        Dim corrVal As Double: corrVal = ResolveDriverCorrelation(ws, r, driverVal, corrCol, corrTopixCol)
         Dim gapAbsPct As Double: gapAbsPct = Abs(gapVal) / 100#
 
         If gapBanPct > 0# And gapAbsPct > gapBanPct Then
-            ws.Cells(r, jthCol).Value = "BAN"
+            If CanWriteCell(ws, r, jthCol) Then ws.Cells(r, jthCol).Value = "BAN"
             ClearRowDynamicCells ws, r, eBuyCol, eSellCol, sideCol, tpEffCol, slEffCol, trailEffCol, qtyCol, volTagCol
             If volTagCol > 0 Then ws.Cells(r, volTagCol).Value = "BAN"
             GoTo ContinueLoop
@@ -1286,7 +1550,7 @@ Public Sub ApplyDynamicSignalsV2()
 
         Dim adjJth As Double
         adjJth = baseJ + biasSlopeVal * (biasBpGlobal / 100#) + gapSlopeVal * gapAbsPct + corrSlopeVal * corrVal * (biasBpGlobal / 100#)
-        ws.Cells(r, jthCol).Value = adjJth
+        If CanWriteCell(ws, r, jthCol) Then ws.Cells(r, jthCol).Value = adjJth
 
         Dim vwapVal As Double: vwapVal = ToDouble(ws.Cells(r, vwapCol).Value, 0#)
         Dim prevVal As Double: prevVal = ToDouble(ws.Cells(r, prevCol).Value, 0#)
@@ -1300,8 +1564,8 @@ Public Sub ApplyDynamicSignalsV2()
         If basePrice <= 0# Then basePrice = lastVal
 
         If basePrice > 0# Then
-            If eBuyCol > 0 Then ws.Cells(r, eBuyCol).Value = basePrice - 0.001 * Abs(adjJth) * basePrice
-            If eSellCol > 0 Then ws.Cells(r, eSellCol).Value = basePrice + 0.001 * Abs(adjJth) * basePrice
+            If CanWriteCell(ws, r, eBuyCol) Then ws.Cells(r, eBuyCol).Value = basePrice - 0.001 * Abs(adjJth) * basePrice
+            If CanWriteCell(ws, r, eSellCol) Then ws.Cells(r, eSellCol).Value = basePrice + 0.001 * Abs(adjJth) * basePrice
         Else
             ClearRowDynamicCells ws, r, eBuyCol, eSellCol
         End If
@@ -1317,9 +1581,9 @@ Public Sub ApplyDynamicSignalsV2()
         End If
         If sideCol > 0 Then
             If entrySide = "" Then
-                ws.Cells(r, sideCol).ClearContents
+                If CanWriteCell(ws, r, sideCol) Then ws.Cells(r, sideCol).ClearContents
             Else
-                ws.Cells(r, sideCol).Value = entrySide
+                If CanWriteCell(ws, r, sideCol) Then ws.Cells(r, sideCol).Value = entrySide
             End If
         End If
 
@@ -1328,16 +1592,6 @@ Public Sub ApplyDynamicSignalsV2()
             ratioVal = Abs(jVal) / Abs(adjJth)
         Else
             ratioVal = 0#
-        End If
-        Dim tickerVal As String
-        If tickerCol > 0 Then tickerVal = Trim$(CStr(ws.Cells(r, tickerCol).Value))
-        Dim sessionVal As String
-        If sessionCol > 0 Then sessionVal = Trim$(CStr(ws.Cells(r, sessionCol).Value))
-        Dim driverVal As String
-        If trendDriverCol > 0 Then
-            driverVal = NormalizeDriverName(CStr(ws.Cells(r, trendDriverCol).Value))
-        Else
-            driverVal = DRIVER_NKY
         End If
         Dim driverDayState As String: driverDayState = GetDriverTrendDay(driverVal)
         Dim driverWindowState As String: driverWindowState = GetDriverTrendWindow(driverVal)
@@ -1352,8 +1606,16 @@ Public Sub ApplyDynamicSignalsV2()
         If Len(trendWindowVal) = 0 Then
             trendWindowVal = driverWindowState
         End If
-        Dim bbBlocked As Boolean
-        bbBlocked = ShouldBlockByBollinger(tickerVal, sessionVal, trendWindowVal, ratioVal)
+        Dim bbRisk As BbRiskLevel
+        bbRisk = EvaluateBbRisk(tickerVal, sessionVal, trendWindowVal, ratioVal)
+        Dim bbKey As String
+        If Len(tickerVal) > 0 And Len(sessionVal) > 0 Then
+            bbKey = GetBbBlockKey(tickerVal, sessionVal)
+        End If
+        Dim bbActive As Boolean
+        If Len(bbKey) > 0 Then
+            bbActive = IsBbBlockActive(bbKey)
+        End If
 
         Dim blockReason As String: blockReason = ""
         Dim batchKindVal As String
@@ -1392,9 +1654,20 @@ Public Sub ApplyDynamicSignalsV2()
             AppendSpikeEvent tickerVal, sessionVal, ratioVal
         End If
 
-        If blockReason = "" And bbBlocked Then
-            blockReason = "BLOCKED_BB"
+        If bbRisk = bbRiskBlock And Len(bbKey) > 0 Then
+            ActivateBbBlock bbKey
+            bbActive = True
         End If
+
+        If blockReason = "" Then
+            If bbActive Then
+                blockReason = "BLOCKED_BB"
+            ElseIf bbRisk = bbRiskWarn Then
+                If entryStatusCol > 0 Then ws.Cells(r, entryStatusCol).Value = "WARN_BB"
+            End If
+        End If
+
+        ApplyDirectionHighlight ws, r, entrySide, allowedSideState
         If blockReason <> "" Then
             If entryStatusCol > 0 Then ws.Cells(r, entryStatusCol).Value = blockReason
             Dim shouldDeselect As Boolean: shouldDeselect = True
@@ -1412,6 +1685,8 @@ Public Sub ApplyDynamicSignalsV2()
                     If selCol > 0 And ws.Cells(r, selCol).Value = 0 Then
                         ws.Cells(r, selCol).Value = 1
                     End If
+                ElseIf StrComp(curStatus, "WARN_BB", vbTextCompare) = 0 And bbRisk <> bbRiskWarn Then
+                    ws.Cells(r, entryStatusCol).ClearContents
                 End If
             End If
         End If
@@ -1426,10 +1701,12 @@ Public Sub ApplyDynamicSignalsV2()
             qty = 0#
         End If
         If qtyCol > 0 Then
-            If qty > 0# Then
-                ws.Cells(r, qtyCol).Value = qty
-            Else
-                ws.Cells(r, qtyCol).ClearContents
+            If CanWriteCell(ws, r, qtyCol) Then
+                If qty > 0# Then
+                    ws.Cells(r, qtyCol).Value = qty
+                Else
+                    ws.Cells(r, qtyCol).ClearContents
+                End If
             End If
         End If
 
@@ -1448,9 +1725,9 @@ Public Sub ApplyDynamicSignalsV2()
         If tpRowCol > 0 Then ws.Cells(r, tpRowCol).Value = tpBase
         If slRowCol > 0 Then ws.Cells(r, slRowCol).Value = slBase
         If trailRowCol > 0 Then ws.Cells(r, trailRowCol).Value = trailBase
-        If tpEffCol > 0 Then ws.Cells(r, tpEffCol).Value = tpEff
-        If slEffCol > 0 Then ws.Cells(r, slEffCol).Value = slEff
-        If trailEffCol > 0 Then ws.Cells(r, trailEffCol).Value = trailEff
+        If tpEffCol > 0 And CanWriteCell(ws, r, tpEffCol) Then ws.Cells(r, tpEffCol).Value = tpEff
+        If slEffCol > 0 And CanWriteCell(ws, r, slEffCol) Then ws.Cells(r, slEffCol).Value = slEff
+        If trailEffCol > 0 And CanWriteCell(ws, r, trailEffCol) Then ws.Cells(r, trailEffCol).Value = trailEff
 
 ContinueLoop:
     Next r
@@ -1560,12 +1837,99 @@ Private Function EnsureOrdersSheet(ByVal host As Worksheet) As Worksheet
         End If
         Set sh = ThisWorkbook.Worksheets.Add(After:=anchor)
         sh.Name = "Orders"
-        sh.Range("A1:K1").Value = Array("ts", "ticker", "side", "price", "qty", "mode", "status", "note", "tp", "sl", "trail")
     End If
+
+    With sh.Range("A1:R1")
+        .Value = Array("ts", "ticker", "side", "price", "qty", "mode", "status", "note", "tp", "sl", "trail", "fill_ts", "fill_price", "fill_qty", "close_ts", "close_price", "pnl_bp", "source")
+    End With
 
     Set EnsureOrdersSheet = sh
 
 End Function
+
+Private Function FindOrderRow(ByVal sh As Worksheet, ByVal ticker As String, ByVal side As String, ByVal statusFilters As Variant) As Long
+    Dim lastRow As Long
+    lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
+    Dim r As Long
+    Dim targetTicker As String: targetTicker = UCase$(Trim$(ticker))
+    Dim targetSide As String: targetSide = UCase$(Trim$(side))
+    For r = lastRow To 2 Step -1
+        If UCase$(Trim$(CStr(sh.Cells(r, 2).Value))) = targetTicker Then
+            If targetSide = "" Or UCase$(Trim$(CStr(sh.Cells(r, 3).Value))) = targetSide Then
+                If IsEmpty(statusFilters) Then
+                    FindOrderRow = r
+                    Exit Function
+                Else
+                    Dim statusVal As String
+                    statusVal = UCase$(Trim$(CStr(sh.Cells(r, 7).Value)))
+                    Dim idx As Long
+                    For idx = LBound(statusFilters) To UBound(statusFilters)
+                        If UCase$(CStr(statusFilters(idx))) = statusVal Then
+                            FindOrderRow = r
+                            Exit Function
+                        End If
+                    Next idx
+                End If
+            End If
+        End If
+    Next r
+    FindOrderRow = 0
+End Function
+
+Private Function AppendOrderRow(ByVal ticker As String, ByVal side As String, ByVal price As Double, ByVal qty As Double, ByVal mode As String, ByVal statusVal As String, ByVal note As String) As Long
+    Dim sh As Worksheet: Set sh = EnsureOrdersSheet(Nothing)
+    Dim rowIdx As Long
+    rowIdx = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row + 1
+    sh.Cells(rowIdx, 1).Value = Now
+    sh.Cells(rowIdx, 2).Value = ticker
+    sh.Cells(rowIdx, 3).Value = side
+    sh.Cells(rowIdx, 4).Value = price
+    sh.Cells(rowIdx, 5).Value = qty
+    sh.Cells(rowIdx, 6).Value = mode
+    sh.Cells(rowIdx, 7).Value = statusVal
+    sh.Cells(rowIdx, 8).Value = note
+    AppendOrderRow = rowIdx
+End Function
+
+Public Sub LogOrderFilled(ByVal ticker As String, ByVal side As String, ByVal fillPrice As Double, ByVal qty As Double, Optional ByVal mode As String = "", Optional ByVal note As String = "")
+    Dim sh As Worksheet: Set sh = EnsureOrdersSheet(Nothing)
+    Dim targets As Variant: targets = Array("PENDING", "PREPLACE", "PREPLACE")
+    Dim rowIdx As Long
+    rowIdx = FindOrderRow(sh, ticker, side, targets)
+    If rowIdx = 0 Then
+        rowIdx = AppendOrderRow(ticker, side, fillPrice, qty, mode, "NEW", note)
+    End If
+    sh.Cells(rowIdx, 7).Value = "FILLED"
+    sh.Cells(rowIdx, 12).Value = Now
+    sh.Cells(rowIdx, 13).Value = fillPrice
+    If qty > 0# Then sh.Cells(rowIdx, 14).Value = qty
+    If Len(mode) > 0 Then sh.Cells(rowIdx, 6).Value = mode
+    If Len(note) > 0 Then sh.Cells(rowIdx, 8).Value = note
+End Sub
+
+Public Sub LogOrderSettled(ByVal ticker As String, ByVal side As String, ByVal closePrice As Double, Optional ByVal qty As Double = 0#, Optional ByVal note As String = "")
+    Dim sh As Worksheet: Set sh = EnsureOrdersSheet(Nothing)
+    Dim rowIdx As Long
+    rowIdx = FindOrderRow(sh, ticker, side, Array("FILLED", "RUNNING"))
+    If rowIdx = 0 Then
+        rowIdx = AppendOrderRow(ticker, side, closePrice, qty, "", "ADHOC_CLOSE", note)
+    End If
+    sh.Cells(rowIdx, 7).Value = "CLOSED"
+    sh.Cells(rowIdx, 15).Value = Now
+    sh.Cells(rowIdx, 16).Value = closePrice
+    If qty > 0# Then sh.Cells(rowIdx, 14).Value = qty
+    Dim fillPrice As Double: fillPrice = ToDouble(sh.Cells(rowIdx, 13).Value, 0#)
+    Dim fillQty As Double: fillQty = ToDouble(sh.Cells(rowIdx, 14).Value, 0#)
+    If fillQty = 0# And qty > 0# Then fillQty = qty
+    If Len(note) > 0 Then sh.Cells(rowIdx, 8).Value = note
+    If fillPrice > 0# And fillQty > 0# Then
+        Dim direction As Double
+        direction = IIf(UCase$(Trim$(side)) = "BUY", 1#, -1#)
+        Dim pnlBp As Double
+        pnlBp = direction * (closePrice - fillPrice) / fillPrice * 10000#
+        sh.Cells(rowIdx, 17).Value = pnlBp
+    End If
+End Sub
 
 
 Private Sub LogPreOrder(ByVal ws As Worksheet, ByVal orderSheet As Worksheet, ByVal rowIndex As Long, _
@@ -1742,27 +2106,19 @@ Public Sub SetupDashboardUIV2()
 
 
 
-    ' Move status banner to the right to avoid overlapping params
-
-    With ws.Range("N1:U2")
-
-        .Merge
-
+    ' Status + direction indicators near the left
+    With ws.Range("A3")
         .HorizontalAlignment = xlCenter
-
         .VerticalAlignment = xlCenter
-
         .Font.Bold = True
-
-        .Font.Size = 18
-
+        .Font.Size = 14
         .Interior.Color = RGB(230, 230, 230)
-
         .Value = "IDLE"
-
-        .name = "RunStatusV2"
-
+        .Name = "RunStatusV2"
     End With
+
+    SetupTrendIndicatorCells ws
+    UpdateTrendIndicators ws
 
 
 
@@ -1778,21 +2134,25 @@ Public Sub SetupDashboardUIV2()
 
     ' Buttons (swap: Live on left, Demo on right)
 
-    CreateButton ws, "btn_live_start", "Live Start", 3, 14, "AutoTraderAdvanced.StartLiveV2"    ' N3
+    CreateButton ws, "btn_live_start", "Live Start", 3, 6, "AutoTraderAdvanced.StartLiveV2"    ' F3
 
-    CreateButton ws, "btn_live_stop", "Live Stop", 3, 18, "AutoTraderAdvanced.StopLiveV2"      ' R3
+    CreateButton ws, "btn_live_stop", "Live Stop", 3, 8, "AutoTraderAdvanced.StopLiveV2"      ' H3
 
-    CreateButton ws, "btn_demo_start", "Demo Start", 3, 22, "AutoTraderAdvanced.StartDemoV2"    ' V3
+    CreateButton ws, "btn_demo_start", "Demo Start", 3, 10, "AutoTraderAdvanced.StartDemoV2"    ' J3
 
-    CreateButton ws, "btn_demo_stop", "Demo Stop", 3, 26, "AutoTraderAdvanced.StopDemoV2"      ' Z3
+    CreateButton ws, "btn_demo_stop", "Demo Stop", 3, 12, "AutoTraderAdvanced.StopDemoV2"      ' L3
 
-    CreateButton ws, "btn_import", "Import Candidates", 3, 30, "AutoTraderAdvanced.ImportCandidatesV2"      ' AD3
+    CreateButton ws, "btn_import", "Import Candidates", 3, 14, "AutoTraderAdvanced.ImportCandidatesV2"      ' N3
 
+    CreateButton ws, "btn_refresh_trend", "方向再計算", 3, 16, "AutoTraderAdvanced.RefreshTrendsV2"        ' P3
 
+    CreateButton ws, "btn_clear_bb", "BBブロック解除", 3, 18, "AutoTraderAdvanced.ClearBBBlocks"          ' R3
 
     ApplyJapaneseLabelsV2 ws
 
     ReorderHeadersV2 ws
+
+    UpdateTrendIndicators ws
 
 End Sub
 
@@ -1835,7 +2195,7 @@ Private Sub ApplyJapaneseLabelsV2(ByVal ws As Worksheet)
     Dim labels As Variant
 
     labels = Array("Ticker", "Name", "J_th_base", "J_th", "J", "PrevClose", "VWAP", "OrderQtyPlan", "Selected", _
-                   "EntryBuyPx", "EntrySellPx", "EntrySide", "EntryStatus", "TP_price", "SL_price", "StopTrail", "SettleStatus", "BestBid", "BestAsk", "Gap_bp", "CorrNKY", _
+                   "EntryBuyPx", "EntrySellPx", "EntrySide", "EntryStatus", "TP_price", "SL_price", "StopTrail", "SettleStatus", "BestBid", "BestAsk", "Gap_bp", "CorrNKY", "CorrTOPIX", _
                    "BiasSlope_row", "GapSlope_row", "CorrSlope_row", "TP_per_J_row", "SL_per_J_row", "Trail_per_J_row", "TP_per_J_eff", "SL_per_J_eff", "Trail_per_J_eff", "VolatilityTag")
 
     Dim i As Long
@@ -1860,7 +2220,7 @@ Private Sub ReorderHeadersV2(ByVal ws As Worksheet)
 
     Dim order As Variant
 
-    order = Array("Ticker", "Name", "J_th_base", "J_th", "J", "PrevClose", "VWAP", "OrderQtyPlan", "Selected", "EntryBuyPx", "EntrySellPx", "EntrySide", "EntryStatus", "TP_price", "SL_price", "StopTrail", "SettleStatus", "BestBid", "BestAsk", "Gap_bp", "CorrNKY", _
+    order = Array("Ticker", "Name", "J_th_base", "J_th", "J", "PrevClose", "VWAP", "OrderQtyPlan", "Selected", "EntryBuyPx", "EntrySellPx", "EntrySide", "EntryStatus", "TP_price", "SL_price", "StopTrail", "SettleStatus", "BestBid", "BestAsk", "Gap_bp", "CorrNKY", "CorrTOPIX", _
                   "BiasSlope_row", "GapSlope_row", "CorrSlope_row", "TP_per_J_row", "SL_per_J_row", "Trail_per_J_row", "TP_per_J_eff", "SL_per_J_eff", "Trail_per_J_eff", "VolatilityTag")
 
     Dim c As Long
@@ -1883,39 +2243,32 @@ Public Sub StartLiveV2(): UpdateStatusV2 "LIVE_RUNNING": End Sub
 
 Public Sub StopLiveV2():  UpdateStatusV2 "IDLE": End Sub
 
-
-
 Private Sub UpdateStatusV2(ByVal mode As String)
 
     Dim ws As Worksheet: Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
 
-    Dim statusArea As Range
-    Set statusArea = ws.Range("A3:B3")
+    Dim statusCell As Range
+    Set statusCell = ws.Range("A3")
 
     On Error Resume Next
-    statusArea.UnMerge
+    ws.Parent.Names.Add Name:="RunStatusV2", RefersTo:=statusCell
     On Error GoTo 0
 
-    On Error Resume Next
-    ws.Parent.Names.Add Name:="RunStatusV2", RefersTo:=statusArea
-    On Error GoTo 0
+    statusCell.ClearContents
 
-    statusArea.ClearContents
-
-    With statusArea
-        .HorizontalAlignment = xlCenterAcrossSelection
+    With statusCell
+        .HorizontalAlignment = xlCenter
         .VerticalAlignment = xlCenter
         .Font.Bold = True
-        .Font.Size = 16
+        .Font.Size = 14
 
         Select Case mode
             Case "DEMO_RUNNING": .Interior.Color = RGB(220, 240, 255)
             Case "LIVE_RUNNING": .Interior.Color = RGB(255, 230, 230)
             Case Else: .Interior.Color = RGB(230, 230, 230)
         End Select
+        .Value = mode
     End With
-
-    statusArea.Cells(1, 1).Value = mode
 
 End Sub
 
@@ -1942,6 +2295,8 @@ Public Sub ImportCandidatesV2()
     On Error GoTo 0
 
     If Len(Dir$(path)) = 0 Then Exit Sub
+
+    On Error GoTo ImportErr
 
     Dim f As Integer: f = FreeFile
 
@@ -1974,6 +2329,8 @@ Public Sub ImportCandidatesV2()
     Dim colTrendWindow As Long: colTrendWindow = FindColumn(ws, DASH2_HEADER_ROW, "trend_window")
     Dim colTrendBp As Long: colTrendBp = FindColumn(ws, DASH2_HEADER_ROW, "trend_bp_th")
     Dim colTrendPolicy As Long: colTrendPolicy = FindColumn(ws, DASH2_HEADER_ROW, "trend_allowed_policy")
+    Dim corrCol As Long: corrCol = FindColumn(ws, DASH2_HEADER_ROW, "CorrNKY")
+    Dim corrTopixCol As Long: corrTopixCol = FindColumn(ws, DASH2_HEADER_ROW, "CorrTOPIX")
 
     Dim colTpk As Long: colTpk = FindColumn(ws, DASH2_HEADER_ROW, "TPk")
 
@@ -1995,6 +2352,7 @@ Public Sub ImportCandidatesV2()
     Dim idxAtr As Long, idxTpk As Long, idxSlk As Long, idxMode As Long, idxSession As Long, idxPlan As Long, idxBatchKind As Long
     Dim idxBiasSlope As Long, idxGapSlope As Long, idxCorrSlope As Long
     Dim idxTpRow As Long, idxSlRow As Long, idxTrailRow As Long
+    Dim idxCorrNky As Long, idxCorrTopix As Long
     Dim idxTrendDriver As Long, idxTrendWindow As Long, idxTrendBp As Long, idxTrendPolicy As Long
 
     idxTicker = -1: idxJtb = -1: idxPf = -1: idxCi = -1: idxTrades = -1: idxExpBp = -1
@@ -2002,6 +2360,7 @@ Public Sub ImportCandidatesV2()
     idxAtr = -1: idxTpk = -1: idxSlk = -1: idxMode = -1: idxSession = -1: idxPlan = -1: idxBatchKind = -1
     idxBiasSlope = -1: idxGapSlope = -1: idxCorrSlope = -1
     idxTpRow = -1: idxSlRow = -1: idxTrailRow = -1
+    idxCorrNky = -1: idxCorrTopix = -1
     idxTrendDriver = -1: idxTrendWindow = -1: idxTrendBp = -1: idxTrendPolicy = -1
 
     Dim hdr As Variant
@@ -2052,16 +2411,21 @@ Public Sub ImportCandidatesV2()
 
                 If h = "plan_tag" Then idxPlan = i
                 If h = "batchkind" Or h = "batch_kind" Then idxBatchKind = i
-                If h = "bias_slope" Or h = "biasslope" Then idxBiasSlope = i
-                If h = "gap_slope" Or h = "gapslope" Then idxGapSlope = i
-                If h = "corr_slope" Or h = "corrslope" Then idxCorrSlope = i
-                If h = "tp_per_j" Or h = "tp_per_j_row" Then idxTpRow = i
-                If h = "sl_per_j" Or h = "sl_per_j_row" Then idxSlRow = i
-                If h = "trail_per_j" Or h = "trail_per_j_row" Then idxTrailRow = i
+                Dim hCore As String: hCore = h
+                If Right$(hCore, 4) = "_row" Then hCore = Left$(hCore, Len(hCore) - 4)
+
+                If h = "bias_slope" Or h = "biasslope" Or hCore = "biasslope" Then idxBiasSlope = i
+                If h = "gap_slope" Or h = "gapslope" Or hCore = "gapslope" Then idxGapSlope = i
+                If h = "corr_slope" Or h = "corrslope" Or hCore = "corrslope" Then idxCorrSlope = i
+                If h = "tp_per_j" Or h = "tp_per_j_row" Or hCore = "tp_per_j" Then idxTpRow = i
+                If h = "sl_per_j" Or h = "sl_per_j_row" Or hCore = "sl_per_j" Then idxSlRow = i
+                If h = "trail_per_j" Or h = "trail_per_j_row" Or hCore = "trail_per_j" Then idxTrailRow = i
                 If h = "trend_driver" Then idxTrendDriver = i
                 If h = "trend_window" Then idxTrendWindow = i
                 If h = "trend_bp_th" Then idxTrendBp = i
                 If h = "trend_allowed_policy" Then idxTrendPolicy = i
+                If h = "corrnky" Or h = "corr_nky" Or hCore = "corrnky" Then idxCorrNky = i
+                If h = "corrtopix" Or h = "corr_topix" Or hCore = "corrtopix" Then idxCorrTopix = i
 
             Next i
 
@@ -2135,6 +2499,12 @@ Public Sub ImportCandidatesV2()
                     If idxCorrSlope >= 0 And idxCorrSlope <= UBound(parts) And colCorrSlope > 0 Then
                         ws.Cells(r, colCorrSlope).Value = ToDouble(Trim$(parts(idxCorrSlope)), 0#)
                     End If
+                    If idxCorrNky >= 0 And idxCorrNky <= UBound(parts) And corrCol > 0 Then
+                        ws.Cells(r, corrCol).Value = ToDouble(Trim$(parts(idxCorrNky)), 0#)
+                    End If
+                    If idxCorrTopix >= 0 And idxCorrTopix <= UBound(parts) And corrTopixCol > 0 Then
+                        ws.Cells(r, corrTopixCol).Value = ToDouble(Trim$(parts(idxCorrTopix)), 0#)
+                    End If
                     If idxTpRow >= 0 And idxTpRow <= UBound(parts) And colTpRow > 0 Then
                         ws.Cells(r, colTpRow).Value = ToDouble(Trim$(parts(idxTpRow)), 0#)
                     End If
@@ -2167,11 +2537,18 @@ Public Sub ImportCandidatesV2()
 
     Loop
 
+    GoTo ImportFinalize
+
+ImportFinalize:
+    On Error Resume Next
     Close #f
-
-
+    On Error GoTo 0
 
     Dim clearRow As Long
+
+    On Error Resume Next
+    ApplyDynamicSignalsV2
+    On Error GoTo 0
 
     If maxExisting >= DASH2_DATA_START And r <= maxExisting Then
 
@@ -2203,6 +2580,9 @@ Public Sub ImportCandidatesV2()
 
             If colPlan > 0 Then ws.Cells(clearRow, colPlan).ClearContents
 
+            If corrCol > 0 Then ws.Cells(clearRow, corrCol).ClearContents
+            If corrTopixCol > 0 Then ws.Cells(clearRow, corrTopixCol).ClearContents
+
             If colBiasSlope > 0 Then ws.Cells(clearRow, colBiasSlope).ClearContents
 
             If colGapSlope > 0 Then ws.Cells(clearRow, colGapSlope).ClearContents
@@ -2229,10 +2609,63 @@ Public Sub ImportCandidatesV2()
 
     EnsureParamFormulas ws
     InstallRealtimeFormulasV2
+    RefreshTrendsV2
+    Exit Sub
+
+ImportErr:
+    LogVbaEvent "ImportCandidatesV2", "Err " & Err.Number & ": " & Err.Description
+    Resume ImportFinalize
+
+End Sub
+Public Sub RefreshTrendsV2()
+
+    Dim ws As Worksheet
+
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
+    On Error GoTo 0
+
+    If ws Is Nothing Then Exit Sub
+
+    Dim prevStatus As Variant
+    prevStatus = Application.StatusBar
+
+    Application.StatusBar = "方向フィルタを再計算しています..."
+
+    On Error Resume Next
+    UpdateAllDriverTrends ws
     ws.Calculate
     ApplyDynamicSignalsV2
     PreplaceOrdersV2
+    UpdateTrendIndicators ws
+    On Error GoTo 0
 
+    Application.StatusBar = prevStatus
+
+End Sub
+
+Public Sub ClearBBBlocks()
+    ResetBbBlockCache
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
+    On Error GoTo 0
+    If ws Is Nothing Then Exit Sub
+
+    Dim entryStatusCol As Long: entryStatusCol = FindColumn(ws, DASH2_HEADER_ROW, "EntryStatus")
+    If entryStatusCol > 0 Then
+        Dim lastRow As Long
+        lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+        Dim r As Long
+        For r = DASH2_DATA_START To lastRow
+            Dim statusVal As String: statusVal = Trim$(CStr(ws.Cells(r, entryStatusCol).Value))
+            If statusVal = "BLOCKED_BB" Or statusVal = "WARN_BB" Then
+                ws.Cells(r, entryStatusCol).ClearContents
+            End If
+        Next r
+    End If
+
+    RefreshTrendsV2
 End Sub
 
 
@@ -2241,17 +2674,17 @@ Private Sub EnsureParamFormulas(ByVal ws As Worksheet)
     ws.Cells(2, 1).Value = "N225"
     ws.Cells(2, 4).Value = "TOPX"
     ws.Cells(2, 2).Formula = "=IF(A2="""","""",IFERROR(RssIndexMarket(A2,""現在値""),""""))"
-    ws.Cells(2, 3).Formula = "=IF(A2="""","""",IFERROR(RssIndexMarket(A2,""前日比""),""""))"
+    ws.Cells(2, 3).Formula = "=IF(A2="""","""",IFERROR(RssIndexMarket(A2,""前日比率""),""""))"
     ws.Cells(2, 5).Formula = "=IF(D2="""","""",IFERROR(RssIndexMarket(D2,""現在値""),""""))"
-    ws.Cells(2, 6).Formula = "=IF(D2="""","""",IFERROR(RssIndexMarket(D2,""前日比""),""""))"
+    ws.Cells(2, 6).Formula = "=IF(D2="""","""",IFERROR(RssIndexMarket(D2,""前日比率""),""""))"
     Dim paramHeaders As Variant
     paramHeaders = Array( _
         Array(1, "指標コード(日経平均)", "楽天RSSに渡す指標コード。通常はN225固定です"), _
         Array(2, "日経平均 現在値", ""), _
-        Array(3, "日経平均 前日比", ""), _
+        Array(3, "日経平均 前日比率", ""), _
         Array(4, "指標コード(TOPIX)", "楽天RSSに渡すTOPIXコード。通常はTOPXです"), _
         Array(5, "TOPIX 現在値", ""), _
-        Array(6, "TOPIX 前日比", ""), _
+        Array(6, "TOPIX 前日比率", ""), _
         Array(7, "バイアス閾値(bp)", "J補正をBAN扱いにする絶対値閾値"), _
         Array(8, "Bias補正係数", "日経平均との方向差で加算する係数"), _
         Array(9, "Gap補正係数", "ギャップ量に応じた補正係数"), _
@@ -2281,18 +2714,18 @@ Private Sub EnsureParamFormulas(ByVal ws As Worksheet)
     Next headerInfo
     Dim noteItems As Variant
     noteItems = Array( _
-        Array(13, "TP/J グローバル設定。銘柄行が空欄の場合に利確幅として使用します。"), _
-        Array(14, "SL/J グローバル設定。銘柄行が空欄の場合の損切幅です。"), _
-        Array(15, "Trail/J グローバル設定。トレーリング幅（J値基準）。"), _
-        Array(16, "CorrSlope: 相関係数による J_th 補正係数。"), _
-        Array(17, "BudgetPerTicker: 銘柄ごとの最大投下資金（円）。"), _
-        Array(18, "LotSize: 1 取引あたりの株数。"), _
-        Array(19, "NKY_TrendDay: 日経平均の日足トレンド（上書き用）。"), _
-        Array(20, "NKY_TrendWindow: 日経平均の短期トレンド。"), _
-        Array(21, "NKY_AllowedSide: 日経連動時に許可する方向。"), _
-        Array(22, "TOPIX_TrendDay: TOPIX 日足トレンド。"), _
-        Array(23, "TOPIX_TrendWindow: TOPIX 短期トレンド。"), _
-        Array(24, "TOPIX_AllowedSide: TOPIX 連動時の許可方向。") _
+        Array(12, "TP/J グローバル設定。銘柄行が空欄の場合に利確幅として使用します。"), _
+        Array(13, "SL/J グローバル設定。銘柄行が空欄の場合の損切幅です。"), _
+        Array(14, "Trail/J グローバル設定。トレーリング幅（J値基準）。"), _
+        Array(15, "CorrSlope: 相関係数による J_th 補正係数。"), _
+        Array(16, "BudgetPerTicker: 銘柄ごとの最大投下資金（円）。"), _
+        Array(17, "LotSize: 1 取引あたりの株数。"), _
+        Array(18, "NKY_TrendDay: 日経平均の日足トレンド（上書き用）。"), _
+        Array(19, "NKY_TrendWindow: 日経平均の短期トレンド。"), _
+        Array(20, "NKY_AllowedSide: 日経連動時に許可する方向。"), _
+        Array(21, "TOPIX_TrendDay: TOPIX 日足トレンド。"), _
+        Array(22, "TOPIX_TrendWindow: TOPIX 短期トレンド。"), _
+        Array(23, "TOPIX_AllowedSide: TOPIX 連動時の許可方向。") _
     )
     Dim entry As Variant
     For Each entry In noteItems

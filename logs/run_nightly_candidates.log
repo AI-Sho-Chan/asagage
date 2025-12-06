@@ -8,3 +8,57 @@
 [2025-11-10T16:30:16] nightly_build_candidates start
 [2025-11-10T17:18:37] nightly_build_candidates exit 0
 [2025-11-10T17:18:37] run_trade_analysis completed
+[2025-11-11T16:30:16] nightly_build_candidates start
+[2025-11-11T16:59:38] nightly_build_candidates exit 0
+[2025-11-11T16:59:38] run_trade_analysis completed
+[2025-11-12T16:30:17] nightly_build_candidates start
+[2025-11-12T16:31:37] nightly_build_candidates exit 1
+[2025-11-14T16:01:04] nightly_build_candidates start
+[2025-11-14T16:04:04] nightly_build_candidates exit 0
+[2025-11-14T16:30:03] nightly_build_candidates start weekend_seq
+[2025-11-14T20:37:22] weekend_seq exit -196608
+[2025-11-15T16:30:03] nightly_build_candidates skip (holiday)
+[2025-11-16T16:30:03] nightly_build_candidates skip (holiday)
+[2025-11-17T16:30:06] nightly_build_candidates skip (holiday)
+[2025-11-18T16:30:05] nightly_build_candidates skip (holiday)
+[2025-11-18T21:24:43] nightly_build_candidates start
+[2025-11-19T07:39:16] nightly_build_candidates start
+[2025-11-19T16:30:05] nightly_build_candidates start
+[2025-11-19T16:30:06] nightly_build_candidates exit 1
+[2025-11-20T00:00:29] nightly_build_candidates start
+[2025-11-20T00:00:29] nightly_build_candidates error Cannot validate argument on parameter 'RedirectStandardOutput'. The argument is null or empty. Provide an argument that is not null or empty, and then try the command again.
+[2025-11-20T00:00:48] nightly_build_candidates start
+[2025-11-20T00:14:10] nightly_build_candidates exit 120
+[2025-11-20T00:14:10] nightly_build_candidates error_detail C:\AI\asagake\logs\nightly_py_error_20251120_000047.log
+[2025-11-20T15:35:40] nightly_build_candidates exit 1
+[2025-11-20T15:35:46] nightly_build_candidates exit 120
+[2025-11-20T16:30:08] nightly_build_candidates start
+[2025-11-20T16:30:09] nightly_build_candidates exit 1
+[2025-11-20T16:30:09] nightly_build_candidates error_detail C:\AI\asagake\logs\nightly_py_error_20251120_163007.log
+[2025-11-20T17:13:10] nightly_build_candidates start
+[2025-11-20T17:38:02] nightly_build_candidates exit 0
+[2025-11-20T17:38:02] run_trade_analysis completed
+[2025-11-21T16:30:05] nightly_build_candidates skip weekend_seq (disabled locally)
+[2025-11-21T16:30:05] nightly_build_candidates skip nightly (disabled locally)
+[2025-11-22T16:30:10] nightly_build_candidates skip (holiday)
+[2025-11-23T16:30:07] nightly_build_candidates skip (holiday)
+[2025-11-24T16:30:04] nightly_build_candidates skip (holiday)
+[2025-11-25T16:30:05] nightly_build_candidates start
+[2025-11-25T16:30:06] nightly_build_candidates exit 1
+[2025-11-25T16:30:06] nightly_build_candidates error_detail C:\AI\asagake\logs\nightly_py_error_20251125_163004.log
+[2025-11-26T16:30:08] nightly_build_candidates start
+[2025-11-26T16:30:09] nightly_build_candidates exit 1
+[2025-11-26T16:30:09] nightly_build_candidates error_detail C:\AI\asagake\logs\nightly_py_error_20251126_163007.log
+[2025-11-27T16:30:14] nightly_build_candidates start
+[2025-11-27T16:30:15] nightly_build_candidates exit 1
+[2025-11-27T16:30:15] nightly_build_candidates error_detail C:\AI\asagake\logs\nightly_py_error_20251127_163011.log
+[2025-11-28T17:16:58] nightly_build_candidates skip weekend_seq (disabled locally)
+[2025-11-28T17:16:58] nightly_build_candidates skip nightly (disabled locally)
+[2025-11-29T16:34:11] nightly_build_candidates skip (holiday)
+[2025-11-30T16:35:19] nightly_build_candidates skip (holiday)
+[2025-12-01T16:31:59] nightly_build_candidates start
+[2025-12-01T16:32:00] nightly_build_candidates exit 1
+[2025-12-01T16:32:00] nightly_build_candidates error_detail C:\AI\asagake\logs\nightly_py_error_20251201_163154.log
+[2025-12-02T16:34:39] nightly_build_candidates start
+[2025-12-02T16:34:48] nightly_build_candidates exit 1
+[2025-12-02T16:34:48] nightly_build_candidates error_detail C:\AI\asagake\logs\nightly_py_error_20251202_163433.log

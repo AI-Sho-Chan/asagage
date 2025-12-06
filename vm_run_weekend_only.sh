@@ -54,6 +54,13 @@ LOG_FILE="$LOG_DIR/weekend_${STAMP}.log"
     --target-date "$TARGET_DATE"
 
   python scripts/run_trade_analysis.py || true
+
+  # Weekly WF summary report (candidates × trades × expected PnL) and email
+  python analysis/build_weekly_wf_report.py \
+    --week-ending "$TARGET_DATE" \
+    --email \
+    --recipient "shouichi.ikeda@gmail.com" || true
+
   gsutil -m rsync -r "$HOME/asagage/output" "gs://asagage-weekend-output/output"
 } >> "$LOG_FILE" 2>&1
 

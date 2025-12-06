@@ -64,7 +64,11 @@ def snapshot_board(xlsx_path: Path, outdir: Path) -> Path:
     excel.Visible = False
     excel.DisplayAlerts = False
     try:
-        wb = excel.Workbooks.Open(str(xlsx_path.resolve()))
+        wb = excel.Workbooks.Open(
+            str(xlsx_path.resolve()),
+            ReadOnly=True,
+            UpdateLinks=False,
+        )
         row: Dict[str, object] = {"ts": dt.datetime.now().isoformat()}
         for nm in NAMES:
             row[nm] = read_named(wb, nm)
@@ -90,7 +94,11 @@ def snapshot_dashboard_j(xls_path: Path, outdir: Path) -> Path | None:
     excel.Visible = False
     excel.DisplayAlerts = False
     try:
-        wb = excel.Workbooks.Open(str(xls_path.resolve()))
+        wb = excel.Workbooks.Open(
+            str(xls_path.resolve()),
+            ReadOnly=True,
+            UpdateLinks=False,
+        )
         try:
             ws = wb.Worksheets("NewDashboardV2")
         except Exception:

@@ -112,11 +112,21 @@ def update_bb_rules(
     flat_k = compute_k(flat_ratio, flat_quantile, sigma_floor)
     trend_k = compute_k(trend_ratio, trend_quantile, sigma_floor)
 
+    block_cap = float(ratio_series.quantile(0.05)) if not ratio_series.empty else 0.9
+    warn_level = float(ratio_series.quantile(0.25)) if not ratio_series.empty else block_cap + 0.1
+    block_cap = max(0.2, min(0.88, block_cap))
+    warn_margin = max(0.20, min(0.5, warn_level - block_cap))
+
     rules_text = rules_path.read_text(encoding="utf-8").splitlines()
     rules_text = upsert_rule(rules_text, "bb_flat_k", f"{flat_k:.4f}")
     rules_text = upsert_rule(rules_text, "bb_trend_k", f"{trend_k:.4f}")
+    rules_text = upsert_rule(rules_text, "bb_block_ratio_cap", f"{block_cap:.4f}")
+    rules_text = upsert_rule(rules_text, "bb_warn_margin", f"{warn_margin:.4f}")
     rules_path.write_text("\n".join(rules_text) + "\n", encoding="utf-8")
-    print(f"Updated {rules_path} with bb_flat_k={flat_k:.4f}, bb_trend_k={trend_k:.4f}")
+    print(
+        f"Updated {rules_path} with bb_flat_k={flat_k:.4f}, bb_trend_k={trend_k:.4f}, "
+        f"bb_block_ratio_cap={block_cap:.4f}, bb_warn_margin={warn_margin:.4f}"
+    )
 
 
 def compute_k(series: pd.Series, target_quantile: float, sigma_floor: float) -> float:

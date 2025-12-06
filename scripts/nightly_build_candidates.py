@@ -84,7 +84,7 @@ def aggregate_candidates(
     corr_map: Dict[str, Dict[str, float]] | None = None,
     vwap_stats: Dict[str, Dict[str, float]] | None = None,
 ) -> Dict[str, str]:
-    """Combine plan outputs, enforce quality filters, and pick one combo per ticker.
+    """Combine plan outputs, enforce quality filters, and keep all qualifying combos per ticker.
 
     Filters (hard):
       - J_th >= 0.8
@@ -94,7 +94,7 @@ def aggregate_candidates(
       - CorrTOPIX >= min_index_corr (default 0.2) if列がある
       - VWAP_revert_prob >= min_vwap_revert (データがある場合)
 
-    One-per-ticker selection:
+    Scoring:
       score = forward_pf_eff * (forward_winrate ** 1.2) * log1p(forward_trades) / (1 + MaxDD/1000)
       さらに Corr / VWAP 回帰があれば軽く加点
     """
@@ -163,10 +163,9 @@ def aggregate_candidates(
         score = score * (1.0 + pd.to_numeric(df["VWAP_revert_prob"], errors="coerce").fillna(0).clip(0, 1) * 0.1)
     df["_score"] = score
 
-    # One per ticker (best score)
+    # Sort by ticker / score but keep all combos that passed the filters
     if "Ticker" in df.columns:
         df = df.sort_values(["Ticker", "_score"], ascending=[True, False])
-        df = df.drop_duplicates(subset=["Ticker"], keep="first")
     else:
         df = df.sort_values(["_score"], ascending=[False])
 

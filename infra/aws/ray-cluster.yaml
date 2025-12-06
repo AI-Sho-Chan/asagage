@@ -12,8 +12,6 @@ available_node_types:
     node_config:
       InstanceType: t3.large
       ImageId: latest_dlami
-      InstanceMarketOptions:
-        MarketType: on-demand
     resources: {CPU: 2}
     min_workers: 0
     max_workers: 0
@@ -40,6 +38,3 @@ file_mounts: {}
 cluster_synced_files: []
 
 idle_timeout_minutes: 20
-
-docker: {enabled: false}
-

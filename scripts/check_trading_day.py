@@ -5,12 +5,41 @@ import argparse
 import datetime as dt
 from pathlib import Path
 import sys
-
-import jpholiday
+from typing import Set
 
 DATA_ROOT = Path("data/raw/yahoo_1m")
 REFERENCE_TICKERS = ["1301.T", "1332.T", "7203.T", "9984.T"]
 REMOTE_LOOKBACK_DAYS = 45  # Yahoo 1m history limit is ~60 days
+JPX_CALENDAR_CSV = Path("data/calendar/jpx_holidays_2025_2026.csv")
+
+_JPX_HOLIDAYS: Set[dt.date] | None = None
+
+
+def load_jpx_holidays() -> Set[dt.date]:
+    """Load JPX holiday dates from CSV (YYYY-MM-DD,name)."""
+    global _JPX_HOLIDAYS
+    if _JPX_HOLIDAYS is not None:
+        return _JPX_HOLIDAYS
+
+    holidays: Set[dt.date] = set()
+    if JPX_CALENDAR_CSV.exists():
+        try:
+            with JPX_CALENDAR_CSV.open("r", encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line or line.startswith("#") or line.startswith("date,"):
+                        continue
+                    parts = line.split(",", 1)
+                    try:
+                        d = dt.datetime.strptime(parts[0], "%Y-%m-%d").date()
+                    except Exception:
+                        continue
+                    holidays.add(d)
+        except Exception:
+            # Fail silently; fallback logic will be used instead.
+            holidays = set()
+    _JPX_HOLIDAYS = holidays
+    return holidays
 
 
 def has_local_data(target: dt.date) -> bool:
@@ -110,9 +139,28 @@ def fetch_remote_minutes(target: dt.date) -> bool:
 
 
 def is_calendar_open(target: dt.date) -> bool:
+    """Return True if the date is a JPX trading calendar day.
+
+    Priority is given to the JPX official holiday CSV (土日以外の休業日).
+    When the CSV is unavailable or does not cover the date, we fall back
+    to simple weekend-only logic.
+    """
+    # Weekends are always非営業日
     if target.weekday() >= 5:
         return False
-    if jpholiday.is_holiday(target):
+
+    holidays = load_jpx_holidays()
+    if holidays:
+        # JPX 休業日リストに含まれていれば非営業日、それ以外は営業日
+        return target not in holidays
+
+    # Fallback: minimum safeguards when JPX CSV が無い場合のみ
+    try:
+        import jpholiday  # type: ignore
+    except Exception:
+        jpholiday = None  # type: ignore[assignment]
+
+    if jpholiday is not None and jpholiday.is_holiday(target):
         return False
     if target.month == 1 and target.day in (1, 2, 3):
         return False
@@ -122,11 +170,13 @@ def is_calendar_open(target: dt.date) -> bool:
 
 
 def is_trading_day(target: dt.date) -> bool:
-    if not is_calendar_open(target):
-        return False
-    if has_local_data(target):
-        return True
-    return fetch_remote_minutes(target)
+    """Return True if markets should be treated as open for scheduling.
+
+    以前は「1分足データが取得できるかどうか」も判定に含めていましたが、
+    Yahoo 側の一時的なエラーで本来の営業日が「holiday」と誤判定される
+    リスクがあるため、スケジューラ用途では純粋にカレンダーのみを見る。
+    """
+    return is_calendar_open(target)
 
 
 def main(argv: list[str]) -> int:
