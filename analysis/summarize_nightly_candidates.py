@@ -121,23 +121,23 @@ def summarize_strong_combos(frame: pd.DataFrame, date_tag: str) -> pd.DataFrame:
     strong["forward_winrate"] = win.loc[mask]
     strong["forward_trades"] = trades.loc[mask]
 
-    # 期待bpがあれば使う（無ければ 0 扱い）
-    exp_bp = _to_numeric(strong.get("forward_exp_bp", pd.Series(0.0, index=strong.index)))
-
     # BudgetFactor/Live-Demo クラス付け
     live_demo_class: List[str] = []
     budget_factor: List[float] = []
 
-    for pf_i, win_i, tr_i, exp_i in zip(
-        strong["forward_pf_eff"], strong["forward_winrate"], strong["forward_trades"], exp_bp
+    for pf_i, win_i, tr_i in zip(
+        strong["forward_pf_eff"], strong["forward_winrate"], strong["forward_trades"]
     ):
         # 999 などの上限値は、過剰に効き過ぎないようにクリップして判定
         pf_clip = min(max(float(pf_i), 1.0), 5.0)
 
-        if tr_i >= 30 and win_i >= 0.7 and pf_clip >= 1.8 and exp_i >= 10.0:
+        # NOTE:
+        # - まずは pf / winrate / trades のみでクラス分けし、
+        #   forward_exp_bp などの期待値指標は今後の検証結果を見ながら閾値に組み込む。
+        if tr_i >= 30 and win_i >= 0.7 and pf_clip >= 1.8:
             live_demo_class.append("LIVE_STRONG")
             budget_factor.append(2.0)
-        elif tr_i >= 15 and win_i >= 0.6 and pf_clip >= 1.3 and exp_i >= 5.0:
+        elif tr_i >= 15 and win_i >= 0.6 and pf_clip >= 1.3:
             live_demo_class.append("LIVE_BASE")
             budget_factor.append(1.0)
         else:
