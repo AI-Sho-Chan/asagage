@@ -93,12 +93,17 @@ def summarize_per_plan(frame: pd.DataFrame, date_tag: str) -> pd.DataFrame:
 
 
 def summarize_strong_combos(frame: pd.DataFrame, date_tag: str) -> pd.DataFrame:
-    """Extract strong combos (rough WF edge) for inspection.
+    """Extract strong combos (rough WF edge) for inspection + Live/Demo提案.
 
-    Criteria (can be tuned later):
+    抽出条件（後で調整可能）:
       - forward_pf_eff >= 1.3
       - forward_winrate >= 0.6
       - forward_trades >= 10
+
+    さらに、各コンボに対して
+      - live_demo_class: LIVE_STRONG / LIVE_BASE / DEMO_ONLY
+      - budget_factor:   2.0 / 1.0 / 0.5
+    を付与する（後で Excel 側の BudgetPerTicker × factor で数量調整に使えるようにする想定）。
     """
     if frame.empty:
         return pd.DataFrame()
@@ -115,9 +120,37 @@ def summarize_strong_combos(frame: pd.DataFrame, date_tag: str) -> pd.DataFrame:
     strong["forward_pf_eff"] = pf.loc[mask]
     strong["forward_winrate"] = win.loc[mask]
     strong["forward_trades"] = trades.loc[mask]
+
+    # 期待bpがあれば使う（無ければ 0 扱い）
+    exp_bp = _to_numeric(strong.get("forward_exp_bp", pd.Series(0.0, index=strong.index)))
+
+    # BudgetFactor/Live-Demo クラス付け
+    live_demo_class: List[str] = []
+    budget_factor: List[float] = []
+
+    for pf_i, win_i, tr_i, exp_i in zip(
+        strong["forward_pf_eff"], strong["forward_winrate"], strong["forward_trades"], exp_bp
+    ):
+        # 999 などの上限値は、過剰に効き過ぎないようにクリップして判定
+        pf_clip = min(max(float(pf_i), 1.0), 5.0)
+
+        if tr_i >= 30 and win_i >= 0.7 and pf_clip >= 1.8 and exp_i >= 10.0:
+            live_demo_class.append("LIVE_STRONG")
+            budget_factor.append(2.0)
+        elif tr_i >= 15 and win_i >= 0.6 and pf_clip >= 1.3 and exp_i >= 5.0:
+            live_demo_class.append("LIVE_BASE")
+            budget_factor.append(1.0)
+        else:
+            # 条件自体は strong 抽出を満たしているが、サンプルや期待値がやや弱い場合
+            live_demo_class.append("DEMO_ONLY")
+            budget_factor.append(0.5)
+
+    strong["live_demo_class"] = live_demo_class
+    strong["budget_factor"] = budget_factor
+
     strong = strong.sort_values(
-        ["forward_pf_eff", "forward_trades", "forward_winrate"],
-        ascending=[False, False, False],
+        ["budget_factor", "forward_pf_eff", "forward_trades", "forward_winrate"],
+        ascending=[False, False, False, False],
     )
 
     keep_columns = [
@@ -133,6 +166,8 @@ def summarize_strong_combos(frame: pd.DataFrame, date_tag: str) -> pd.DataFrame:
         "forward_pf_eff",
         "forward_winrate",
         "forward_trades",
+        "live_demo_class",
+        "budget_factor",
     ]
     keep_columns = [col for col in keep_columns if col is not None]
 
@@ -221,4 +256,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

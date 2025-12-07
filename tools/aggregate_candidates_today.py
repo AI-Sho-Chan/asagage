@@ -108,10 +108,12 @@ def aggregate_frames(frames: Iterable[pd.DataFrame], thresholds: Thresholds) -> 
     score = pf * np.power(win, thresholds.win_power) * np.log1p(trades) / (1.0 + (dd / thresholds.dd_scale))
     df["_score"] = score
 
+    # 以前は「1銘柄につきスコア最大の 1 プランだけ」を残していたが、
+    # 強いコンボが複数ある銘柄もすべて採用したいので、
+    # ここではスコアでソートするだけに留めて drop_duplicates は行わない。
     ticker_col = _col(cols, "ticker")
     if ticker_col:
         df = df.sort_values([ticker_col, "_score"], ascending=[True, False])
-        df = df.drop_duplicates(subset=[ticker_col], keep="first")
     else:
         df = df.sort_values("_score", ascending=False)
 
