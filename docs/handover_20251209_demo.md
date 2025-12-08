@@ -22,3 +22,9 @@
 - `AutoTraderAdvanced.bas` を Excel にインポートし直し、`SetupDashboardUIV2` を実行してヘッダ/ボタンを再生成。
 - DEMO_RUNNING で `RefreshTrendsV2` 実行 → Orders に preplace_demo/ORDERED が残るか軽く確認。
 - （必要なら）ローカル nightly 用に依存ライブラリをインストール。
+
+## 6. 5分スナップショット（Board Logger）の扱い
+- 取引時間中に PowerShell ウィンドウが頻繁に出て邪魔になるため、以下のタスクを削除して停止した。
+  - `\ASAGAKE_BoardLogger`（実行: `C:\AI\asagake\scripts\board_logger_task.cmd`）
+  - `\Asagake-CheckBoardLogger`（実行: `C:\AI\asagake\scripts\run_check_boardlogger_today.cmd`）
+- 再開が必要な場合は、`scripts/register_boardlogger_task.ps1` をベースに再登録するか、同等の schtasks コマンドで復活させる。
