@@ -108,6 +108,21 @@ def aggregate_frames(frames: Iterable[pd.DataFrame], thresholds: Thresholds) -> 
     score = pf * np.power(win, thresholds.win_power) * np.log1p(trades) / (1.0 + (dd / thresholds.dd_scale))
     df["_score"] = score
 
+    # BudgetFactor_row: Live/Demo 分類とロット倍率のたたき台。
+    # nightly_summarize 側と同じロジックで、pf/win/trades から 2.0 / 1.0 / 0.5 を割り当てる。
+    if pf_col and trades_col:
+        pf_clip = pf.clip(lower=1.0, upper=5.0)
+        live_strong = (trades >= 30) & (win >= 0.7) & (pf_clip >= 1.8)
+        live_base = (trades >= 15) & (win >= 0.6) & (pf_clip >= 1.3) & ~live_strong
+        budget_factor = np.where(
+            live_strong,
+            2.0,
+            np.where(live_base, 1.0, 0.5),
+        )
+        df["BudgetFactor_row"] = budget_factor
+    else:
+        df["BudgetFactor_row"] = 1.0
+
     # 以前は「1銘柄につきスコア最大の 1 プランだけ」を残していたが、
     # 強いコンボが複数ある銘柄もすべて採用したいので、
     # ここではスコアでソートするだけに留めて drop_duplicates は行わない。

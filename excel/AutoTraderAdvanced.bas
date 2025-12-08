@@ -162,8 +162,9 @@ Private Function ResolveDriverCorrelation(ByVal ws As Worksheet, ByVal rowIndex 
 End Function
 
 Private Sub SetupTrendIndicatorCells(ByVal ws As Worksheet)
-    SetupSingleTrendIndicator ws, "B3:C3", "NKY方向", "NKYTrendCell"
-    SetupSingleTrendIndicator ws, "D3:E3", "TOPIX方向", "TOPIXTrendCell"
+    ' Use ASCII-only labels to avoid encoding issues
+    SetupSingleTrendIndicator ws, "B3:C3", "NKY Trend", "NKYTrendCell"
+    SetupSingleTrendIndicator ws, "D3:E3", "TOPIX Trend", "TOPIXTrendCell"
 End Sub
 
 Private Sub SetupSingleTrendIndicator(ByVal ws As Worksheet, ByVal address As String, ByVal label As String, ByVal rangeName As String)
@@ -1460,6 +1461,7 @@ Public Sub ApplyDynamicSignalsV2()
     Dim tpRowCol As Long: tpRowCol = FindColumn(ws, DASH2_HEADER_ROW, "TP_per_J_row")
     Dim slRowCol As Long: slRowCol = FindColumn(ws, DASH2_HEADER_ROW, "SL_per_J_row")
     Dim trailRowCol As Long: trailRowCol = FindColumn(ws, DASH2_HEADER_ROW, "Trail_per_J_row")
+    Dim budgetFactorCol As Long: budgetFactorCol = FindColumn(ws, DASH2_HEADER_ROW, "BudgetFactor_row")
     Dim tpEffCol As Long: tpEffCol = FindColumn(ws, DASH2_HEADER_ROW, "TP_per_J_eff")
     Dim slEffCol As Long: slEffCol = FindColumn(ws, DASH2_HEADER_ROW, "SL_per_J_eff")
     Dim trailEffCol As Long: trailEffCol = FindColumn(ws, DASH2_HEADER_ROW, "Trail_per_J_eff")
@@ -1694,8 +1696,17 @@ Public Sub ApplyDynamicSignalsV2()
         Dim priceForQty As Double: priceForQty = lastVal
         If priceForQty <= 0# Then priceForQty = basePrice
         Dim qty As Double
+        Dim effBudget As Double
+        Dim budgetFactor As Double
+        If budgetFactorCol > 0 Then
+            budgetFactor = ToDouble(ws.Cells(r, budgetFactorCol).Value, 1#)
+            If budgetFactor <= 0# Then budgetFactor = 1#
+        Else
+            budgetFactor = 1#
+        End If
+        effBudget = budgetPerTicker * budgetFactor
         If priceForQty > 0# Then
-            qty = Int(budgetPerTicker / priceForQty / lotSize) * lotSize
+            qty = Int(effBudget / priceForQty / lotSize) * lotSize
             If qty < 0# Then qty = 0#
         Else
             qty = 0#
@@ -2144,9 +2155,10 @@ Public Sub SetupDashboardUIV2()
 
     CreateButton ws, "btn_import", "Import Candidates", 3, 14, "AutoTraderAdvanced.ImportCandidatesV2"      ' N3
 
-    CreateButton ws, "btn_refresh_trend", "方向再計算", 3, 16, "AutoTraderAdvanced.RefreshTrendsV2"        ' P3
+    ' ASCII-only captions to avoid encoding issues
+    CreateButton ws, "btn_refresh_trend", "Recalc Trend", 3, 16, "AutoTraderAdvanced.RefreshTrendsV2"        ' P3
 
-    CreateButton ws, "btn_clear_bb", "BBブロック解除", 3, 18, "AutoTraderAdvanced.ClearBBBlocks"          ' R3
+    CreateButton ws, "btn_clear_bb", "Clear BB Blocks", 3, 18, "AutoTraderAdvanced.ClearBBBlocks"          ' R3
 
     ApplyJapaneseLabelsV2 ws
 
@@ -2196,7 +2208,7 @@ Private Sub ApplyJapaneseLabelsV2(ByVal ws As Worksheet)
 
     labels = Array("Ticker", "Name", "J_th_base", "J_th", "J", "PrevClose", "VWAP", "OrderQtyPlan", "Selected", _
                    "EntryBuyPx", "EntrySellPx", "EntrySide", "EntryStatus", "TP_price", "SL_price", "StopTrail", "SettleStatus", "BestBid", "BestAsk", "Gap_bp", "CorrNKY", "CorrTOPIX", _
-                   "BiasSlope_row", "GapSlope_row", "CorrSlope_row", "TP_per_J_row", "SL_per_J_row", "Trail_per_J_row", "TP_per_J_eff", "SL_per_J_eff", "Trail_per_J_eff", "VolatilityTag")
+                   "BiasSlope_row", "GapSlope_row", "CorrSlope_row", "TP_per_J_row", "SL_per_J_row", "Trail_per_J_row", "TP_per_J_eff", "SL_per_J_eff", "Trail_per_J_eff", "BudgetFactor_row", "VolatilityTag")
 
     Dim i As Long
 
@@ -2221,7 +2233,7 @@ Private Sub ReorderHeadersV2(ByVal ws As Worksheet)
     Dim order As Variant
 
     order = Array("Ticker", "Name", "J_th_base", "J_th", "J", "PrevClose", "VWAP", "OrderQtyPlan", "Selected", "EntryBuyPx", "EntrySellPx", "EntrySide", "EntryStatus", "TP_price", "SL_price", "StopTrail", "SettleStatus", "BestBid", "BestAsk", "Gap_bp", "CorrNKY", "CorrTOPIX", _
-                  "BiasSlope_row", "GapSlope_row", "CorrSlope_row", "TP_per_J_row", "SL_per_J_row", "Trail_per_J_row", "TP_per_J_eff", "SL_per_J_eff", "Trail_per_J_eff", "VolatilityTag")
+                  "BiasSlope_row", "GapSlope_row", "CorrSlope_row", "TP_per_J_row", "SL_per_J_row", "Trail_per_J_row", "TP_per_J_eff", "SL_per_J_eff", "Trail_per_J_eff", "BudgetFactor_row", "VolatilityTag")
 
     Dim c As Long
 
@@ -2325,6 +2337,7 @@ Public Sub ImportCandidatesV2()
     Dim colTpRow As Long: colTpRow = FindColumn(ws, DASH2_HEADER_ROW, "TP_per_J_row")
     Dim colSlRow As Long: colSlRow = FindColumn(ws, DASH2_HEADER_ROW, "SL_per_J_row")
     Dim colTrailRow As Long: colTrailRow = FindColumn(ws, DASH2_HEADER_ROW, "Trail_per_J_row")
+    Dim colBudgetFactor As Long: colBudgetFactor = FindColumn(ws, DASH2_HEADER_ROW, "BudgetFactor_row")
     Dim colTrendDriver As Long: colTrendDriver = FindColumn(ws, DASH2_HEADER_ROW, "trend_driver")
     Dim colTrendWindow As Long: colTrendWindow = FindColumn(ws, DASH2_HEADER_ROW, "trend_window")
     Dim colTrendBp As Long: colTrendBp = FindColumn(ws, DASH2_HEADER_ROW, "trend_bp_th")
@@ -2351,7 +2364,7 @@ Public Sub ImportCandidatesV2()
 
     Dim idxAtr As Long, idxTpk As Long, idxSlk As Long, idxMode As Long, idxSession As Long, idxPlan As Long, idxBatchKind As Long
     Dim idxBiasSlope As Long, idxGapSlope As Long, idxCorrSlope As Long
-    Dim idxTpRow As Long, idxSlRow As Long, idxTrailRow As Long
+    Dim idxTpRow As Long, idxSlRow As Long, idxTrailRow As Long, idxBudgetFactor As Long
     Dim idxCorrNky As Long, idxCorrTopix As Long
     Dim idxTrendDriver As Long, idxTrendWindow As Long, idxTrendBp As Long, idxTrendPolicy As Long
 
@@ -2359,7 +2372,7 @@ Public Sub ImportCandidatesV2()
 
     idxAtr = -1: idxTpk = -1: idxSlk = -1: idxMode = -1: idxSession = -1: idxPlan = -1: idxBatchKind = -1
     idxBiasSlope = -1: idxGapSlope = -1: idxCorrSlope = -1
-    idxTpRow = -1: idxSlRow = -1: idxTrailRow = -1
+    idxTpRow = -1: idxSlRow = -1: idxTrailRow = -1: idxBudgetFactor = -1
     idxCorrNky = -1: idxCorrTopix = -1
     idxTrendDriver = -1: idxTrendWindow = -1: idxTrendBp = -1: idxTrendPolicy = -1
 
@@ -2420,6 +2433,7 @@ Public Sub ImportCandidatesV2()
                 If h = "tp_per_j" Or h = "tp_per_j_row" Or hCore = "tp_per_j" Then idxTpRow = i
                 If h = "sl_per_j" Or h = "sl_per_j_row" Or hCore = "sl_per_j" Then idxSlRow = i
                 If h = "trail_per_j" Or h = "trail_per_j_row" Or hCore = "trail_per_j" Then idxTrailRow = i
+                If h = "budgetfactor_row" Or h = "budget_factor_row" Or hCore = "budgetfactor" Then idxBudgetFactor = i
                 If h = "trend_driver" Then idxTrendDriver = i
                 If h = "trend_window" Then idxTrendWindow = i
                 If h = "trend_bp_th" Then idxTrendBp = i
@@ -2442,6 +2456,10 @@ Public Sub ImportCandidatesV2()
                 End If
                 tkr = Replace$(tkr, """", "")
                 If Len(tkr) > 0 Then
+
+                    ' Be tolerant of per-row write errors so that
+                    ' one bad value does not abort the whole import.
+                    On Error Resume Next
 
                     ws.Cells(r, 1).Value = tkr
 
@@ -2514,6 +2532,9 @@ Public Sub ImportCandidatesV2()
                     If idxTrailRow >= 0 And idxTrailRow <= UBound(parts) And colTrailRow > 0 Then
                         ws.Cells(r, colTrailRow).Value = ToDouble(Trim$(parts(idxTrailRow)), 0#)
                     End If
+                    If idxBudgetFactor >= 0 And idxBudgetFactor <= UBound(parts) And colBudgetFactor > 0 Then
+                        ws.Cells(r, colBudgetFactor).Value = ToDouble(Trim$(parts(idxBudgetFactor)), 1#)
+                    End If
                     If idxTrendDriver >= 0 And idxTrendDriver <= UBound(parts) And colTrendDriver > 0 Then
                         ws.Cells(r, colTrendDriver).Value = Trim$(parts(idxTrendDriver))
                     End If
@@ -2526,6 +2547,8 @@ Public Sub ImportCandidatesV2()
                     If idxTrendPolicy >= 0 And idxTrendPolicy <= UBound(parts) And colTrendPolicy > 0 Then
                         ws.Cells(r, colTrendPolicy).Value = Trim$(parts(idxTrendPolicy))
                     End If
+
+                    On Error GoTo ImportErr
 
                     r = r + 1
 
@@ -2594,6 +2617,7 @@ ImportFinalize:
             If colSlRow > 0 Then ws.Cells(clearRow, colSlRow).ClearContents
 
             If colTrailRow > 0 Then ws.Cells(clearRow, colTrailRow).ClearContents
+            If colBudgetFactor > 0 Then ws.Cells(clearRow, colBudgetFactor).ClearContents
 
             If colTrendDriver > 0 Then ws.Cells(clearRow, colTrendDriver).ClearContents
 
@@ -2637,11 +2661,47 @@ Public Sub RefreshTrendsV2()
     ws.Calculate
     ApplyDynamicSignalsV2
     PreplaceOrdersV2
+    If IsDemoMode() Then MarkPendingPreplaceAsOrderedDemo
     UpdateTrendIndicators ws
     On Error GoTo 0
 
     Application.StatusBar = prevStatus
 
+End Sub
+
+Private Function IsDemoMode() As Boolean
+    On Error Resume Next
+    Dim nm As Name
+    Set nm = Application.Names("RunStatusV2")
+    If Not nm Is Nothing Then
+        IsDemoMode = (UCase$(Trim$(nm.RefersToRange.Value)) = "DEMO_RUNNING")
+    Else
+        IsDemoMode = False
+    End If
+    On Error GoTo 0
+End Function
+
+Private Sub MarkPendingPreplaceAsOrderedDemo()
+    Dim Sh As Worksheet
+    On Error Resume Next
+    Set Sh = ThisWorkbook.Worksheets("Orders")
+    On Error GoTo 0
+    If Sh Is Nothing Then Exit Sub
+
+    Dim lastRow As Long
+    lastRow = Sh.Cells(Sh.Rows.Count, 1).End(xlUp).Row
+    Dim r As Long
+    For r = 2 To lastRow
+        Dim modeVal As String: modeVal = UCase$(Trim$(CStr(Sh.Cells(r, 6).Value)))
+        Dim statusVal As String: statusVal = UCase$(Trim$(CStr(Sh.Cells(r, 7).Value)))
+        If modeVal = "PREPLACE" And statusVal = "PENDING" Then
+            Sh.Cells(r, 6).Value = "preplace_demo"
+            Sh.Cells(r, 7).Value = "ORDERED"
+            If Len(Trim$(CStr(Sh.Cells(r, 8).Value))) = 0 Then
+                Sh.Cells(r, 8).Value = "DEMO_PREPLACE"
+            End If
+        End If
+    Next r
 End Sub
 
 Public Sub ClearBBBlocks()
@@ -2670,6 +2730,9 @@ End Sub
 
 
 Private Sub EnsureParamFormulas(ByVal ws As Worksheet)
+    If ws Is Nothing Then Exit Sub
+
+    ' Index codes and RSS formulas (Japanese labels inside formula are fine)
     On Error Resume Next
     ws.Cells(2, 1).Value = "N225"
     ws.Cells(2, 4).Value = "TOPX"
@@ -2677,67 +2740,38 @@ Private Sub EnsureParamFormulas(ByVal ws As Worksheet)
     ws.Cells(2, 3).Formula = "=IF(A2="""","""",IFERROR(RssIndexMarket(A2,""前日比率""),""""))"
     ws.Cells(2, 5).Formula = "=IF(D2="""","""",IFERROR(RssIndexMarket(D2,""現在値""),""""))"
     ws.Cells(2, 6).Formula = "=IF(D2="""","""",IFERROR(RssIndexMarket(D2,""前日比率""),""""))"
+    On Error GoTo 0
+
+    ' Simple ASCII headers for parameter row (row 1)
     Dim paramHeaders As Variant
     paramHeaders = Array( _
-        Array(1, "指標コード(日経平均)", "楽天RSSに渡す指標コード。通常はN225固定です"), _
-        Array(2, "日経平均 現在値", ""), _
-        Array(3, "日経平均 前日比率", ""), _
-        Array(4, "指標コード(TOPIX)", "楽天RSSに渡すTOPIXコード。通常はTOPXです"), _
-        Array(5, "TOPIX 現在値", ""), _
-        Array(6, "TOPIX 前日比率", ""), _
-        Array(7, "バイアス閾値(bp)", "J補正をBAN扱いにする絶対値閾値"), _
-        Array(8, "Bias補正係数", "日経平均との方向差で加算する係数"), _
-        Array(9, "Gap補正係数", "ギャップ量に応じた補正係数"), _
-        Array(10, "Gap BAN 閾値(%)", "この割合を超えるギャップは自動BAN"), _
-        Array(11, "取引停止分数", "AutoTrader再開までのクールダウン（分）"), _
-        Array(12, "TP/J (全体)", ""), _
-        Array(13, "SL/J (全体)", ""), _
-        Array(14, "Trail/J (全体)", ""), _
-        Array(15, "相関補正係数", "NKY/TOPIX相関でJ_thを補正する係数"), _
-        Array(16, "銘柄別予算(円)", ""), _
-        Array(17, "ロットサイズ", ""), _
-        Array(18, "NKY日足トレンド", ""), _
-        Array(19, "NKY窓トレンド", ""), _
-        Array(20, "NKY許容サイド", ""), _
-        Array(21, "TOPIX日足トレンド", ""), _
-        Array(22, "TOPIX窓トレンド", ""), _
-        Array(23, "TOPIX許容サイド", "") _
+        Array(1, "NKY_Code"), _
+        Array(2, "NKY_Last"), _
+        Array(3, "NKY_ChgPct"), _
+        Array(4, "TOPIX_Code"), _
+        Array(5, "TOPIX_Last"), _
+        Array(6, "TOPIX_ChgPct"), _
+        Array(7, "Bias_bp"), _
+        Array(8, "BiasSlope"), _
+        Array(9, "GapSlope"), _
+        Array(10, "GapBanPct"), _
+        Array(11, "NoTradeMin"), _
+        Array(12, "TP_per_J"), _
+        Array(13, "SL_per_J"), _
+        Array(14, "Trail_per_J"), _
+        Array(15, "CorrSlope"), _
+        Array(16, "BudgetPerTicker"), _
+        Array(17, "LotSize"), _
+        Array(18, "NKY_TrendDay"), _
+        Array(19, "NKY_TrendWindow"), _
+        Array(20, "NKY_AllowedSide"), _
+        Array(21, "TOPIX_TrendDay"), _
+        Array(22, "TOPIX_TrendWindow"), _
+        Array(23, "TOPIX_AllowedSide") _
     )
+
     Dim headerInfo As Variant
     For Each headerInfo In paramHeaders
         ws.Cells(1, headerInfo(0)).Value = headerInfo(1)
-        If UBound(headerInfo) >= 2 Then
-            If Len(headerInfo(2)) > 0 Then
-                SetHeaderComment ws, headerInfo(0), headerInfo(2)
-            End If
-        End If
     Next headerInfo
-    Dim noteItems As Variant
-    noteItems = Array( _
-        Array(12, "TP/J グローバル設定。銘柄行が空欄の場合に利確幅として使用します。"), _
-        Array(13, "SL/J グローバル設定。銘柄行が空欄の場合の損切幅です。"), _
-        Array(14, "Trail/J グローバル設定。トレーリング幅（J値基準）。"), _
-        Array(15, "CorrSlope: 相関係数による J_th 補正係数。"), _
-        Array(16, "BudgetPerTicker: 銘柄ごとの最大投下資金（円）。"), _
-        Array(17, "LotSize: 1 取引あたりの株数。"), _
-        Array(18, "NKY_TrendDay: 日経平均の日足トレンド（上書き用）。"), _
-        Array(19, "NKY_TrendWindow: 日経平均の短期トレンド。"), _
-        Array(20, "NKY_AllowedSide: 日経連動時に許可する方向。"), _
-        Array(21, "TOPIX_TrendDay: TOPIX 日足トレンド。"), _
-        Array(22, "TOPIX_TrendWindow: TOPIX 短期トレンド。"), _
-        Array(23, "TOPIX_AllowedSide: TOPIX 連動時の許可方向。") _
-    )
-    Dim entry As Variant
-    For Each entry In noteItems
-        SetHeaderComment ws, entry(0), entry(1)
-    Next entry
-    On Error GoTo 0
-End Sub
-
-Private Sub SetHeaderComment(ByVal ws As Worksheet, ByVal col As Long, ByVal text As String)
-    On Error Resume Next
-    ws.Cells(1, col).Comment.Delete
-    On Error GoTo 0
-    ws.Cells(1, col).AddComment text
-    ws.Cells(1, col).Comment.Visible = False
 End Sub
