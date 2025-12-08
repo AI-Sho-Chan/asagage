@@ -2732,14 +2732,20 @@ End Sub
 Private Sub EnsureParamFormulas(ByVal ws As Worksheet)
     If ws Is Nothing Then Exit Sub
 
+    ' Build RSS labels without文字化け (use Unicode code points)
+    Dim rssPriceNow As String
+    rssPriceNow = ChrW(&H73FE) & ChrW(&H5728) & ChrW(&H5024)           ' 現在値
+    Dim rssPctChange As String
+    rssPctChange = ChrW(&H524D) & ChrW(&H65E5) & ChrW(&H6BD4) & ChrW(&H7387) ' 前日比率
+
     ' Index codes and RSS formulas (Japanese labels inside formula are fine)
     On Error Resume Next
     ws.Cells(2, 1).Value = "N225"
     ws.Cells(2, 4).Value = "TOPX"
-    ws.Cells(2, 2).Formula = "=IF(A2="""","""",IFERROR(RssIndexMarket(A2,""現在値""),""""))"
-    ws.Cells(2, 3).Formula = "=IF(A2="""","""",IFERROR(RssIndexMarket(A2,""前日比率""),""""))"
-    ws.Cells(2, 5).Formula = "=IF(D2="""","""",IFERROR(RssIndexMarket(D2,""現在値""),""""))"
-    ws.Cells(2, 6).Formula = "=IF(D2="""","""",IFERROR(RssIndexMarket(D2,""前日比率""),""""))"
+    ws.Cells(2, 2).Formula = "=IF(A2="""","""",IFERROR(RssIndexMarket(A2,""" & rssPriceNow & """),""""))"
+    ws.Cells(2, 3).Formula = "=IF(A2="""","""",IFERROR(RssIndexMarket(A2,""" & rssPctChange & """),""""))"
+    ws.Cells(2, 5).Formula = "=IF(D2="""","""",IFERROR(RssIndexMarket(D2,""" & rssPriceNow & """),""""))"
+    ws.Cells(2, 6).Formula = "=IF(D2="""","""",IFERROR(RssIndexMarket(D2,""" & rssPctChange & """),""""))"
     On Error GoTo 0
 
     ' Simple ASCII headers for parameter row (row 1)
