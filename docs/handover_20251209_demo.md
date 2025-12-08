@@ -28,3 +28,7 @@
   - `\ASAGAKE_BoardLogger`（実行: `C:\AI\asagake\scripts\board_logger_task.cmd`）
   - `\Asagake-CheckBoardLogger`（実行: `C:\AI\asagake\scripts\run_check_boardlogger_today.cmd`）
 - 再開が必要な場合は、`scripts/register_boardlogger_task.ps1` をベースに再登録するか、同等の schtasks コマンドで復活させる。
+
+## 7. 日次 Expected PnL シミュレーション
+- タスク: `Asagake-ExpectedPnL` を平日 18:05 実行に変更（コマンド: `scripts/run_expected_pnl_daily2.ps1`）。
+- スクリプトは `analysis/expected_pnl_daily.csv` / `expected_pnl_YYYYMMDD.json` を更新し、`state/smtp.json` があれば `shouichi.ikeda@gmail.com` にメール送信するよう修正。

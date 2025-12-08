@@ -23,4 +23,5 @@
 - [x] Produce expected-P&L comparison (ﾂ･10M equal allocation) via `tools/simulate_expected_pnl.py`.
 - [ ] Add Japanese display columns on NewDashboard (entry status / fill status).
 - [ ] Complete straddle re-entry latch (block same-day re-fire after a loss).
+- [ ] Weekend batch runtime optimisation (minute_cache deep-refresh 整理 + bt_opt30_forward early-stop 実装)
 

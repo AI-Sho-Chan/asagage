@@ -62,3 +62,16 @@
 [2025-12-02T16:34:39] nightly_build_candidates start
 [2025-12-02T16:34:48] nightly_build_candidates exit 1
 [2025-12-02T16:34:48] nightly_build_candidates error_detail C:\AI\asagake\logs\nightly_py_error_20251202_163433.log
+[2025-12-03T16:30:08] nightly_build_candidates start
+[2025-12-03T16:30:09] nightly_build_candidates exit 1
+[2025-12-03T16:30:09] nightly_build_candidates error_detail C:\AI\asagake\logs\nightly_py_error_20251203_163007.log
+[2025-12-04T16:30:04] nightly_build_candidates start
+[2025-12-04T16:30:05] nightly_build_candidates exit 1
+[2025-12-04T16:30:05] nightly_build_candidates error_detail C:\AI\asagake\logs\nightly_py_error_20251204_163003.log
+[2025-12-05T16:30:06] nightly_build_candidates skip weekend_seq (disabled locally)
+[2025-12-05T16:30:06] nightly_build_candidates skip nightly (disabled locally)
+[2025-12-06T16:30:05] nightly_build_candidates skip (holiday)
+[2025-12-07T16:30:05] nightly_build_candidates skip (holiday)
+[2025-12-08T16:30:02] nightly_build_candidates start
+[2025-12-08T16:30:03] nightly_build_candidates exit 1
+[2025-12-08T16:30:03] nightly_build_candidates error_detail C:\AI\asagake\logs\nightly_py_error_20251208_163001.log
