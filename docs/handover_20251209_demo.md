@@ -43,3 +43,12 @@
 - AllowedSide/ALIGNED_ONLY を常時適用し、逆方向エントリーを防止したうえで、249件のトレードで +5.22M 円 / +7.52bp の結果。
 - Live/Demo 別サマリはまだ強弱判定（LIVE_STRONG/LIVE_BASE）を candidates_nextday に出せていないため、全件 LIVE_BASE に分類されている。強弱判定を candidates に書き出すと配分/評価がさらに精緻になる。
 - GapBan/NoTradeMin が candidates にないため、逆行が長引くプランの抑止が未反映。列を持たせてリプレイに組み込むと、損失プランの棚卸しが可能。
+
+## 10. 追加の改善（2025-12-09）
+- `aggregate_candidates_today.py` を拡張し、candidates_nextday に `live_demo_class`, `NKY_AllowedSide`, `TOPIX_AllowedSide`, `GapBanPct`, `NoTradeMin` を補完（無い場合はデフォルト: AllowedSide=BOTH, GapBan/NoTrade=0）。
+- `simulate_daily_replay.py` で GapBan/NoTradeMin 付きの candidates を再リプレイ（20251208）:
+  - trades: 366, pnl_yen: +7,459,777円, pnl_bp_mean: +7.24bp
+  - LIVE_STRONG: 133件, +11,523,916円 (+43.32bp 平均)
+  - LIVE_BASE: 128件, -5,016,252円 (-39.19bp 平均)
+  - DEMO_ONLY: 105件, +952,113円 (+18.14bp 平均)
+- 強弱判定が candidates_nextday に書き出されたため、Live/Demo別の評価が可能になった。GapBan/NoTradeMin もCSVに持たせたので、今後はこれらの閾値調整で損失側のプランを絞り込む検証がしやすい。

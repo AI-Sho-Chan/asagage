@@ -139,6 +139,16 @@ def aggregate_frames(frames: Iterable[pd.DataFrame], thresholds: Thresholds) -> 
     else:
         df["TOPIX_AllowedSide"] = df[cols["topix_allowedside"]].fillna("BOTH")
 
+    # GapBan / NoTradeMin が無ければ 0 で補完
+    if "gapbanpc" not in cols:
+        df["GapBanPct"] = 0.0
+    else:
+        df["GapBanPct"] = _num(df, cols["gapbanpc"])
+    if "notrademin" not in cols:
+        df["NoTradeMin"] = 0.0
+    else:
+        df["NoTradeMin"] = _num(df, cols["notrademin"])
+
     # 以前は「1銘柄につきスコア最大の 1 プランだけ」を残していたが、
     # 強いコンボが複数ある銘柄もすべて採用したいので、
     # ここではスコアでソートするだけに留めて drop_duplicates は行わない。
