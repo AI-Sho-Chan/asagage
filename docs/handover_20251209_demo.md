@@ -32,3 +32,8 @@
 ## 7. 日次 Expected PnL シミュレーション
 - タスク: `Asagake-ExpectedPnL` を平日 18:05 実行に変更（コマンド: `scripts/run_expected_pnl_daily2.ps1`）。
 - スクリプトは `analysis/expected_pnl_daily.csv` / `expected_pnl_YYYYMMDD.json` を更新し、`state/smtp.json` があれば `shouichi.ikeda@gmail.com` にメール送信するよう修正。
+
+## 8. DailyReplay 一本化に向けた改修
+- `tools/aggregate_candidates_today.py`: candidates_nextday に `BudgetFactor_row`, `live_demo_class` を付与。`NKY_AllowedSide` / `TOPIX_AllowedSide` が無ければ BOTH で補完。
+- `tools/simulate_daily_replay.py`: BudgetFactor をロットに反映、AllowedSide と trend_allowed_policy を簡易適用（ALIGNED_ONLY なら AllowedSide 不一致を除外）、Live/Demo クラス別サマリを出力。サマリを `analysis/daily_replay_<date>.json` に書き出し。
+- `scripts/run_daily_replay.ps1`: 実行後、サマリ JSON があれば smtp.json を使って `shouichi.ikeda@gmail.com` へメール通知。

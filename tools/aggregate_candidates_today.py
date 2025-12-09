@@ -114,14 +114,26 @@ def aggregate_frames(frames: Iterable[pd.DataFrame], thresholds: Thresholds) -> 
         pf_clip = pf.clip(lower=1.0, upper=5.0)
         live_strong = (trades >= 30) & (win >= 0.7) & (pf_clip >= 1.8)
         live_base = (trades >= 15) & (win >= 0.6) & (pf_clip >= 1.3) & ~live_strong
-        budget_factor = np.where(
+        df["BudgetFactor_row"] = np.where(
             live_strong,
             2.0,
             np.where(live_base, 1.0, 0.5),
         )
-        df["BudgetFactor_row"] = budget_factor
+        df["live_demo_class"] = np.where(
+            live_strong,
+            "LIVE_STRONG",
+            np.where(live_base, "LIVE_BASE", "DEMO_ONLY"),
+        )
     else:
         df["BudgetFactor_row"] = 1.0
+        df["live_demo_class"] = "LIVE_BASE"
+
+    # AllowedSide (NKY/TOPIX) が無い場合は BOTH をデフォルトにする
+    cols = _column_lookup(df)
+    if "nky_allowedside" not in cols:
+        df["NKY_AllowedSide"] = "BOTH"
+    if "topix_allowedside" not in cols:
+        df["TOPIX_AllowedSide"] = "BOTH"
 
     # 以前は「1銘柄につきスコア最大の 1 プランだけ」を残していたが、
     # 強いコンボが複数ある銘柄もすべて採用したいので、
