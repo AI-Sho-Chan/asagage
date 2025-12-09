@@ -132,8 +132,12 @@ def aggregate_frames(frames: Iterable[pd.DataFrame], thresholds: Thresholds) -> 
     cols = _column_lookup(df)
     if "nky_allowedside" not in cols:
         df["NKY_AllowedSide"] = "BOTH"
+    else:
+        df["NKY_AllowedSide"] = df[cols["nky_allowedside"]].fillna("BOTH")
     if "topix_allowedside" not in cols:
         df["TOPIX_AllowedSide"] = "BOTH"
+    else:
+        df["TOPIX_AllowedSide"] = df[cols["topix_allowedside"]].fillna("BOTH")
 
     # 以前は「1銘柄につきスコア最大の 1 プランだけ」を残していたが、
     # 強いコンボが複数ある銘柄もすべて採用したいので、

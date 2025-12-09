@@ -38,3 +38,8 @@
 - `tools/simulate_daily_replay.py`: BudgetFactor をロットに反映、AllowedSide と trend_allowed_policy を簡易適用（ALIGNED_ONLY なら AllowedSide 不一致を除外）、Live/Demo クラス別サマリを出力。サマリを `analysis/daily_replay_<date>.json` に書き出し。
 - `scripts/run_daily_replay.ps1`: 実行後、サマリ JSON があれば smtp.json を使って `shouichi.ikeda@gmail.com` へメール通知。
   - 20251208 をリプレイした結果（基準1,000万円×BudgetFactor）: トレード 249 件、合計 PnL 約 +5,221,531 円、平均 +7.52 bp（LIVE_BASE のみ）。
+
+## 9. ラーニングメモ（2025-12-08 リプレイ）
+- AllowedSide/ALIGNED_ONLY を常時適用し、逆方向エントリーを防止したうえで、249件のトレードで +5.22M 円 / +7.52bp の結果。
+- Live/Demo 別サマリはまだ強弱判定（LIVE_STRONG/LIVE_BASE）を candidates_nextday に出せていないため、全件 LIVE_BASE に分類されている。強弱判定を candidates に書き出すと配分/評価がさらに精緻になる。
+- GapBan/NoTradeMin が candidates にないため、逆行が長引くプランの抑止が未反映。列を持たせてリプレイに組み込むと、損失プランの棚卸しが可能。

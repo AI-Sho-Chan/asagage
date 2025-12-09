@@ -193,14 +193,9 @@ def simulate_trade_for_candidate(
             return True
         return False
 
-    # trend_policy が ALIGNED_ONLY の場合は AllowedSide を必須とみなし、不一致ならスキップ
-    if trend_policy.strip().upper() == "ALIGNED_ONLY":
-        if not (_allow(allowed_side_nky, side) and _allow(allowed_side_topix, side)):
-            return None
-    else:
-        # trend_policy が空でも、AllowedSide が BUY/SELL に絞られていれば適用
-        if not (_allow(allowed_side_nky, side) and _allow(allowed_side_topix, side)):
-            return None
+    # 方針B: policyが空でも ALIGNED_ONLY 相当で常に方向チェックを入れる
+    if not (_allow(allowed_side_nky, side) and _allow(allowed_side_topix, side)):
+        return None
     px = float(entry_row["close"])
     atr_val = float(entry_row["atr"])
     if not (np.isfinite(atr_val) and atr_val > 0):
