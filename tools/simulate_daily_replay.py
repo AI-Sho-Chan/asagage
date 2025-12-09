@@ -82,10 +82,17 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     out["SLk"] = num_col("SLk", 2.0)
     out["J_th"] = num_col("J_th", 0.8)
     out["BudgetFactor_row"] = num_col("BudgetFactor_row", 1.0).clip(lower=0.0)
-    out["live_demo_class"] = df.get(cols.get("live_demo_class", ""), "LIVE_BASE").fillna("LIVE_BASE")
-    out["NKY_AllowedSide"] = df.get(cols.get("nky_allowedside", ""), "BOTH").fillna("BOTH")
-    out["TOPIX_AllowedSide"] = df.get(cols.get("topix_allowedside", ""), "BOTH").fillna("BOTH")
-    out["trend_allowed_policy"] = df.get(cols.get("trend_allowed_policy", ""), "").fillna("")
+    # helper to get text column with default
+    def text_col(name: str, default: str) -> pd.Series:
+        col = cols.get(name.lower())
+        if col and col in df.columns:
+            return df[col].fillna(default)
+        return pd.Series(default, index=df.index)
+
+    out["live_demo_class"] = text_col("live_demo_class", "LIVE_BASE")
+    out["NKY_AllowedSide"] = text_col("nky_allowedside", "BOTH")
+    out["TOPIX_AllowedSide"] = text_col("topix_allowedside", "BOTH")
+    out["trend_allowed_policy"] = text_col("trend_allowed_policy", "")
 
     return out
 

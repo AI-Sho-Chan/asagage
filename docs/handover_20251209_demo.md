@@ -37,3 +37,4 @@
 - `tools/aggregate_candidates_today.py`: candidates_nextday に `BudgetFactor_row`, `live_demo_class` を付与。`NKY_AllowedSide` / `TOPIX_AllowedSide` が無ければ BOTH で補完。
 - `tools/simulate_daily_replay.py`: BudgetFactor をロットに反映、AllowedSide と trend_allowed_policy を簡易適用（ALIGNED_ONLY なら AllowedSide 不一致を除外）、Live/Demo クラス別サマリを出力。サマリを `analysis/daily_replay_<date>.json` に書き出し。
 - `scripts/run_daily_replay.ps1`: 実行後、サマリ JSON があれば smtp.json を使って `shouichi.ikeda@gmail.com` へメール通知。
+  - 20251208 をリプレイした結果（基準1,000万円×BudgetFactor）: トレード 249 件、合計 PnL 約 +5,221,531 円、平均 +7.52 bp（LIVE_BASE のみ）。
