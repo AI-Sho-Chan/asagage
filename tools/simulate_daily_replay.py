@@ -42,6 +42,9 @@ SESSION_WINDOWS: Dict[str, Tuple[dt.time, dt.time]] = {
     "PM1": (dt.time(12, 30), dt.time(13, 30)),
 }
 
+INTRADAY_CACHE: Dict[Tuple[str, str], pd.DataFrame] = {}
+PREV_CLOSE_CACHE: Dict[Tuple[str, str], float | None] = {}
+
 
 def _session_window(label: str) -> Tuple[dt.time, dt.time]:
     return SESSION_WINDOWS.get(label, (dt.time(9, 0), dt.time(15, 0)))
@@ -82,6 +85,9 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     out["SLk"] = num_col("SLk", 2.0)
     out["J_th"] = num_col("J_th", 0.8)
     out["BudgetFactor_row"] = num_col("BudgetFactor_row", 1.0).clip(lower=0.0)
+    out["GapBanPct"] = num_col("GapBanPct", 3.0).clip(lower=0.0)
+    out["NoTradeMin"] = num_col("NoTradeMin", 5.0).clip(lower=0.0)
+    out["trend_bp_th"] = num_col("trend_bp_th", 15.0).clip(lower=0.0)
     # helper to get text column with default
     def text_col(name: str, default: str) -> pd.Series:
         col = cols.get(name.lower())
@@ -93,14 +99,23 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     out["NKY_AllowedSide"] = text_col("nky_allowedside", "BOTH")
     out["TOPIX_AllowedSide"] = text_col("topix_allowedside", "BOTH")
     out["trend_allowed_policy"] = text_col("trend_allowed_policy", "")
+    out["trend_driver"] = text_col("trend_driver", "NKY")
+    out["trend_window"] = text_col("trend_window", "window")
 
     return out
 
 
 def load_intraday(code: str, day: dt.date) -> pd.DataFrame:
+    key = (code, day.isoformat())
+    cached = INTRADAY_CACHE.get(key)
+    if cached is not None:
+        return cached
+
     path = DATA_ROOT / code / f"{day:%Y-%m-%d}.parquet"
     if not path.exists():
-        return pd.DataFrame()
+        INTRADAY_CACHE[key] = pd.DataFrame()
+        return INTRADAY_CACHE[key]
+
     df = pd.read_parquet(path)
     df = df.sort_index()
     if isinstance(df.columns, pd.MultiIndex):
@@ -109,7 +124,10 @@ def load_intraday(code: str, day: dt.date) -> pd.DataFrame:
         df.columns = [str(c).lower() for c in df.columns]
     needed = {"open", "high", "low", "close", "volume"}
     if not needed.issubset(set(df.columns)):
-        return pd.DataFrame()
+        INTRADAY_CACHE[key] = pd.DataFrame()
+        return INTRADAY_CACHE[key]
+
+    INTRADAY_CACHE[key] = df
     return df
 
 
@@ -136,6 +154,99 @@ def compute_features(df: pd.DataFrame, atr_n: float) -> pd.DataFrame:
     return df
 
 
+def _prev_trading_close(code: str, day: dt.date) -> float | None:
+    key = (code, day.isoformat())
+    if key in PREV_CLOSE_CACHE:
+        return PREV_CLOSE_CACHE[key]
+
+    root = DATA_ROOT / code
+    if not root.exists():
+        PREV_CLOSE_CACHE[key] = None
+        return None
+
+    prev_path: Path | None = None
+    for path in sorted(root.glob("????-??-??.parquet"), reverse=True):
+        try:
+            d = dt.datetime.strptime(path.stem, "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        if d < day:
+            prev_path = path
+            break
+
+    if prev_path is None:
+        PREV_CLOSE_CACHE[key] = None
+        return None
+
+    try:
+        prev = pd.read_parquet(prev_path)
+        if isinstance(prev.columns, pd.MultiIndex):
+            prev.columns = [str(c[0]).lower() for c in prev.columns]
+        else:
+            prev.columns = [str(c).lower() for c in prev.columns]
+        if prev.empty or "close" not in prev.columns:
+            PREV_CLOSE_CACHE[key] = None
+            return None
+        close = float(prev["close"].iloc[-1])
+        PREV_CLOSE_CACHE[key] = close if np.isfinite(close) and close > 0 else None
+        return PREV_CLOSE_CACHE[key]
+    except Exception:
+        PREV_CLOSE_CACHE[key] = None
+        return None
+
+
+def _trend_proxy_code(driver: str) -> str | None:
+    d = (driver or "").strip().upper()
+    if d in {"NKY", "N225", "NIKKEI"}:
+        return "1570.T"
+    if d in {"TOPIX", "TOPX"}:
+        return "1306.T"
+    return None
+
+
+def _trend_direction(
+    driver: str,
+    window_mode: str,
+    window_minutes: int,
+    bp_threshold: float,
+    day: dt.date,
+    asof: pd.Timestamp,
+) -> str:
+    proxy = _trend_proxy_code(driver)
+    if proxy is None:
+        return "BOTH"
+
+    df = load_intraday(proxy, day)
+    if df.empty:
+        return "BOTH"
+
+    close = df["close"]
+    if close.empty:
+        return "BOTH"
+
+    sliced = close.loc[:asof]
+    if sliced.empty:
+        return "BOTH"
+    close_asof = float(sliced.iloc[-1])
+    if not (np.isfinite(close_asof) and close_asof > 0):
+        return "BOTH"
+
+    if (window_mode or "").strip().lower() == "day":
+        base_close = float(close.iloc[0])
+    else:
+        start = asof - pd.Timedelta(minutes=window_minutes)
+        w = close.loc[start:asof]
+        base_close = float(w.iloc[0]) if not w.empty else float(close.iloc[0])
+
+    if not (np.isfinite(base_close) and base_close > 0):
+        return "BOTH"
+
+    bp = (close_asof - base_close) / base_close * 10000.0
+    if abs(bp) < float(bp_threshold):
+        return "BOTH"
+    return "BUY" if bp > 0 else "SELL"
+
+
 def simulate_trade_for_candidate(
     code: str,
     session: str,
@@ -150,19 +261,29 @@ def simulate_trade_for_candidate(
     allowed_side_nky: str,
     allowed_side_topix: str,
     trend_policy: str,
+    trend_driver: str,
+    trend_window: str,
+    trend_bp_th: float,
+    gapban_pct: float,
+    no_trade_min: float,
+    counters: Dict[str, int],
 ) -> Dict[str, object] | None:
     intraday = load_intraday(code, day)
     if intraday.empty:
+        counters["missing_intraday"] = counters.get("missing_intraday", 0) + 1
         return None
     intraday = compute_features(intraday, atr_n)
     start_t, end_t = _session_window(session)
     times = intraday.index.time
-    mask_window = (times >= start_t) & (times <= end_t)
+    min_entry_t = (dt.datetime.combine(day, start_t) + dt.timedelta(minutes=float(no_trade_min))).time()
+    mask_window = (times >= min_entry_t) & (times <= end_t)
     if not mask_window.any():
+        counters["no_session_rows"] = counters.get("no_session_rows", 0) + 1
         return None
 
     df = intraday.loc[mask_window].copy()
     if df.empty:
+        counters["no_session_rows"] = counters.get("no_session_rows", 0) + 1
         return None
 
     J = (df["close"] - df["vwap"]) / df["atr"]
@@ -176,11 +297,20 @@ def simulate_trade_for_candidate(
     # first signal only
     sig_idx = sig[sig].index
     if len(sig_idx) == 0:
+        counters["no_signal"] = counters.get("no_signal", 0) + 1
         return None
 
     entry_ts = sig_idx[0]
     entry_row = intraday.loc[entry_ts]
     side = "BUY" if float(J.loc[entry_ts]) < 0 else "SELL"
+
+    prev_close = _prev_trading_close(code, day)
+    if prev_close is not None and prev_close > 0:
+        day_open = float(intraday["open"].iloc[0])
+        gap_bp = (day_open - prev_close) / prev_close * 10000.0
+        if abs(gap_bp) > float(gapban_pct) * 100.0:
+            counters["skip_gapban"] = counters.get("skip_gapban", 0) + 1
+            return None
 
     # AllowedSide フィルタ: BUY しか許容しない/SELLしか許容しない場合は弾く
     def _allow(side_val: str, side_signal: str) -> bool:
@@ -193,12 +323,29 @@ def simulate_trade_for_candidate(
             return True
         return False
 
-    # 方針B: policyが空でも ALIGNED_ONLY 相当で常に方向チェックを入れる
+    # Policy B: treat empty policy as ALIGNED_ONLY (=always apply direction checks).
     if not (_allow(allowed_side_nky, side) and _allow(allowed_side_topix, side)):
+        counters["skip_allowed_side"] = counters.get("skip_allowed_side", 0) + 1
         return None
+
+    policy = (trend_policy or "").strip().upper() or "ALIGNED_ONLY"
+    if policy == "ALIGNED_ONLY":
+        trend_side = _trend_direction(
+            trend_driver,
+            trend_window,
+            window_minutes=15,
+            bp_threshold=float(trend_bp_th),
+            day=day,
+            asof=entry_ts,
+        )
+        if trend_side in {"BUY", "SELL"} and trend_side != side:
+            counters["skip_trend_mismatch"] = counters.get("skip_trend_mismatch", 0) + 1
+            return None
+
     px = float(entry_row["close"])
     atr_val = float(entry_row["atr"])
     if not (np.isfinite(atr_val) and atr_val > 0):
+        counters["bad_atr"] = counters.get("bad_atr", 0) + 1
         return None
 
     if side == "BUY":
@@ -270,6 +417,7 @@ def simulate_day(cand_path: Path, day: dt.date, nominal: float) -> Tuple[pd.Data
     df_raw = load_candidates(cand_path)
     df = normalize_columns(df_raw)
     trades: List[Dict[str, object]] = []
+    counters: Dict[str, int] = {}
 
     for _, row in df.iterrows():
         code = str(row["code"])
@@ -293,6 +441,12 @@ def simulate_day(cand_path: Path, day: dt.date, nominal: float) -> Tuple[pd.Data
             str(row.get("NKY_AllowedSide") or "BOTH"),
             str(row.get("TOPIX_AllowedSide") or "BOTH"),
             str(row.get("trend_allowed_policy") or ""),
+            str(row.get("trend_driver") or "NKY"),
+            str(row.get("trend_window") or "window"),
+            float(row.get("trend_bp_th") or 15.0),
+            float(row.get("GapBanPct") or 3.0),
+            float(row.get("NoTradeMin") or 5.0),
+            counters,
         )
         if sim:
             sim["live_demo_class"] = str(row.get("live_demo_class") or "LIVE_BASE")
@@ -310,6 +464,7 @@ def simulate_day(cand_path: Path, day: dt.date, nominal: float) -> Tuple[pd.Data
         "pnl_yen": pnl_yen,
         "pnl_bp_mean": pnl_bp_mean,
     }
+    summary.update({f"diag_{k}": int(v) for k, v in counters.items()})
     # Live/Demo 別集計
     if "live_demo_class" in tdf.columns:
         for cls in ("LIVE_STRONG", "LIVE_BASE", "DEMO_ONLY"):
@@ -383,7 +538,14 @@ def main() -> None:
     summary_csv = OUT_DIR / "daily_realized_pnl.csv"
     row = pd.DataFrame([summary])
     if summary_csv.exists():
-        row.to_csv(summary_csv, mode="a", header=False, index=False, encoding="utf-8-sig")
+        try:
+            prev = pd.read_csv(summary_csv)
+            if "date" in prev.columns:
+                prev = prev[prev["date"].astype(str) != summary["date"]]
+            combined = pd.concat([prev, row], ignore_index=True)
+            combined.to_csv(summary_csv, index=False, encoding="utf-8-sig")
+        except Exception:
+            row.to_csv(summary_csv, mode="a", header=False, index=False, encoding="utf-8-sig")
     else:
         row.to_csv(summary_csv, index=False, encoding="utf-8-sig")
     print(f"summary appended to {summary_csv}")
