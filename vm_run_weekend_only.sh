@@ -51,16 +51,19 @@ LOG_FILE="$LOG_DIR/weekend_${STAMP}.log"
     --enable-market-features --headless --coeff-history-days 5 \
     --target-date "$TARGET_DATE"
 
-  # Optional weekday-style sanity run on the same universe (smaller size)
-  python scripts/nightly_build_candidates.py \
-    --jobs 12 --universe-mode yahoo-top --universe-size 150 \
-    --universe-source "$UNIVERSE_FILE" \
-    --run-type weekday --plan-profile weekday \
-    --enable-asha --enable-bayes --bayes-trials 32 --bayes-timeout 300 \
-    --mask-ineffective --enable-market-features \
-    --disable-minute-cache \
-    --min-forward-winrate 0.60 --headless --coeff-history-days 5 \
-    --target-date "$TARGET_DATE"
+  # Optional weekday-style sanity run on the same universe (smaller size).
+  # Disabled by default on the weekend VM because it can create very large opt30 caches.
+  if [ "${RUN_WEEKDAY_SANITY:-0}" = "1" ]; then
+    python scripts/nightly_build_candidates.py \
+      --jobs 12 --universe-mode yahoo-top --universe-size 150 \
+      --universe-source "$UNIVERSE_FILE" \
+      --run-type weekday --plan-profile weekday \
+      --enable-asha --enable-bayes --bayes-trials 32 --bayes-timeout 300 \
+      --mask-ineffective --enable-market-features \
+      --disable-minute-cache \
+      --min-forward-winrate 0.60 --headless --coeff-history-days 5 \
+      --target-date "$TARGET_DATE"
+  fi
 
   python scripts/run_trade_analysis.py || true
 
