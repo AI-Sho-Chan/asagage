@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 set -euo pipefail
 
 LOG_DIR="$HOME/cloud_logs"
@@ -70,5 +70,4 @@ LOG_FILE="$LOG_DIR/weekend_${STAMP}.log"
 
   gsutil -m rsync -r "$HOME/asagage/output" "gs://asagage-weekend-output/output"
 } >> "$LOG_FILE" 2>&1
-
 
