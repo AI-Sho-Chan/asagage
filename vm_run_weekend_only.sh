@@ -10,7 +10,7 @@ LOG_FILE="$LOG_DIR/weekend_${STAMP}.log"
   cd "$HOME/asagage"
   # Activate Python virtualenv for weekend batch
   source "$HOME/asagake-venv/bin/activate"
-  TARGET_DATE=$(date +%Y%m%d)
+  TARGET_DATE="${1:-$(date +%Y%m%d)}"
 
   # Non-essential opt30 cache can grow very large; clear it once per weekend run
   if [ -d "cache/opt30" ]; then
@@ -62,7 +62,7 @@ LOG_FILE="$LOG_DIR/weekend_${STAMP}.log"
 
   python scripts/run_trade_analysis.py || true
 
-  # Weekly WF summary report (candidates × trades × expected PnL) and email
+  # Weekly WF summary report (candidates x trades x expected PnL) and email
   python analysis/build_weekly_wf_report.py \
     --week-ending "$TARGET_DATE" \
     --email \
@@ -70,4 +70,3 @@ LOG_FILE="$LOG_DIR/weekend_${STAMP}.log"
 
   gsutil -m rsync -r "$HOME/asagage/output" "gs://asagage-weekend-output/output"
 } >> "$LOG_FILE" 2>&1
-
