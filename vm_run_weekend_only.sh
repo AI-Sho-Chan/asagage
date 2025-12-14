@@ -6,6 +6,18 @@ mkdir -p "$LOG_DIR"
 STAMP=$(date +%Y%m%d_%H%M%S)
 LOG_FILE="$LOG_DIR/weekend_${STAMP}.log"
 
+# Auto-stop the VM after the batch finishes (success or failure) to minimize cost.
+# Set AUTO_SHUTDOWN=0 to keep the VM running for manual debugging.
+AUTO_SHUTDOWN="${AUTO_SHUTDOWN:-1}"
+cleanup_and_shutdown() {
+  local exit_code=$?
+  if [ "$AUTO_SHUTDOWN" = "1" ]; then
+    echo "[vm_run_weekend_only] exiting (code=${exit_code}); shutting down VM..." >&2
+    sudo -n shutdown -h now || true
+  fi
+}
+trap cleanup_and_shutdown EXIT
+
 {
   cd "$HOME/asagage"
   # Activate Python virtualenv for weekend batch
