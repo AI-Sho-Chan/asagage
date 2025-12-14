@@ -1412,6 +1412,8 @@ def _main_impl() -> None:
             "--run-type",
             run_type,
         ]
+        if is_weekend:
+            coarse_cmd.append("--no-cache")
         if args.enable_asha:
             coarse_cmd.append("--enable-asha")
         if args.mask_ineffective:
@@ -1535,6 +1537,8 @@ def _main_impl() -> None:
             "--run-type",
             run_type,
         ]
+        if is_weekend:
+            refine_cmd.append("--no-cache")
         if args.enable_bayes:
             refine_cmd.append("--enable-bayes")
             refine_cmd.extend(["--bayes-trials", str(args.bayes_trials)])
