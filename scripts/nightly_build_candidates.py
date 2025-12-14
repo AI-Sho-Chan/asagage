@@ -1553,8 +1553,14 @@ def _main_impl() -> None:
         run(refine_cmd, cwd=repo_root, env=bt_env)
 
         candidates_found = 0
-        candidate_path = next(cand_dir.glob(f"candidates_{date_tag}.csv"), None)
-        if candidate_path and candidate_path.exists():
+        candidate_path = cand_dir / f"candidates_{date_tag}.csv"
+        if not candidate_path.exists():
+            # Backfill runs: bt_opt30_forward may emit candidates_{today}.csv when re-running older target dates.
+            # Fall back to the newest candidates_*.csv in the plan directory.
+            candidates = sorted(cand_dir.glob("candidates_*.csv"), key=lambda p: p.stat().st_mtime)
+            if candidates:
+                candidate_path = candidates[-1]
+        if candidate_path.exists():
             try:
                 df = pd.read_csv(candidate_path)
                 candidates_found = len(df.index)
