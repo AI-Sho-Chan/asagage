@@ -13,9 +13,11 @@ LOG_FILE="$LOG_DIR/weekend_${STAMP}.log"
   TARGET_DATE="${1:-$(date +%Y%m%d)}"
 
   # Non-essential opt30 cache can grow very large; clear it once per weekend run
+  # (remove directory itself to avoid slow per-file deletes).
   if [ -d "cache/opt30" ]; then
-    rm -rf cache/opt30/*
+    rm -rf cache/opt30
   fi
+  mkdir -p cache/opt30
 
   # Build weekly Top300 universe (close * weekly volume)
   python tools/build_master_topvol_universe.py --topn 300 --lookback 5 --tag "$TARGET_DATE"
