@@ -1,6 +1,15 @@
 #!/bin/bash
 set -euo pipefail
 
+LOCK_FILE="/tmp/asagake_weekend_batch.lock"
+exec 9>"$LOCK_FILE"
+if command -v flock >/dev/null 2>&1; then
+  if ! flock -n 9; then
+    echo "[vm_run_weekend_only] another weekend batch is already running; exiting." >&2
+    exit 0
+  fi
+fi
+
 LOG_DIR="$HOME/cloud_logs"
 mkdir -p "$LOG_DIR"
 STAMP=$(date +%Y%m%d_%H%M%S)
