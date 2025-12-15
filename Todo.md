@@ -13,6 +13,7 @@
 
 ## Backlog
 - [ ] `analysis/daily_trades_*.csv` を横断集計するスクリプトを追加し、セッション別・銘柄別の実現PnLレーティングを作成する（DailyReplay のフィードバック用）。
+- [ ] 時間帯分割（M0〜M3）比較検証の集計出力を追加（前提ルール: 1銘柄1ポジション、クールダウン5分、1日最大2回）。設計: `analysis/method_comparison_schema.md`
 - [ ] Re-optimise gap bands vs J adders (PF / win rate / sample count / MaxDD by bucket).
 - [ ] Finalise dynamic TP/SL coefficients (current seed TP:+0.15, SL:+0.10) then wire into VBA.
 - [ ] Register and test the weekday 16:30 fast-nightly task (`scripts/register_fast_nightly_task.ps1`).
@@ -24,4 +25,3 @@
 - [ ] Add Japanese display columns on NewDashboard (entry status / fill status).
 - [ ] Complete straddle re-entry latch (block same-day re-fire after a loss).
 - [ ] Weekend batch runtime optimisation (minute_cache deep-refresh 整理 + bt_opt30_forward early-stop 実装)
-
