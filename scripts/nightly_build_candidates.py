@@ -83,6 +83,7 @@ def aggregate_candidates(
     min_vwap_revert: float = 0.0,
     corr_map: Dict[str, Dict[str, float]] | None = None,
     vwap_stats: Dict[str, Dict[str, float]] | None = None,
+    run_type: str = "weekday",
 ) -> Dict[str, str]:
     """Combine plan outputs, enforce quality filters, and keep all qualifying combos per ticker.
 
@@ -1622,6 +1623,7 @@ def _main_impl() -> None:
         min_vwap_revert=float(getattr(args, "min_vwap_revert", 0.0)),
         corr_map=corr_map,
         vwap_stats=vwap_stats,
+        run_type=run_type,
     )
     summary.update(
         {
