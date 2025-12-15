@@ -43,12 +43,21 @@ class AggregateSummary:
         }
 
 
-def collect_candidate_paths() -> List[Path]:
-    """Return candidate CSV paths sorted oldest→newest so later files win."""
-    patterns = [
-        ROOT / "NIGHTLY_*" / "*" / "candidates_*.csv",
-        ROOT / "candidates_*.csv",
-    ]
+def collect_candidate_paths(date_tag: Optional[str] = None) -> List[Path]:
+    """Return candidate CSV paths sorted oldest→newest so later files win.
+
+    When date_tag is provided (YYYYMMDD), only reads `output/excel/NIGHTLY_YYYYMMDD/*/candidates_*.csv`.
+    """
+    patterns: List[Path] = []
+    if date_tag:
+        patterns.append(ROOT / f"NIGHTLY_{date_tag}" / "*" / "candidates_*.csv")
+    else:
+        patterns.extend(
+            [
+                ROOT / "NIGHTLY_*" / "*" / "candidates_*.csv",
+                ROOT / "candidates_*.csv",
+            ]
+        )
 
     paths: List[Path] = []
     for pat in patterns:
@@ -205,6 +214,12 @@ def parse_args() -> argparse.Namespace:
         description="Aggregate candidates into candidates_nextday.csv with quality filters."
     )
     ap.add_argument("--output", type=Path, default=ROOT / "candidates_nextday.csv")
+    ap.add_argument(
+        "--date-tag",
+        type=str,
+        default="",
+        help="Optional YYYYMMDD to aggregate only that NIGHTLY folder (e.g. 20251212).",
+    )
     ap.add_argument("--min-j", type=float, default=0.8)
     ap.add_argument("--min-win-ci", type=float, default=0.70)
     ap.add_argument("--min-pf", type=float, default=1.30)
@@ -230,7 +245,8 @@ def main() -> None:
     )
 
     frames: List[pd.DataFrame] = []
-    for path in collect_candidate_paths():
+    date_tag = args.date_tag.strip()
+    for path in collect_candidate_paths(date_tag or None):
         try:
             frames.append(pd.read_csv(path))
         except Exception:
@@ -260,4 +276,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
