@@ -33,6 +33,13 @@ trap cleanup_and_shutdown EXIT
   source "$HOME/asagake-venv/bin/activate"
   TARGET_DATE="${1:-$(date +%Y%m%d)}"
 
+  # Ensure Parquet support exists so 1-minute bars can be saved locally.
+  # Without this, the batch tends to re-download data for each plan (slow).
+  if ! python -c "import pyarrow" >/dev/null 2>&1; then
+    echo "[vm_run_weekend_only] pyarrow not found; installing (one-time)..." >&2
+    python -m pip install -q pyarrow || echo "[vm_run_weekend_only] pyarrow install failed; minute cache may not persist" >&2
+  fi
+
   # Non-essential opt30 cache can grow very large; clear it once per weekend run
   # (remove directory itself to avoid slow per-file deletes).
   if [ -d "cache/opt30" ]; then
