@@ -21,7 +21,7 @@ $args = @(
 
 & $python $args
 
-# メール通知（smtp.json があれば送信）
+# メール送信（state/smtp.json がある場合のみ）
 try {
   $summaryPath = Join-Path $repo ("analysis/daily_replay_{0}.json" -f $DateTag)
   $smtpPath = Join-Path $repo "state/smtp.json"

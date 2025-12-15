@@ -29,6 +29,14 @@ OUT_DIR = Path("analysis")
 
 COST_BP = 8.0
 
+# Replay constraints (comparison baseline)
+# - One position per ticker at a time
+# - Re-entry allowed only after exit + cooldown
+# - Cooldown: 5 minutes
+# - Max trades per ticker per day: 2
+COOLDOWN_MINUTES = 5
+MAX_TRADES_PER_TICKER = 2
+
 
 SESSION_WINDOWS: Dict[str, Tuple[dt.time, dt.time]] = {
     "AM15": (dt.time(9, 0), dt.time(9, 15)),
@@ -88,6 +96,7 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     out["GapBanPct"] = num_col("GapBanPct", 3.0).clip(lower=0.0)
     out["NoTradeMin"] = num_col("NoTradeMin", 5.0).clip(lower=0.0)
     out["trend_bp_th"] = num_col("trend_bp_th", 15.0).clip(lower=0.0)
+    out["forward_exp_boot_mean"] = num_col("forward_exp_boot_mean", 0.0)
     # helper to get text column with default
     def text_col(name: str, default: str) -> pd.Series:
         col = cols.get(name.lower())
@@ -312,7 +321,7 @@ def simulate_trade_for_candidate(
             counters["skip_gapban"] = counters.get("skip_gapban", 0) + 1
             return None
 
-    # AllowedSide フィルタ: BUY しか許容しない/SELLしか許容しない場合は弾く
+    # AllowedSide filter: allow only BUY/SELL direction if specified (default BOTH).
     def _allow(side_val: str, side_signal: str) -> bool:
         s = (side_val or "").strip().upper()
         if s in ("", "BOTH"):
@@ -416,7 +425,7 @@ def simulate_trade_for_candidate(
 def simulate_day(cand_path: Path, day: dt.date, nominal: float) -> Tuple[pd.DataFrame, Dict[str, float]]:
     df_raw = load_candidates(cand_path)
     df = normalize_columns(df_raw)
-    trades: List[Dict[str, object]] = []
+    candidate_trades: List[Dict[str, object]] = []
     counters: Dict[str, int] = {}
 
     for _, row in df.iterrows():
@@ -450,12 +459,72 @@ def simulate_day(cand_path: Path, day: dt.date, nominal: float) -> Tuple[pd.Data
         )
         if sim:
             sim["live_demo_class"] = str(row.get("live_demo_class") or "LIVE_BASE")
-            trades.append(sim)
+            sim["budget_factor"] = float(row.get("BudgetFactor_row", 1.0) or 1.0)
+            sim["forward_exp_boot_mean"] = float(row.get("forward_exp_boot_mean", 0.0) or 0.0)
+            candidate_trades.append(sim)
 
-    if not trades:
+    if not candidate_trades:
         return pd.DataFrame(), {"date": day.strftime("%Y-%m-%d"), "trades": 0, "pnl_yen": 0.0, "pnl_bp_mean": 0.0}
 
-    tdf = pd.DataFrame(trades)
+    def _cls_rank(cls: str) -> int:
+        c = (cls or "").strip().upper()
+        if c == "LIVE_STRONG":
+            return 2
+        if c == "LIVE_BASE":
+            return 1
+        return 0
+
+    # Enforce one-position-per-ticker, cooldown, and max trades per ticker/day.
+    # Each plan produces at most 1 trade ("first signal only"), but multiple plans
+    # can trigger at the same time for the same ticker. We keep only the best one.
+    tdf_all = pd.DataFrame(candidate_trades)
+    tdf_all["entry_ts"] = pd.to_datetime(tdf_all["entry_ts"], errors="coerce")
+    tdf_all["exit_ts"] = pd.to_datetime(tdf_all["exit_ts"], errors="coerce")
+    tdf_all = tdf_all.dropna(subset=["entry_ts", "exit_ts"])
+
+    cooldown = pd.Timedelta(minutes=COOLDOWN_MINUTES)
+    selected_trades: List[Dict[str, object]] = []
+
+    for code, sub in tdf_all.groupby("code", dropna=False):
+        sub = sub.sort_values(["entry_ts", "exit_ts"])
+        sub["_cls_rank"] = sub["live_demo_class"].map(_cls_rank)
+        sub["_budget"] = pd.to_numeric(sub["budget_factor"], errors="coerce").fillna(1.0)
+        sub["_exp"] = pd.to_numeric(sub["forward_exp_boot_mean"], errors="coerce").fillna(0.0)
+
+        last_exit: pd.Timestamp | None = None
+        trade_count = 0
+
+        # Process in chronological order; for same entry_ts choose best by priority.
+        for entry_ts, bucket in sub.groupby("entry_ts", sort=True):
+            if trade_count >= MAX_TRADES_PER_TICKER:
+                break
+
+            bucket = bucket.sort_values(
+                ["_cls_rank", "_budget", "_exp"],
+                ascending=[False, False, False],
+            )
+
+            picked = None
+            for _, r in bucket.iterrows():
+                if last_exit is not None:
+                    if r["entry_ts"] < last_exit:
+                        continue
+                    if r["entry_ts"] < last_exit + cooldown:
+                        continue
+                picked = r
+                break
+
+            if picked is None:
+                continue
+
+            selected_trades.append({k: picked[k] for k in tdf_all.columns if not str(k).startswith("_")})
+            last_exit = picked["exit_ts"]
+            trade_count += 1
+
+    if not selected_trades:
+        return pd.DataFrame(), {"date": day.strftime("%Y-%m-%d"), "trades": 0, "pnl_yen": 0.0, "pnl_bp_mean": 0.0}
+
+    tdf = pd.DataFrame(selected_trades)
     pnl_yen = float(tdf["pnl_yen"].sum())
     pnl_bp_mean = float(tdf["pnl_bp"].mean())
     summary = {
@@ -463,6 +532,8 @@ def simulate_day(cand_path: Path, day: dt.date, nominal: float) -> Tuple[pd.Data
         "trades": int(len(tdf)),
         "pnl_yen": pnl_yen,
         "pnl_bp_mean": pnl_bp_mean,
+        "cooldown_minutes": COOLDOWN_MINUTES,
+        "max_trades_per_ticker": MAX_TRADES_PER_TICKER,
     }
     summary.update({f"diag_{k}": int(v) for k, v in counters.items()})
     # Live/Demo 別集計
