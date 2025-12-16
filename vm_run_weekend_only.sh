@@ -29,6 +29,11 @@ trap cleanup_and_shutdown EXIT
 
 {
   cd "$HOME/asagage"
+  # Keep VM repo up-to-date (best-effort, do not fail the batch on git issues).
+  if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git fetch origin || true
+    git pull --ff-only || true
+  fi
   # Activate Python virtualenv for weekend batch
   source "$HOME/asagake-venv/bin/activate"
   TARGET_DATE="${1:-$(date +%Y%m%d)}"
@@ -46,6 +51,16 @@ trap cleanup_and_shutdown EXIT
     rm -rf cache/opt30
   fi
   mkdir -p cache/opt30
+
+  # Pull the "Top200 regulars" 1m cache from GCS (built on Windows) to reduce network fetches on the VM.
+  # Best-effort: the batch still runs even if this sync fails.
+  REGULARS_CACHE_BUCKET="${REGULARS_CACHE_BUCKET:-gs://asagage-weekend-output/yahoo_1m_regulars}"
+  if command -v gsutil >/dev/null 2>&1; then
+    echo "[vm_run_weekend_only] syncing regulars 1m cache from ${REGULARS_CACHE_BUCKET} ..." >&2
+    gsutil -m rsync -r "${REGULARS_CACHE_BUCKET}" "$HOME/asagage/data/raw/yahoo_1m" || true
+  else
+    echo "[vm_run_weekend_only] gsutil not found; skip regulars cache sync" >&2
+  fi
 
   # Build weekly Top300 universe (close * weekly volume)
   python tools/build_master_topvol_universe.py --topn 300 --lookback 5 --tag "$TARGET_DATE"
