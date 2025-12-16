@@ -66,10 +66,11 @@ Run-Logged @(
   "tools/build_top_regulars_universe.py",
   "--lookback-files", $RegularsLookbackFiles,
   "--topn", $RegularsTopN,
-  "--tag", $tag
+  "--tag", $tag,
+  "--update-ever"
 )
 
-$regulars = "data/universe/top_regulars_latest.csv"
+$regulars = "data/universe/top_regulars_ever.csv"
 if (-not (Test-Path $regulars)) {
   throw "Regulars CSV not found: $regulars"
 }

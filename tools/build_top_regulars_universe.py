@@ -107,6 +107,20 @@ def parse_args() -> argparse.Namespace:
         help="Date tag for output filename (default: today, YYYYMMDD)",
     )
     ap.add_argument("--out-dir", default=str(DEFAULT_OUT_DIR), help="Output directory (default: data/universe)")
+    ap.add_argument(
+        "--update-ever",
+        action="store_true",
+        help=(
+            "Also update a persistent universe file that keeps any ticker that has ever appeared "
+            "in the TopN regulars. This grows over time but avoids losing cached history when a ticker "
+            "temporarily drops out of the TopN."
+        ),
+    )
+    ap.add_argument(
+        "--ever-file",
+        default="top_regulars_ever.csv",
+        help="Filename (within out-dir) for the persistent universe (default: top_regulars_ever.csv)",
+    )
     return ap.parse_args()
 
 
@@ -120,16 +134,32 @@ def main() -> None:
     df_codes = df_stats.head(args.topn)[["code"]].copy()
 
     out_file = out_dir / f"top_regulars_{args.tag}.csv"
-    df_codes.to_csv(out_file, index=False)
+    df_codes.to_csv(out_file, index=False, encoding="utf-8-sig")
 
     latest = out_dir / "top_regulars_latest.csv"
     shutil.copyfile(out_file, latest)
 
     stats_file = out_dir / f"top_regulars_{args.tag}_stats.csv"
-    df_stats.head(args.topn).to_csv(stats_file, index=False)
+    df_stats.head(args.topn).to_csv(stats_file, index=False, encoding="utf-8-sig")
+
+    ever_updated = ""
+    if args.update_ever:
+        ever_path = out_dir / str(args.ever_file)
+        existing: List[str] = []
+        if ever_path.exists():
+            try:
+                prev = pd.read_csv(ever_path)
+                if "code" in prev.columns:
+                    existing = prev["code"].dropna().astype(str).str.strip().str.upper().tolist()
+            except Exception:
+                existing = []
+        merged = sorted(set(existing).union(df_codes["code"].dropna().astype(str).str.strip().str.upper().tolist()))
+        pd.DataFrame({"code": merged}).to_csv(ever_path, index=False, encoding="utf-8-sig")
+        added = max(0, len(merged) - len(set(existing)))
+        ever_updated = f" ever={ever_path} (total={len(merged)} added={added})"
 
     print(
-        f"[top_regulars] files={len(files)} topn={len(df_codes)} out={out_file} latest={latest} stats={stats_file}"
+        f"[top_regulars] files={len(files)} topn={len(df_codes)} out={out_file} latest={latest} stats={stats_file}{ever_updated}"
     )
 
 
