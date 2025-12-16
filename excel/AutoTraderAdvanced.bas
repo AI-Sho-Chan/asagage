@@ -209,10 +209,10 @@ Private Sub UpdateTrendIndicatorVisual(ByVal ws As Worksheet, ByVal rangeName As
     Dim displayText As String
     displayText = label & ": " & TrendStateLabel(dayState)
     If Len(windowState) > 0 Then
-        displayText = displayText & " / 窓 " & TrendStateLabel(windowState)
+        displayText = displayText & " / WIN " & TrendStateLabel(windowState)
     End If
     If Len(allowedState) > 0 Then
-        displayText = displayText & " / 許容 " & allowedState
+        displayText = displayText & " / Allowed " & allowedState
     End If
     Dim fillColor As Long
     fillColor = TrendFillColor(dayState)
@@ -245,22 +245,22 @@ End Function
 Private Function TrendStateLabel(ByVal state As String) As String
     Select Case UCase$(state)
         Case "BUY"
-            TrendStateLabel = "上昇"
+            TrendStateLabel = "UP"
         Case "SELL"
-            TrendStateLabel = "下落"
+            TrendStateLabel = "DOWN"
         Case Else
-            TrendStateLabel = "フラット"
+            TrendStateLabel = "FLAT"
     End Select
 End Function
 
 Private Function TrendArrow(ByVal state As String) As String
     Select Case UCase$(state)
         Case "BUY"
-            TrendArrow = "▲"
+            TrendArrow = "^"
         Case "SELL"
-            TrendArrow = "▼"
+            TrendArrow = "v"
         Case Else
-            TrendArrow = "↔"
+            TrendArrow = "-"
     End Select
 End Function
 
@@ -2166,6 +2166,17 @@ Public Sub SetupDashboardUIV2()
 
     UpdateTrendIndicators ws
 
+    EnsureDashboardProtectionV2 ws
+
+End Sub
+
+Private Sub EnsureDashboardProtectionV2(ByVal ws As Worksheet)
+    On Error Resume Next
+    ws.Unprotect
+    ws.Protect DrawingObjects:=True, Contents:=True, Scenarios:=True, UserInterfaceOnly:=True, _
+               AllowFormattingCells:=True, AllowFormattingColumns:=True, AllowFormattingRows:=True, _
+               AllowFiltering:=True, AllowSorting:=True
+    On Error GoTo 0
 End Sub
 
 
