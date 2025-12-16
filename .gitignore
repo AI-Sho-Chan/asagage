@@ -26,9 +26,12 @@ analysis/history_adequacy_*.json
 analysis/nightly_plan_summary.csv
 analysis/nightly_strong_candidates.csv
 analysis/time_split_comparison.csv
+analysis/time_window_comparison.csv
+analysis/time_window_comparison_summary.json
 analysis/demo_orders_summary.csv
 analysis/candidates_*_from_*.csv
 analysis/compare_candidates_*.json
+analysis/method_compare_*.json
 analysis/guard_threshold_analysis.csv
 analysis/j_guard_effect.csv
 analysis/expected_pnl_daily.csv
