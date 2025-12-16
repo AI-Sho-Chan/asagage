@@ -1,18 +1,17 @@
-# Todo
+﻿# Todo
 
 ## Done
-- [x] Excel 取り込みの正は `output/excel/candidates_nextday.csv`
-- [x] 同一銘柄でも「強いプランは複数採用」を許容（候補CSVは1銘柄1プランに縮約しない）
-- [x] DailyReplay（取引後の疑似売買）を追加し、メール送信できる状態にした
-- [x] 週末VMが金曜16:30に走らなかった原因を特定（`.sh`の改行がWindows形式になり実行失敗）
-- [x] 取引中に邪魔になるスナップショット系タスクは停止（必要なら復活できるようにする）
+- [x] `output/excel/candidates_nextday.csv` を Excel（ASAGAKE.xlsm）に取り込める状態にした（同一銘柄の複数プランも許容）。
+- [x] 候補CSVに `BudgetFactor_row` / `live_demo_class` / `NKY_AllowedSide` / `TOPIX_AllowedSide` / `GapBanPct` / `NoTradeMin` を含めるように整備。
+- [x] DailyReplay（取引後の仮想売買）を平日 18:00 に自動実行し、メール送信する仕組みを運用に乗せた（Windows側）。
+- [x] 週末VMの週末バッチを「金曜 16:30 JST に自動起動 → 完了後に自動停止」へ安定化（`docs/handover_20251216.md`）。
 
 ## Next（優先）
-- [ ] Windowsの `Asagake-DailyReplay` を「平日18:00」「ログオンしてなくても動く」設定にする（PCスリープ/未ログインで止まるのを防ぐ）
-- [ ] 週末VM側は `~/asagage/vm_run_weekend_only.sh` を正とし、Windowsから `.sh` をscp上書きしない運用に固定
-- [ ] Top200常連の1分足データを毎日育てる（`scripts/run_update_regulars_1m.ps1`）
+- [ ] Top200「常連」銘柄の 1分足データを“永久保存対象”として毎日育てる（`scripts/run_update_regulars_1m.ps1`）
+- [ ] Top200常連の 1分足を VM 側でも活用できるように同期（Windows → GCS → VM）
+- [ ] 次の金曜に週末バッチが自動起動・完走したかを確認（ログの見方を固定化）
 
-## Later（検証・改善）
-- [ ] 時間帯を区切る/区切らない（M0〜M3）を、同じ前提で20営業日ぶん集計して比較（前提ルールは `analysis/method_comparison_schema.md`）
-- [ ] GapBanPct / NoTradeMin の適正値をDailyReplayで検証（実運用へ反映するかは別判断）
-
+## Later（改善）
+- [ ] GapBanPct / NoTradeMin の適正値を、DailyReplay の複数日（例: 20営業日）で検証して提案する（実装は別途判断）。
+- [ ] 時間帯の切り方（区切る/区切らない/粗い区切り）を“同一条件”で比較する（比較表を `analysis/` に出力）。
+- [ ] Live/Demo 判定や BudgetFactor の基準を、実績（DailyReplay/DEMO）に合わせて自動提案できるようにする。

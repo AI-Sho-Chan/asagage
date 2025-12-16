@@ -644,7 +644,7 @@ def main() -> None:
     else:
         # Prefer the dedicated snapshot for this date; fall back to
         # candidates_<date>.csv, and finally candidates_nextday.csv so that
-        # DailyReplay keeps動作 even when nightly snapshot generation fails.
+        # DailyReplay keeps working even when nightly snapshot generation fails.
         base = Path("output/excel")
         primary = base / f"candidates_for_{args.date}.csv"
         alt_date = base / f"candidates_{args.date}.csv"
