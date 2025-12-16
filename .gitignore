@@ -17,3 +17,46 @@ data/raw/**
 *.parquet
 *_GRID_FULL.csv
 
+# analysis outputs (generated)
+analysis/daily_trades_*.csv
+analysis/daily_replay_*.json
+analysis/daily_realized_pnl*.csv
+analysis/expected_pnl_*.json
+analysis/history_adequacy_*.json
+analysis/nightly_plan_summary.csv
+analysis/nightly_strong_candidates.csv
+analysis/time_split_comparison.csv
+analysis/demo_orders_summary.csv
+analysis/candidates_*_from_*.csv
+analysis/compare_candidates_*.json
+analysis/guard_threshold_analysis.csv
+analysis/j_guard_effect.csv
+analysis/expected_pnl_daily.csv
+analysis/tmp_candidates_m0.csv
+analysis/timecmp_*.csv
+
+# generated universe snapshots
+data/universe/master_codes_*.csv
+data/universe/topvol_*.csv
+data/universe/top_regulars_*.csv
+data/universe/top_regulars_latest.csv
+
+# local logs (generated)
+logs/daily_replay_task_*.log
+logs/nightly_py_error_*.log
+logs/boardlogger_check_*.log
+logs/history_report.log
+logs/opt30_run_*.log
+logs/update_regulars_1m_*.log
+logs/vba_events.log
+
+# local secrets / scratch
+*accessKeys*.csv
+*.bak
+data/calendar/jpx_holidays_*.csv
+excel/**/AutoTraderAdvanced.bas
+state/smtp*.json
+state/disable_local_weekend.txt
+temp*.txt
+temp*.py
+temp*.bas

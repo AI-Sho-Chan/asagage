@@ -2,6 +2,7 @@
 *.cls text eol=lf
 *.frm text eol=lf
 *.ps1 text eol=lf
+*.sh  text eol=lf
 *.md  text eol=lf
 *.xlsm binary
 *.xlsx binary

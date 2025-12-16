@@ -1,27 +1,18 @@
-﻿# Todo
+# Todo
 
-## Approved (executing / done)
-- [x] AM0945 j-cross run (coarse竊池efine) with logs and artifacts captured.
-- [x] Operate FAST Top150 nightly (ASHA + shortened Bayes, H1/H3 enabled).
-- [x] Continue verification of gap-aware and market-bias J adjustments.
-- [x] Replace `output/excel/candidates_nextday.csv` with the filtered one-per-ticker shortlist.
-- [ ] Update `SHINSOKU.xlsm` 窶懊す繧ｹ繝・Β讎りｦ≫・tab via COM with the latest batch descriptions.
+## Done
+- [x] Excel 取り込みの正は `output/excel/candidates_nextday.csv`
+- [x] 同一銘柄でも「強いプランは複数採用」を許容（候補CSVは1銘柄1プランに縮約しない）
+- [x] DailyReplay（取引後の疑似売買）を追加し、メール送信できる状態にした
+- [x] 週末VMが金曜16:30に走らなかった原因を特定（`.sh`の改行がWindows形式になり実行失敗）
+- [x] 取引中に邪魔になるスナップショット系タスクは停止（必要なら復活できるようにする）
 
-## Pending approval
-- [ ] Shift Task Scheduler nightly start to 16:30 (requires elevated permissions on host).
-- [ ] Document the 05:30 morning batch (scripts involved, data freshness purpose).
+## Next（優先）
+- [ ] Windowsの `Asagake-DailyReplay` を「平日18:00」「ログオンしてなくても動く」設定にする（PCスリープ/未ログインで止まるのを防ぐ）
+- [ ] 週末VM側は `~/asagage/vm_run_weekend_only.sh` を正とし、Windowsから `.sh` をscp上書きしない運用に固定
+- [ ] Top200常連の1分足データを毎日育てる（`scripts/run_update_regulars_1m.ps1`）
 
-## Backlog
-- [ ] `analysis/daily_trades_*.csv` を横断集計するスクリプトを追加し、セッション別・銘柄別の実現PnLレーティングを作成する（DailyReplay のフィードバック用）。
-- [ ] 時間帯分割（M0〜M3）比較検証の集計出力を追加（前提ルール: 1銘柄1ポジション、クールダウン5分、1日最大2回）。設計: `analysis/method_comparison_schema.md`
-- [ ] Re-optimise gap bands vs J adders (PF / win rate / sample count / MaxDD by bucket).
-- [ ] Finalise dynamic TP/SL coefficients (current seed TP:+0.15, SL:+0.10) then wire into VBA.
-- [ ] Register and test the weekday 16:30 fast-nightly task (`scripts/register_fast_nightly_task.ps1`).
-- [ ] Automate comparative reporting (plan-level & H1/H3 splits in `summary.xlsx`).
-- [ ] Review market-volatility ﾎ寧 coefficients (B32窶釘34) as part of the weekly session tuning.
-- [ ] Add conditional formatting for GapDecision (STOP=red, SKIP=orange, OK=none).
-- [ ] Unify Queue/Place/Cancel/Exit logging across Orders/PnL/ExecMon.
-- [x] Produce expected-P&L comparison (ﾂ･10M equal allocation) via `tools/simulate_expected_pnl.py`.
-- [ ] Add Japanese display columns on NewDashboard (entry status / fill status).
-- [ ] Complete straddle re-entry latch (block same-day re-fire after a loss).
-- [ ] Weekend batch runtime optimisation (minute_cache deep-refresh 整理 + bt_opt30_forward early-stop 実装)
+## Later（検証・改善）
+- [ ] 時間帯を区切る/区切らない（M0〜M3）を、同じ前提で20営業日ぶん集計して比較（前提ルールは `analysis/method_comparison_schema.md`）
+- [ ] GapBanPct / NoTradeMin の適正値をDailyReplayで検証（実運用へ反映するかは別判断）
+

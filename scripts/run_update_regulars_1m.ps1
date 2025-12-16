@@ -17,19 +17,19 @@ $ErrorActionPreference = "Stop"
 Set-Location $Repo
 
 $tag = Get-Date -Format "yyyyMMdd"
-$ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 $logDir = Join-Path $Repo "logs"
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
 $logPath = Join-Path $logDir "update_regulars_1m_$tag.log"
 
 function Run-Logged {
   param(
-    [string[]]$Args
+    [string[]]$PyArgs
   )
 
+  $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
   $psi = New-Object System.Diagnostics.ProcessStartInfo
   $psi.FileName = $Python
-  $psi.Arguments = ($Args -join " ")
+  $psi.Arguments = ($PyArgs -join " ")
   $psi.WorkingDirectory = $Repo
   $psi.RedirectStandardOutput = $true
   $psi.RedirectStandardError = $true
@@ -42,16 +42,16 @@ function Run-Logged {
   $stderr = $proc.StandardError.ReadToEnd()
   $proc.WaitForExit()
 
-  "[$ts] cmd: $Python $($Args -join ' ')" | Out-File -FilePath $logPath -Append -Encoding utf8
+  "[$ts] cmd: $Python $($PyArgs -join ' ')" | Out-File -FilePath $logPath -Append -Encoding utf8
   if ($stdout) { "[$ts] stdout`n$stdout" | Out-File -FilePath $logPath -Append -Encoding utf8 }
   if ($stderr) { "[$ts] stderr`n$stderr" | Out-File -FilePath $logPath -Append -Encoding utf8 }
 
   if ($proc.ExitCode -ne 0) {
-    throw "Command failed (exit=$($proc.ExitCode)): $Python $($Args -join ' ')"
+    throw "Command failed (exit=$($proc.ExitCode)): $Python $($PyArgs -join ' ')"
   }
 }
 
-"[$ts] start update_regulars_1m" | Out-File -FilePath $logPath -Append -Encoding utf8
+("[{0}] start update_regulars_1m" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss")) | Out-File -FilePath $logPath -Append -Encoding utf8
 
 if (-not $SkipTopVolBuild) {
   Run-Logged @(
@@ -83,5 +83,4 @@ Run-Logged @(
   "--pause", $PauseSeconds
 )
 
-"[$ts] done update_regulars_1m" | Out-File -FilePath $logPath -Append -Encoding utf8
-
+("[{0}] done update_regulars_1m" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss")) | Out-File -FilePath $logPath -Append -Encoding utf8

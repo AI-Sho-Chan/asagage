@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 """
-「Top300（週間売買代金 上位）」のCSV（`data/universe/topvol_YYYYMMDD.csv`）が複数日ぶんある前提で、
-「頻繁に上位に出てくる銘柄（Top200常連など）」を機械的に選んでCSVにします。
+Build a small "always-cache" universe from recent weekly TopVol CSVs.
 
-目的（かんたんに）:
-- Yahooの1分足は遡れる日数が限られるため、消える前にローカルへ保存しておきたい
-- その対象を「毎回よく出てくる銘柄」に絞ることで、保存作業を現実的にする
+What it does
+------------
+- Reads multiple `data/universe/topvol_YYYYMMDD.csv` files (Top300 by weekly turnover).
+- Counts how often each ticker appears and its average rank.
+- Outputs the "Top N regulars" (default Top200) as:
+  - `data/universe/top_regulars_<tag>.csv`
+  - `data/universe/top_regulars_latest.csv` (copy)
+  - `data/universe/top_regulars_<tag>_stats.csv`
 
-入力:
-- `data/universe/topvol_*.csv`（列: `code`）
-
-出力:
-- `data/universe/top_regulars_<tag>.csv`（列: `code`）
-- `data/universe/top_regulars_latest.csv`（直近のコピー）
-- `data/universe/top_regulars_<tag>_stats.csv`（出現回数・平均順位のメモ）
+Why we want this
+----------------
+Yahoo 1-minute data is limited in how far back we can fetch.
+By continuously saving 1-minute bars for frequent TopVol tickers, the weekend batch:
+- has fewer missing days
+- downloads less data
+- runs more stably and faster
 """
 
 from __future__ import annotations
@@ -131,4 +135,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

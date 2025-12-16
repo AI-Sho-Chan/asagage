@@ -23,6 +23,7 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
+from yahooquery import Ticker
 
 DATA_ROOT = Path("data/raw/yahoo_1m")
 OUT_DIR = Path("analysis")
@@ -122,8 +123,59 @@ def load_intraday(code: str, day: dt.date) -> pd.DataFrame:
 
     path = DATA_ROOT / code / f"{day:%Y-%m-%d}.parquet"
     if not path.exists():
-        INTRADAY_CACHE[key] = pd.DataFrame()
-        return INTRADAY_CACHE[key]
+        # Fetch on-demand (so DailyReplay can run even when minute_cache is not pre-filled).
+        try:
+            hist = Ticker([code], asynchronous=False).history(
+                start=str(day), end=str(day + dt.timedelta(days=1)), interval="1m"
+            )
+        except Exception:
+            hist = pd.DataFrame()
+
+        fetched = pd.DataFrame()
+        if isinstance(hist, pd.DataFrame) and not hist.empty:
+            if isinstance(hist.index, pd.MultiIndex):
+                try:
+                    sub = hist.xs(code, level=0, drop_level=True).reset_index()
+                except Exception:
+                    sub = pd.DataFrame()
+            else:
+                sub = hist.reset_index()
+
+            if not sub.empty:
+                time_column = None
+                for candidate in ("date", "datetime", "ts"):
+                    if candidate in sub.columns:
+                        time_column = candidate
+                        break
+                if time_column is not None:
+                    sub = sub.rename(columns={time_column: "ts"})
+                    ts = pd.to_datetime(sub["ts"], errors="coerce", utc=True)
+                    sub["ts"] = ts.dt.tz_convert("Asia/Tokyo")
+                    sub = sub[sub["ts"].dt.date == day]
+                    if not sub.empty:
+                        fetched = sub.set_index("ts")
+
+        if fetched.empty:
+            INTRADAY_CACHE[key] = pd.DataFrame()
+            return INTRADAY_CACHE[key]
+
+        # Normalize columns and (best-effort) persist for future runs.
+        if isinstance(fetched.columns, pd.MultiIndex):
+            fetched.columns = [str(c[0]).lower() for c in fetched.columns]
+        else:
+            fetched.columns = [str(c).lower() for c in fetched.columns]
+
+        keep = [c for c in ("open", "high", "low", "close", "volume") if c in fetched.columns]
+        fetched = fetched[keep].sort_index()
+
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            fetched.to_parquet(path)
+        except Exception:
+            pass
+
+        INTRADAY_CACHE[key] = fetched
+        return fetched
 
     df = pd.read_parquet(path)
     df = df.sort_index()
@@ -284,7 +336,12 @@ def simulate_trade_for_candidate(
     intraday = compute_features(intraday, atr_n)
     start_t, end_t = _session_window(session)
     times = intraday.index.time
-    min_entry_t = (dt.datetime.combine(day, start_t) + dt.timedelta(minutes=float(no_trade_min))).time()
+    # NoTradeMin means "ignore the first N minutes after the market open (09:00)".
+    # For sessions that start later than 09:00, do not push the window later.
+    market_open = dt.datetime.combine(day, dt.time(9, 0))
+    no_trade_cutoff = market_open + dt.timedelta(minutes=float(no_trade_min))
+    session_start = dt.datetime.combine(day, start_t)
+    min_entry_t = max(session_start, no_trade_cutoff).time()
     mask_window = (times >= min_entry_t) & (times <= end_t)
     if not mask_window.any():
         counters["no_session_rows"] = counters.get("no_session_rows", 0) + 1
@@ -559,6 +616,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     ap.add_argument(
+        "--label",
+        default="",
+        help=(
+            "Optional label suffix for outputs (e.g. M0/M3). "
+            "When set, writes per-label outputs to avoid overwriting production files."
+        ),
+    )
+    ap.add_argument(
         "--nominal",
         type=float,
         default=10_000_000.0,
@@ -599,20 +664,30 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     trades_df, summary = simulate_day(cand_path, trade_date, args.nominal)
 
-    trades_out = OUT_DIR / f"daily_trades_{args.date}.csv"
+    label = str(args.label or "").strip()
+    safe_label = "".join(ch for ch in label if ch.isalnum() or ch in ("_", "-"))
+    suffix = f"_{safe_label}" if safe_label else ""
+
+    trades_out = OUT_DIR / f"daily_trades_{args.date}{suffix}.csv"
     if not trades_df.empty:
         trades_df.to_csv(trades_out, index=False, encoding="utf-8-sig")
         print(f"written {trades_out} ({len(trades_df)} trades)")
     else:
         print(f"no trades generated for {args.date}")
 
-    summary_csv = OUT_DIR / "daily_realized_pnl.csv"
+    summary_csv = OUT_DIR / f"daily_realized_pnl{suffix}.csv"
+    if safe_label:
+        summary = dict(summary)
+        summary["label"] = safe_label
     row = pd.DataFrame([summary])
     if summary_csv.exists():
         try:
             prev = pd.read_csv(summary_csv)
             if "date" in prev.columns:
-                prev = prev[prev["date"].astype(str) != summary["date"]]
+                mask = prev["date"].astype(str) != summary["date"]
+                if "label" in prev.columns and safe_label:
+                    mask &= prev["label"].astype(str) != safe_label
+                prev = prev[mask]
             combined = pd.concat([prev, row], ignore_index=True)
             combined.to_csv(summary_csv, index=False, encoding="utf-8-sig")
         except Exception:
@@ -621,7 +696,7 @@ def main() -> None:
         row.to_csv(summary_csv, index=False, encoding="utf-8-sig")
     print(f"summary appended to {summary_csv}")
 
-    summary_json = OUT_DIR / f"daily_replay_{args.date}.json"
+    summary_json = OUT_DIR / f"daily_replay_{args.date}{suffix}.json"
     with open(summary_json, "w", encoding="utf-8") as f:
         import json
         json.dump(summary, f, ensure_ascii=False, indent=2)
