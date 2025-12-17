@@ -207,8 +207,8 @@ Private Sub SetupSingleTrendIndicator(ByVal ws As Worksheet, ByVal address As St
     With rng
         On Error Resume Next
         If .MergeCells Then .UnMerge
-        On Error GoTo 0
         .Merge
+        On Error GoTo 0
         .HorizontalAlignment = xlCenter
         .VerticalAlignment = xlCenter
         .Font.Bold = True
