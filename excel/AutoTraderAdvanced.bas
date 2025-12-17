@@ -994,7 +994,7 @@ Private Sub UpdateDriverTrend(ByVal ws As Worksheet, ByVal driverName As String)
     On Error GoTo 0
     If StrComp(prevAllowed, allowedSide, vbTextCompare) <> 0 Then
         state("last_allowed_side") = allowedSide
-        CancelOppositeOrders allowedSide
+        If Not IsDemoMode() Then CancelOppositeOrders allowedSide
     End If
 
     state("trend_day") = trendDay
