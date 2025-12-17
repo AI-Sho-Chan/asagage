@@ -41,6 +41,26 @@ Private Const DRIVER_NKY As String = "NKY"
 Private Const DRIVER_TOPIX As String = "TOPIX"
 Private Const BB_DEFAULT_BLOCK_MINUTES As Double = 3#
 
+' Orders sheet columns (V2)
+Private Const ORD_COL_TS As Long = 1
+Private Const ORD_COL_TICKER As Long = 2
+Private Const ORD_COL_SIDE As Long = 3
+Private Const ORD_COL_PRICE As Long = 4
+Private Const ORD_COL_QTY As Long = 5
+Private Const ORD_COL_MODE As Long = 6
+Private Const ORD_COL_STATUS As Long = 7
+Private Const ORD_COL_NOTE As Long = 8
+Private Const ORD_COL_TP As Long = 9
+Private Const ORD_COL_SL As Long = 10
+Private Const ORD_COL_TRAIL As Long = 11
+Private Const ORD_COL_FILL_TS As Long = 12
+Private Const ORD_COL_FILL_PRICE As Long = 13
+Private Const ORD_COL_FILL_QTY As Long = 14
+Private Const ORD_COL_CLOSE_TS As Long = 15
+Private Const ORD_COL_CLOSE_PRICE As Long = 16
+Private Const ORD_COL_PNL_BP As Long = 17
+Private Const ORD_COL_SOURCE As Long = 18
+
 Private Enum BbRiskLevel
     bbRiskNone = 0
     bbRiskWarn = 1
@@ -2770,25 +2790,6 @@ End Sub
 ' - when RUNNING, create tp_demo / sl_demo OCO orders (ORDERED)
 ' - when tp_demo/sl_demo is touched, mark exit FILLED and mark entry CLOSED
 ' ----------------------------------------------------------------------------
-
-Private Const ORD_COL_TS As Long = 1
-Private Const ORD_COL_TICKER As Long = 2
-Private Const ORD_COL_SIDE As Long = 3
-Private Const ORD_COL_PRICE As Long = 4
-Private Const ORD_COL_QTY As Long = 5
-Private Const ORD_COL_MODE As Long = 6
-Private Const ORD_COL_STATUS As Long = 7
-Private Const ORD_COL_NOTE As Long = 8
-Private Const ORD_COL_TP As Long = 9
-Private Const ORD_COL_SL As Long = 10
-Private Const ORD_COL_TRAIL As Long = 11
-Private Const ORD_COL_FILL_TS As Long = 12
-Private Const ORD_COL_FILL_PRICE As Long = 13
-Private Const ORD_COL_FILL_QTY As Long = 14
-Private Const ORD_COL_CLOSE_TS As Long = 15
-Private Const ORD_COL_CLOSE_PRICE As Long = 16
-Private Const ORD_COL_PNL_BP As Long = 17
-Private Const ORD_COL_SOURCE As Long = 18
 
 Private Sub ProcessDemoOrdersV2(ByVal ws As Worksheet)
     On Error GoTo Fail
