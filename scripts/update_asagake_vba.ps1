@@ -37,8 +37,7 @@ if ($runningExcel -ne $null) {
 # Backup first
 $stamp = New-Timestamp
 $dir = Split-Path -Parent $WorkbookPath
-$base = Split-Path -LeafBase $WorkbookPath
-$ext = Split-Path -Leaf $WorkbookPath
+$base = [System.IO.Path]::GetFileNameWithoutExtension($WorkbookPath)
 $backupPath = Join-Path $dir ("{0}_backup_{1}.xlsm" -f $base, $stamp)
 Copy-Item -LiteralPath $WorkbookPath -Destination $backupPath -Force
 Write-Host "Backup created: $backupPath"
@@ -85,4 +84,3 @@ try {
 }
 
 Write-Host "Done."
-
