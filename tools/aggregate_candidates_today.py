@@ -256,18 +256,18 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
 
     if not frames:
-        pd.DataFrame().to_csv(out, index=False, encoding="utf-8-sig")
+        pd.DataFrame().to_csv(out, index=False, encoding="utf-8-sig", lineterminator="\r\n")
         print(json.dumps({"written": str(out), "rows": 0}))
         return
 
     combined = aggregate_frames(frames, thresholds)
     if combined is None:
-        pd.DataFrame().to_csv(out, index=False, encoding="utf-8-sig")
+        pd.DataFrame().to_csv(out, index=False, encoding="utf-8-sig", lineterminator="\r\n")
         print(json.dumps({"written": str(out), "rows": 0}))
         return
 
     summary = build_summary(combined, sum(len(frame) for frame in frames))
-    combined.to_csv(out, index=False, encoding="utf-8-sig")
+    combined.to_csv(out, index=False, encoding="utf-8-sig", lineterminator="\r\n")
 
     payload = {"written": str(out), "rows": int(len(combined))}
     payload.update(summary.to_json())

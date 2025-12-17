@@ -164,7 +164,18 @@ End Sub
 Private Sub LogVbaEvent(ByVal tag As String, ByVal message As String)
     On Error Resume Next
     Dim logPath As String
-    logPath = ThisWorkbook.Path & "\logs\vba_events.log"
+    Dim basePath As String
+    ' Always prefer the workspace log dir so PowerShell can tail a stable path.
+    If Len(Dir$("C:\AI\asagake", vbDirectory)) > 0 Then
+        basePath = "C:\AI\asagake"
+    Else
+        basePath = ThisWorkbook.Path
+    End If
+    If Len(basePath) = 0 Then basePath = "C:\AI\asagake"
+    Dim logDir As String
+    logDir = basePath & "\logs"
+    If Len(Dir$(logDir, vbDirectory)) = 0 Then MkDir logDir
+    logPath = logDir & "\vba_events.log"
     Dim f As Integer: f = FreeFile
     Open logPath For Append As #f
     Print #f, Format$(Now, "yyyy-mm-dd hh:nn:ss") & " [" & tag & "] " & message
@@ -2346,7 +2357,18 @@ End Sub
 
 Public Sub ImportCandidatesV2()
 
-    Dim ws As Worksheet: Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
+    Dim ws As Worksheet
+    Dim path As String
+    Dim f As Integer
+    Dim raw As String
+    Dim lines As Variant
+    Dim line As Variant
+    Dim importedCount As Long: importedCount = 0
+    Dim r As Long: r = DASH2_DATA_START
+
+    On Error GoTo ImportErr
+
+    Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
 
     Dim wasProtected As Boolean
     On Error Resume Next
@@ -2354,7 +2376,7 @@ Public Sub ImportCandidatesV2()
     If wasProtected Then ws.Unprotect
     On Error GoTo 0
 
-    Dim path As String
+    LogVbaEvent "ImportCandidatesV2", "start workbook_path=" & ThisWorkbook.path & " dash=" & DASH2_SHEET & " protected=" & CStr(wasProtected)
 
     path = ThisWorkbook.path & "\output\excel\candidates_nextday.csv"
 
@@ -2381,15 +2403,18 @@ Public Sub ImportCandidatesV2()
         Exit Sub
     End If
 
-    On Error GoTo ImportErr
+    ' Read full file and split by LF/CRLF. pandas emits LF-only by default,
+    ' which can make Line Input treat the file as a single "line".
+    f = FreeFile
+    Open path For Binary As #f
+    raw = String$(LOF(f), vbNullChar)
+    If LOF(f) > 0 Then Get #f, , raw
+    Close #f
+    f = 0
 
-    Dim f As Integer: f = FreeFile
-
-    Open path For Input As #f
-
-    Dim line As String
-
-    Dim r As Long: r = DASH2_DATA_START
+    raw = Replace$(raw, vbCrLf, vbLf)
+    raw = Replace$(raw, vbCr, vbLf)
+    lines = Split(raw, vbLf)
 
     Dim selCol As Long: selCol = FindColumn(ws, DASH2_HEADER_ROW, "Selected")
 
@@ -2450,13 +2475,14 @@ Public Sub ImportCandidatesV2()
     idxTrendDriver = -1: idxTrendWindow = -1: idxTrendBp = -1: idxTrendPolicy = -1
 
     Dim hdr As Variant
-    Do While Not EOF(f)
-
-        Line Input #f, line
+    For Each line In lines
+        Dim lineText As String
+        lineText = Trim$(CStr(line))
+        If Len(lineText) = 0 Then GoTo NextLine
 
         If first Then
 
-            hdr = ParseCsvLine(line)
+            hdr = ParseCsvLine(lineText)
             Dim i As Long
 
             For i = LBound(hdr) To UBound(hdr)
@@ -2520,7 +2546,7 @@ Public Sub ImportCandidatesV2()
 
         Else
 
-            Dim parts As Variant: parts = ParseCsvLine(line)
+            Dim parts As Variant: parts = ParseCsvLine(lineText)
             If idxTicker >= 0 And idxTicker <= UBound(parts) Then
 
                 Dim tkr As String: tkr = Trim$(parts(idxTicker))
@@ -2535,6 +2561,12 @@ Public Sub ImportCandidatesV2()
                     On Error Resume Next
 
                     ws.Cells(r, 1).Value = tkr
+                    If Err.Number <> 0 Then
+                        LogVbaEvent "ImportCandidatesV2", "write_failed row=" & CStr(r) & " col=1 err=" & CStr(Err.Number) & " " & Err.Description & " ticker=" & tkr
+                        Err.Clear
+                        On Error GoTo ImportErr
+                        GoTo ImportFinalize
+                    End If
 
                     If selCol > 0 Then ws.Cells(r, selCol).Value = 1
 
@@ -2624,6 +2656,7 @@ Public Sub ImportCandidatesV2()
                     On Error GoTo ImportErr
 
                     r = r + 1
+                    importedCount = importedCount + 1
 
                 End If
 
@@ -2631,14 +2664,17 @@ Public Sub ImportCandidatesV2()
 
         End If
 
-    Loop
+NextLine:
+    Next line
 
     GoTo ImportFinalize
 
 ImportFinalize:
     On Error Resume Next
-    Close #f
+    If f <> 0 Then Close #f
     On Error GoTo 0
+
+    LogVbaEvent "ImportCandidatesV2", "done imported=" & CStr(importedCount) & " path=" & path
 
     Dim clearRow As Long
 
@@ -2646,7 +2682,8 @@ ImportFinalize:
     ApplyDynamicSignalsV2
     On Error GoTo 0
 
-    If maxExisting >= DASH2_DATA_START And r <= maxExisting Then
+    ' If we imported nothing, do not clear the sheet (keeps last known candidates visible).
+    If importedCount > 0 And maxExisting >= DASH2_DATA_START And r <= maxExisting Then
 
         For clearRow = r To maxExisting
 
