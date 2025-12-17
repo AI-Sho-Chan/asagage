@@ -174,6 +174,9 @@ Private Sub SetupSingleTrendIndicator(ByVal ws As Worksheet, ByVal address As St
     ws.Parent.Names(rangeName).Delete
     On Error GoTo 0
     With rng
+        On Error Resume Next
+        If .MergeCells Then .UnMerge
+        On Error GoTo 0
         .Merge
         .HorizontalAlignment = xlCenter
         .VerticalAlignment = xlCenter
@@ -2126,6 +2129,13 @@ Public Sub SetupDashboardUIV2()
 
     If ws Is Nothing Then Exit Sub
 
+    Dim wasProtected As Boolean
+    On Error Resume Next
+    wasProtected = (ws.ProtectContents Or ws.ProtectDrawingObjects Or ws.ProtectScenarios)
+    If wasProtected Then ws.Unprotect
+    On Error GoTo 0
+
+    On Error GoTo SetupFail
 
 
     ' Status + direction indicators near the left
@@ -2178,7 +2188,13 @@ Public Sub SetupDashboardUIV2()
     UpdateTrendIndicators ws
 
     EnsureDashboardProtectionV2 ws
+    Exit Sub
 
+SetupFail:
+    LogVbaEvent "SetupDashboardUIV2", "Err " & Err.Number & ": " & Err.Description
+    On Error Resume Next
+    EnsureDashboardProtectionV2 ws
+    On Error GoTo 0
 End Sub
 
 Private Sub EnsureDashboardProtectionV2(ByVal ws As Worksheet)
