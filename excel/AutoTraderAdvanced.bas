@@ -2312,6 +2312,12 @@ Public Sub ImportCandidatesV2()
 
     Dim ws As Worksheet: Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
 
+    Dim wasProtected As Boolean
+    On Error Resume Next
+    wasProtected = (ws.ProtectContents Or ws.ProtectDrawingObjects Or ws.ProtectScenarios)
+    If wasProtected Then ws.Unprotect
+    On Error GoTo 0
+
     Dim path As String
 
     path = ThisWorkbook.path & "\output\excel\candidates_nextday.csv"
@@ -2656,12 +2662,27 @@ ImportFinalize:
     EnsureParamFormulas ws
     InstallRealtimeFormulasV2
     RefreshTrendsV2
+
+    If wasProtected Then
+        ProtectDashboardV2 ws
+    End If
     Exit Sub
 
 ImportErr:
     LogVbaEvent "ImportCandidatesV2", "Err " & Err.Number & ": " & Err.Description
     Resume ImportFinalize
 
+End Sub
+
+Private Sub ProtectDashboardV2(ByVal ws As Worksheet)
+    If ws Is Nothing Then Exit Sub
+    On Error Resume Next
+    ws.Unprotect
+    ws.Protect DrawingObjects:=True, Contents:=True, Scenarios:=True, _
+               UserInterfaceOnly:=True, AllowFormattingCells:=True, _
+               AllowFormattingColumns:=True, AllowFormattingRows:=True, _
+               AllowSorting:=True, AllowFiltering:=True
+    On Error GoTo 0
 End Sub
 Public Sub RefreshTrendsV2()
 
