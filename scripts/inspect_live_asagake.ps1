@@ -35,7 +35,7 @@ function Get-HeaderMap {
 try {
   $excel = [Runtime.InteropServices.Marshal]::GetActiveObject("Excel.Application")
 } catch {
-  Write-Output "NO_ACTIVE_EXCEL: Excelが起動していません。ASAGAKE.xlsmを開いてから再実行してください。"
+  Write-Output "NO_ACTIVE_EXCEL: Excel is not running. Open ASAGAKE.xlsm and run again."
   exit 2
 }
 
@@ -97,7 +97,11 @@ $counts = @{
 }
 
 $banRows = @()
+$activeRows = 0
 for ($i = 1; $i -le $rows; $i++) {
+  $tickerHere = $tikVals[$i, 1]
+  if ($null -eq $tickerHere -or $tickerHere -eq "") { continue }
+  $activeRows++
   $v = $jVals[$i, 1]
   if ($null -eq $v -or $v -eq "") { $counts.BLANK++; continue }
   if ($v -is [string]) {
@@ -116,7 +120,8 @@ for ($i = 1; $i -le $rows; $i++) {
   $counts.OTHER++
 }
 
-Write-Output ("J_th summary: NUM={0} BAN={1} ERR={2} BLANK={3} OTHER={4}" -f $counts.NUM, $counts.BAN, $counts.ERR, $counts.BLANK, $counts.OTHER)
+Write-Output ("Active tickers rows: {0}" -f $activeRows)
+Write-Output ("J_th summary (active rows only): NUM={0} BAN={1} ERR={2} BLANK={3} OTHER={4}" -f $counts.NUM, $counts.BAN, $counts.ERR, $counts.BLANK, $counts.OTHER)
 
 if ($banRows.Count -gt 0) {
   Write-Output "BAN rows (why):"
@@ -166,4 +171,3 @@ try {
 } catch {
   Write-Output ("Orders read failed: {0}" -f $_.Exception.Message)
 }
-
