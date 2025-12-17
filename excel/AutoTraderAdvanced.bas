@@ -2370,7 +2370,16 @@ Public Sub ImportCandidatesV2()
 
     On Error GoTo 0
 
-    If Len(Dir$(path)) = 0 Then Exit Sub
+    ' Fallback to fixed workspace path (helps when workbook is opened from a different folder)
+    If Len(Dir$(path)) = 0 Then
+        path = "C:\AI\asagake\output\excel\candidates_nextday.csv"
+    End If
+
+    If Len(Dir$(path)) = 0 Then
+        LogVbaEvent "ImportCandidatesV2", "candidate_csv_not_found path_try=" & path & " workbook_path=" & ThisWorkbook.path
+        If wasProtected Then ProtectDashboardV2 ws
+        Exit Sub
+    End If
 
     On Error GoTo ImportErr
 
@@ -2705,7 +2714,7 @@ ImportFinalize:
     Exit Sub
 
 ImportErr:
-    LogVbaEvent "ImportCandidatesV2", "Err " & Err.Number & ": " & Err.Description
+    LogVbaEvent "ImportCandidatesV2", "Err " & Err.Number & ": " & Err.Description & " path=" & path
     Resume ImportFinalize
 
 End Sub
