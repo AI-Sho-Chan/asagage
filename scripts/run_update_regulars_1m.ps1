@@ -1,7 +1,7 @@
 param(
   [string]$Repo = "C:\AI\asagake",
   [string]$Python = "C:\Python313\python.exe",
-  [string]$Gsutil = "gsutil",
+  [string]$Gsutil = "",
   [string]$RegularsGcsBucket = "gs://asagage-weekend-output/yahoo_1m_regulars",
   [switch]$SkipRegularsMirror,
   [switch]$SkipRegularsUpload,
@@ -19,6 +19,21 @@ param(
 $ErrorActionPreference = "Stop"
 
 Set-Location $Repo
+
+$resolvedGsutil = $Gsutil
+if (-not $resolvedGsutil) {
+  $gsutilCmd = Get-Command "gsutil.cmd" -ErrorAction SilentlyContinue
+  if ($gsutilCmd) {
+    $resolvedGsutil = $gsutilCmd.Source
+  } else {
+    $gsutilExe = Get-Command "gsutil" -ErrorAction SilentlyContinue
+    if ($gsutilExe) {
+      $resolvedGsutil = $gsutilExe.Source
+    } else {
+      $resolvedGsutil = "gsutil"
+    }
+  }
+}
 
 $tag = Get-Date -Format "yyyyMMdd"
 $logDir = Join-Path $Repo "logs"
@@ -114,7 +129,7 @@ if (-not $SkipRegularsUpload) {
     "[$ts] upload regulars to $RegularsGcsBucket" | Out-File -FilePath $logPath -Append -Encoding utf8
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = $Gsutil
+    $psi.FileName = $resolvedGsutil
     $psi.Arguments = ('-m rsync -r "{0}" "{1}"' -f $mirrorRoot, $RegularsGcsBucket)
     $psi.WorkingDirectory = $Repo
     $psi.RedirectStandardOutput = $true
