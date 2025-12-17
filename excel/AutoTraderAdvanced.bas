@@ -1021,11 +1021,22 @@ Private Sub CancelOppositeOrders(ByVal allowedSide As String)
     lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
     Dim r As Long
     For r = 2 To lastRow
+        Dim modeVal As String
+        modeVal = LCase$(Trim$(CStr(sh.Cells(r, 6).Value)))
+        Dim statusVal As String
+        statusVal = UCase$(Trim$(CStr(sh.Cells(r, 7).Value)))
+        If modeVal <> "preplace" And modeVal <> "preplace_demo" Then
+            GoTo ContinueCancelLoop
+        End If
+        If statusVal <> "PENDING" And statusVal <> "ORDERED" Then
+            GoTo ContinueCancelLoop
+        End If
         Dim orderSide As String
         orderSide = UCase$(CStr(sh.Cells(r, 3).Value))
         If orderSide = UCase$(cancelSide) Then
             sh.Cells(r, 7).Value = "CANCELLED_AUTO"
         End If
+ContinueCancelLoop:
     Next r
 End Sub
 
@@ -2673,6 +2684,7 @@ Public Sub RefreshTrendsV2()
     ApplyDynamicSignalsV2
     PreplaceOrdersV2
     If IsDemoMode() Then MarkPendingPreplaceAsOrderedDemo
+    If IsDemoMode() Then ProcessDemoOrdersV2 ws
     UpdateTrendIndicators ws
     On Error GoTo 0
 
@@ -2712,6 +2724,325 @@ Private Sub MarkPendingPreplaceAsOrderedDemo()
                 Sh.Cells(r, 8).Value = "DEMO_PREPLACE"
             End If
         End If
+    Next r
+End Sub
+
+' ----------------------------------------------------------------------------
+' DEMO: simulate fills and exits so Orders shows the full lifecycle.
+' - preplace_demo ORDERED -> RUNNING when price is touched
+' - when RUNNING, create tp_demo / sl_demo OCO orders (ORDERED)
+' - when tp_demo/sl_demo is touched, mark exit FILLED and mark entry CLOSED
+' ----------------------------------------------------------------------------
+
+Private Const ORD_COL_TS As Long = 1
+Private Const ORD_COL_TICKER As Long = 2
+Private Const ORD_COL_SIDE As Long = 3
+Private Const ORD_COL_PRICE As Long = 4
+Private Const ORD_COL_QTY As Long = 5
+Private Const ORD_COL_MODE As Long = 6
+Private Const ORD_COL_STATUS As Long = 7
+Private Const ORD_COL_NOTE As Long = 8
+Private Const ORD_COL_TP As Long = 9
+Private Const ORD_COL_SL As Long = 10
+Private Const ORD_COL_TRAIL As Long = 11
+Private Const ORD_COL_FILL_TS As Long = 12
+Private Const ORD_COL_FILL_PRICE As Long = 13
+Private Const ORD_COL_FILL_QTY As Long = 14
+Private Const ORD_COL_CLOSE_TS As Long = 15
+Private Const ORD_COL_CLOSE_PRICE As Long = 16
+Private Const ORD_COL_PNL_BP As Long = 17
+Private Const ORD_COL_SOURCE As Long = 18
+
+Private Sub ProcessDemoOrdersV2(ByVal ws As Worksheet)
+    On Error GoTo Fail
+    If ws Is Nothing Then Exit Sub
+    If Not IsDemoMode() Then Exit Sub
+
+    Dim sh As Worksheet
+    On Error Resume Next
+    Set sh = ThisWorkbook.Worksheets("Orders")
+    On Error GoTo Fail
+    If sh Is Nothing Then Exit Sub
+
+    Dim tickerCol As Long: tickerCol = FindColumn(ws, DASH2_HEADER_ROW, HeaderTickerJP())
+    If tickerCol = 0 Then Exit Sub
+    Dim bestBidCol As Long: bestBidCol = FindColumn(ws, DASH2_HEADER_ROW, "BestBid")
+    Dim bestAskCol As Long: bestAskCol = FindColumn(ws, DASH2_HEADER_ROW, "BestAsk")
+    If bestBidCol = 0 Or bestAskCol = 0 Then Exit Sub
+
+    ProcessDemoPreplaceFills ws, sh, tickerCol, bestBidCol, bestAskCol
+    ProcessDemoExitFills ws, sh, tickerCol, bestBidCol, bestAskCol
+    Exit Sub
+
+Fail:
+    LogVbaEvent "ProcessDemoOrdersV2", "Err " & Err.Number & ": " & Err.Description
+End Sub
+
+Private Function DashboardRowForTicker(ByVal ws As Worksheet, ByVal tickerCol As Long, ByVal ticker As String) As Long
+    DashboardRowForTicker = 0
+    If ws Is Nothing Or tickerCol = 0 Then Exit Function
+    If Len(Trim$(ticker)) = 0 Then Exit Function
+    Dim lastRow As Long
+    lastRow = ws.Cells(ws.Rows.Count, tickerCol).End(xlUp).Row
+    Dim r As Long
+    For r = DASH2_DATA_START To lastRow
+        If StrComp(Trim$(CStr(ws.Cells(r, tickerCol).Value)), ticker, vbTextCompare) = 0 Then
+            DashboardRowForTicker = r
+            Exit Function
+        End If
+    Next r
+End Function
+
+Private Function HasOpenDemoPosition(ByVal sh As Worksheet, ByVal ticker As String) As Boolean
+    HasOpenDemoPosition = False
+    If sh Is Nothing Then Exit Function
+    Dim lastRow As Long
+    lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
+    Dim r As Long
+    For r = lastRow To 2 Step -1
+        If StrComp(Trim$(CStr(sh.Cells(r, ORD_COL_TICKER).Value)), ticker, vbTextCompare) = 0 Then
+            Dim m As String: m = LCase$(Trim$(CStr(sh.Cells(r, ORD_COL_MODE).Value)))
+            If m = "preplace_demo" Then
+                Dim st As String: st = UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_STATUS).Value)))
+                If st = "RUNNING" Or st = "FILLED" Then
+                    HasOpenDemoPosition = True
+                    Exit Function
+                End If
+            End If
+        End If
+    Next r
+End Function
+
+Private Sub CancelOppositePreplaceDemo(ByVal sh As Worksheet, ByVal ticker As String, ByVal filledSide As String)
+    If sh Is Nothing Then Exit Sub
+    Dim cancelSide As String
+    If StrComp(filledSide, "BUY", vbTextCompare) = 0 Then
+        cancelSide = "SELL"
+    ElseIf StrComp(filledSide, "SELL", vbTextCompare) = 0 Then
+        cancelSide = "BUY"
+    Else
+        Exit Sub
+    End If
+    Dim lastRow As Long
+    lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
+    Dim r As Long
+    For r = 2 To lastRow
+        If StrComp(Trim$(CStr(sh.Cells(r, ORD_COL_TICKER).Value)), ticker, vbTextCompare) <> 0 Then GoTo NextCancel
+        If StrComp(LCase$(Trim$(CStr(sh.Cells(r, ORD_COL_MODE).Value))), "preplace_demo", vbTextCompare) <> 0 Then GoTo NextCancel
+        Dim st As String: st = UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_STATUS).Value)))
+        If st <> "ORDERED" And st <> "PENDING" Then GoTo NextCancel
+        Dim side As String: side = UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_SIDE).Value)))
+        If side = UCase$(cancelSide) Then
+            sh.Cells(r, ORD_COL_STATUS).Value = "CANCELLED_AUTO"
+            If Len(Trim$(CStr(sh.Cells(r, ORD_COL_NOTE).Value))) = 0 Then
+                sh.Cells(r, ORD_COL_NOTE).Value = "DEMO_OCO_CANCEL"
+            End If
+        End If
+NextCancel:
+    Next r
+End Sub
+
+Private Sub EnsureDemoExitOrders(ByVal sh As Worksheet, ByVal entryRow As Long)
+    If sh Is Nothing Or entryRow <= 1 Then Exit Sub
+
+    Dim ticker As String: ticker = Trim$(CStr(sh.Cells(entryRow, ORD_COL_TICKER).Value))
+    Dim entrySide As String: entrySide = UCase$(Trim$(CStr(sh.Cells(entryRow, ORD_COL_SIDE).Value)))
+    Dim qty As Double: qty = ToDouble(sh.Cells(entryRow, ORD_COL_QTY).Value, 0#)
+    Dim tpPrice As Double: tpPrice = ToDouble(sh.Cells(entryRow, ORD_COL_TP).Value, 0#)
+    Dim slPrice As Double: slPrice = ToDouble(sh.Cells(entryRow, ORD_COL_SL).Value, 0#)
+    If Len(ticker) = 0 Or qty <= 0# Then Exit Sub
+
+    Dim exitSide As String
+    If entrySide = "BUY" Then
+        exitSide = "SELL"
+    ElseIf entrySide = "SELL" Then
+        exitSide = "BUY"
+    Else
+        Exit Sub
+    End If
+
+    If tpPrice > 0# Then
+        AppendDemoExitIfMissing sh, ticker, exitSide, tpPrice, qty, "tp_demo", "ORDERED", "DEMO_TP"
+    End If
+    If slPrice > 0# Then
+        AppendDemoExitIfMissing sh, ticker, exitSide, slPrice, qty, "sl_demo", "ORDERED", "DEMO_SL"
+    End If
+End Sub
+
+Private Sub AppendDemoExitIfMissing(ByVal sh As Worksheet, ByVal ticker As String, ByVal side As String, ByVal price As Double, ByVal qty As Double, ByVal mode As String, ByVal statusVal As String, ByVal note As String)
+    If sh Is Nothing Then Exit Sub
+    Dim lastRow As Long
+    lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
+    Dim r As Long
+    For r = lastRow To 2 Step -1
+        If StrComp(Trim$(CStr(sh.Cells(r, ORD_COL_TICKER).Value)), ticker, vbTextCompare) = 0 Then
+            If StrComp(UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_SIDE).Value))), UCase$(side), vbTextCompare) = 0 Then
+                If StrComp(LCase$(Trim$(CStr(sh.Cells(r, ORD_COL_MODE).Value))), LCase$(mode), vbTextCompare) = 0 Then
+                    Dim st As String: st = UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_STATUS).Value)))
+                    If st = "ORDERED" Or st = "PENDING" Or st = "FILLED" Or st = "RUNNING" Then
+                        Exit Sub
+                    End If
+                End If
+            End If
+        End If
+    Next r
+
+    Dim rowIdx As Long
+    rowIdx = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row + 1
+    sh.Cells(rowIdx, ORD_COL_TS).Value = Now
+    sh.Cells(rowIdx, ORD_COL_TICKER).Value = ticker
+    sh.Cells(rowIdx, ORD_COL_SIDE).Value = UCase$(side)
+    sh.Cells(rowIdx, ORD_COL_PRICE).Value = price
+    sh.Cells(rowIdx, ORD_COL_QTY).Value = qty
+    sh.Cells(rowIdx, ORD_COL_MODE).Value = mode
+    sh.Cells(rowIdx, ORD_COL_STATUS).Value = statusVal
+    sh.Cells(rowIdx, ORD_COL_NOTE).Value = note
+    sh.Cells(rowIdx, ORD_COL_SOURCE).Value = "DEMO"
+End Sub
+
+Private Sub ProcessDemoPreplaceFills(ByVal ws As Worksheet, ByVal sh As Worksheet, ByVal tickerCol As Long, ByVal bestBidCol As Long, ByVal bestAskCol As Long)
+    Dim lastRow As Long
+    lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
+
+    Dim r As Long
+    For r = 2 To lastRow
+        Dim modeVal As String: modeVal = LCase$(Trim$(CStr(sh.Cells(r, ORD_COL_MODE).Value)))
+        If modeVal <> "preplace_demo" Then GoTo NextPreplace
+        Dim statusVal As String: statusVal = UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_STATUS).Value)))
+        If statusVal <> "ORDERED" Then GoTo NextPreplace
+
+        Dim ticker As String: ticker = Trim$(CStr(sh.Cells(r, ORD_COL_TICKER).Value))
+        If Len(ticker) = 0 Then GoTo NextPreplace
+        If HasOpenDemoPosition(sh, ticker) Then GoTo NextPreplace
+
+        Dim dashRow As Long
+        dashRow = DashboardRowForTicker(ws, tickerCol, ticker)
+        If dashRow = 0 Then GoTo NextPreplace
+
+        Dim bestBid As Double: bestBid = ToDouble(ws.Cells(dashRow, bestBidCol).Value, 0#)
+        Dim bestAsk As Double: bestAsk = ToDouble(ws.Cells(dashRow, bestAskCol).Value, 0#)
+        If bestBid <= 0# Or bestAsk <= 0# Then GoTo NextPreplace
+
+        Dim side As String: side = UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_SIDE).Value)))
+        Dim limitPrice As Double: limitPrice = ToDouble(sh.Cells(r, ORD_COL_PRICE).Value, 0#)
+        Dim qty As Double: qty = ToDouble(sh.Cells(r, ORD_COL_QTY).Value, 0#)
+        If limitPrice <= 0# Or qty <= 0# Then GoTo NextPreplace
+
+        Dim shouldFill As Boolean
+        Dim fillPrice As Double
+        If side = "BUY" Then
+            shouldFill = (bestAsk <= limitPrice)
+            If shouldFill Then fillPrice = IIf(bestAsk > 0#, bestAsk, limitPrice)
+        ElseIf side = "SELL" Then
+            shouldFill = (bestBid >= limitPrice)
+            If shouldFill Then fillPrice = IIf(bestBid > 0#, bestBid, limitPrice)
+        Else
+            GoTo NextPreplace
+        End If
+
+        If Not shouldFill Then GoTo NextPreplace
+
+        sh.Cells(r, ORD_COL_STATUS).Value = "RUNNING"
+        sh.Cells(r, ORD_COL_FILL_TS).Value = Now
+        sh.Cells(r, ORD_COL_FILL_PRICE).Value = fillPrice
+        sh.Cells(r, ORD_COL_FILL_QTY).Value = qty
+        sh.Cells(r, ORD_COL_SOURCE).Value = "DEMO"
+
+        CancelOppositePreplaceDemo sh, ticker, side
+        EnsureDemoExitOrders sh, r
+
+NextPreplace:
+    Next r
+End Sub
+
+Private Sub CancelSiblingExitOrders(ByVal sh As Worksheet, ByVal ticker As String, ByVal keepMode As String)
+    If sh Is Nothing Then Exit Sub
+    Dim lastRow As Long
+    lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
+    Dim r As Long
+    For r = 2 To lastRow
+        If StrComp(Trim$(CStr(sh.Cells(r, ORD_COL_TICKER).Value)), ticker, vbTextCompare) <> 0 Then GoTo NextExitCancel
+        Dim modeVal As String: modeVal = LCase$(Trim$(CStr(sh.Cells(r, ORD_COL_MODE).Value)))
+        If modeVal <> "tp_demo" And modeVal <> "sl_demo" Then GoTo NextExitCancel
+        If modeVal = LCase$(keepMode) Then GoTo NextExitCancel
+        Dim st As String: st = UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_STATUS).Value)))
+        If st = "ORDERED" Or st = "PENDING" Then
+            sh.Cells(r, ORD_COL_STATUS).Value = "CANCELLED_AUTO"
+            If Len(Trim$(CStr(sh.Cells(r, ORD_COL_NOTE).Value))) = 0 Then
+                sh.Cells(r, ORD_COL_NOTE).Value = "DEMO_OCO_CANCEL"
+            End If
+        End If
+NextExitCancel:
+    Next r
+End Sub
+
+Private Sub ProcessDemoExitFills(ByVal ws As Worksheet, ByVal sh As Worksheet, ByVal tickerCol As Long, ByVal bestBidCol As Long, ByVal bestAskCol As Long)
+    Dim lastRow As Long
+    lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
+
+    Dim r As Long
+    For r = 2 To lastRow
+        Dim modeVal As String: modeVal = LCase$(Trim$(CStr(sh.Cells(r, ORD_COL_MODE).Value)))
+        If modeVal <> "tp_demo" And modeVal <> "sl_demo" Then GoTo NextExit
+        Dim statusVal As String: statusVal = UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_STATUS).Value)))
+        If statusVal <> "ORDERED" Then GoTo NextExit
+
+        Dim ticker As String: ticker = Trim$(CStr(sh.Cells(r, ORD_COL_TICKER).Value))
+        If Len(ticker) = 0 Then GoTo NextExit
+
+        Dim dashRow As Long
+        dashRow = DashboardRowForTicker(ws, tickerCol, ticker)
+        If dashRow = 0 Then GoTo NextExit
+
+        Dim bestBid As Double: bestBid = ToDouble(ws.Cells(dashRow, bestBidCol).Value, 0#)
+        Dim bestAsk As Double: bestAsk = ToDouble(ws.Cells(dashRow, bestAskCol).Value, 0#)
+        If bestBid <= 0# Or bestAsk <= 0# Then GoTo NextExit
+
+        Dim side As String: side = UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_SIDE).Value)))
+        Dim limitPrice As Double: limitPrice = ToDouble(sh.Cells(r, ORD_COL_PRICE).Value, 0#)
+        Dim qty As Double: qty = ToDouble(sh.Cells(r, ORD_COL_QTY).Value, 0#)
+        If limitPrice <= 0# Or qty <= 0# Then GoTo NextExit
+
+        Dim shouldFill As Boolean
+        Dim fillPrice As Double
+        If modeVal = "tp_demo" Then
+            If side = "SELL" Then
+                shouldFill = (bestBid >= limitPrice)
+                If shouldFill Then fillPrice = bestBid
+            ElseIf side = "BUY" Then
+                shouldFill = (bestAsk <= limitPrice)
+                If shouldFill Then fillPrice = bestAsk
+            End If
+        ElseIf modeVal = "sl_demo" Then
+            If side = "SELL" Then
+                shouldFill = (bestBid <= limitPrice)
+                If shouldFill Then fillPrice = bestBid
+            ElseIf side = "BUY" Then
+                shouldFill = (bestAsk >= limitPrice)
+                If shouldFill Then fillPrice = bestAsk
+            End If
+        End If
+
+        If Not shouldFill Then GoTo NextExit
+
+        sh.Cells(r, ORD_COL_STATUS).Value = "FILLED"
+        sh.Cells(r, ORD_COL_FILL_TS).Value = Now
+        sh.Cells(r, ORD_COL_FILL_PRICE).Value = fillPrice
+        sh.Cells(r, ORD_COL_FILL_QTY).Value = qty
+        sh.Cells(r, ORD_COL_SOURCE).Value = "DEMO"
+
+        Dim entrySide As String
+        If side = "BUY" Then
+            entrySide = "SELL"
+        ElseIf side = "SELL" Then
+            entrySide = "BUY"
+        Else
+            GoTo NextExit
+        End If
+        LogOrderSettled ticker, entrySide, fillPrice, qty, "DEMO_EXIT_" & UCase$(modeVal)
+        CancelSiblingExitOrders sh, ticker, modeVal
+
+NextExit:
     Next r
 End Sub
 
