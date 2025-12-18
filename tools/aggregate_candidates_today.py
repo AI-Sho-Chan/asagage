@@ -216,6 +216,44 @@ def _ensure_gapban_notrade_fields(df: pd.DataFrame, thresholds: Thresholds) -> p
     return df
 
 
+def _ensure_tp_sl_trail_fields(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensure per-row TP/SL/Trail multipliers exist for the dashboard.
+
+    Some candidate sources (e.g. *_M0/M3 condensed exports) may not include the
+    newer `*_per_J_row` columns. In that case, we fall back to TPk/SLk which
+    historically match the dashboard's per-row multipliers.
+    """
+
+    cols = _column_lookup(df)
+    tpk_col = _col(cols, "TPk")
+    slk_col = _col(cols, "SLk")
+
+    tp_row_col = _col(cols, "TP_per_J_row")
+    sl_row_col = _col(cols, "SL_per_J_row")
+    trail_row_col = _col(cols, "Trail_per_J_row")
+
+    # Build fallback series (may be all-zeros when missing).
+    tp_fallback = _num(df, tpk_col)
+    sl_fallback = _num(df, slk_col)
+    trail_fallback = _num(df, slk_col)
+
+    def fill_or_fallback(col: Optional[str], fallback: pd.Series, out_name: str) -> None:
+        if col and col in df.columns:
+            current = pd.to_numeric(df[col], errors="coerce")
+            missing = current.isna() | (current <= 0)
+            if missing.any():
+                current = current.fillna(0.0)
+                current.loc[missing] = fallback.loc[missing]
+            df[out_name] = current
+        else:
+            df[out_name] = fallback
+
+    fill_or_fallback(tp_row_col, tp_fallback, "TP_per_J_row")
+    fill_or_fallback(sl_row_col, sl_fallback, "SL_per_J_row")
+    fill_or_fallback(trail_row_col, trail_fallback, "Trail_per_J_row")
+    return df
+
+
 def aggregate_frames(frames: Iterable[pd.DataFrame], thresholds: Thresholds) -> Optional[pd.DataFrame]:
     frames = [frame for frame in frames if not frame.empty]
     if not frames:
@@ -260,6 +298,7 @@ def aggregate_frames(frames: Iterable[pd.DataFrame], thresholds: Thresholds) -> 
     df = _ensure_live_demo_fields(df)
     df = _ensure_allowed_side_fields(df)
     df = _ensure_gapban_notrade_fields(df, thresholds)
+    df = _ensure_tp_sl_trail_fields(df)
 
     cols = _column_lookup(df)
     ticker_col = _col(cols, "ticker")

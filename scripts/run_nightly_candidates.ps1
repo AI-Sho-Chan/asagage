@@ -50,7 +50,7 @@ if ($checkProcess.ExitCode -ne 0) {
 
 $arguments = @(
     'scripts/nightly_build_candidates.py',
-    '--excel','C:/AI/asagake/SHINSOKU.xlsm',
+    '--excel','C:/AI/asagake/ASAGAKE.xlsm',
     '--base-out','output/bt30',
     '--run-type','weekday',
     '--target-date',$now.ToString('yyyyMMdd'),
@@ -92,6 +92,18 @@ try {
     if ($code -ne 0 -and (Test-Path $errLog)) {
         "[$($end.ToString('s'))] nightly_build_candidates error_detail $errLog" | Out-File -FilePath $logPath -Append -Encoding utf8
     }
+
+    # Always refresh candidates_nextday.csv so Excel Import stays on a single clean set,
+    # even when nightly_build_candidates exits early (e.g. no degraded tickers).
+    try {
+        $aggScript = Join-Path $repo 'tools/aggregate_candidates_today.py'
+        $aggOut = Join-Path $repo 'output/excel/candidates_nextday.csv'
+        & $python $aggScript --output $aggOut | Out-Null
+        "[$([DateTime]::Now.ToString('s'))] aggregate_candidates_today exit 0" | Out-File -FilePath $logPath -Append -Encoding utf8
+    }
+    catch {
+        "[$([DateTime]::Now.ToString('s'))] aggregate_candidates_today error $_" | Out-File -FilePath $logPath -Append -Encoding utf8
+    }
     if (-not $Smoke -and $code -eq 0) {
         try {
             & "$repo/scripts/run_trade_analysis.ps1" | Out-Null
@@ -108,5 +120,3 @@ catch {
     "[$($end.ToString('s'))] nightly_build_candidates error $_" | Out-File -FilePath $logPath -Append -Encoding utf8
     throw
 }
-
-
