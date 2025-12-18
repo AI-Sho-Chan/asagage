@@ -1805,13 +1805,15 @@ Public Sub PreplaceOrdersV2()
     Dim eBuyCol As Long: eBuyCol = FindColumn(ws, DASH2_HEADER_ROW, "EntryBuyPx")
     Dim eSellCol As Long: eSellCol = FindColumn(ws, DASH2_HEADER_ROW, "EntrySellPx")
     Dim qtyCol As Long: qtyCol = FindColumn(ws, DASH2_HEADER_ROW, "OrderQtyPlan")
-    Dim tpCol As Long: tpCol = FindColumn(ws, DASH2_HEADER_ROW, "TP_price")
-    Dim slCol As Long: slCol = FindColumn(ws, DASH2_HEADER_ROW, "SL_price")
+    Dim jCol As Long: jCol = FindColumn(ws, DASH2_HEADER_ROW, "J")
+    Dim tpPerJCol As Long: tpPerJCol = FindColumn(ws, DASH2_HEADER_ROW, "TP_per_J_row")
+    Dim slPerJCol As Long: slPerJCol = FindColumn(ws, DASH2_HEADER_ROW, "SL_per_J_row")
     Dim modeCol As Long: modeCol = FindColumn(ws, DASH2_HEADER_ROW, "SignalMode")
     Dim sessionCol As Long: sessionCol = FindColumn(ws, DASH2_HEADER_ROW, "session")
     Dim tickerCol As Long: tickerCol = FindColumn(ws, DASH2_HEADER_ROW, HeaderTickerJP())
 
     If selCol = 0 Or tickerCol = 0 Then Exit Sub
+    If jCol = 0 Or tpPerJCol = 0 Or slPerJCol = 0 Then Exit Sub
 
     Dim sh As Worksheet
     Set sh = EnsureOrdersSheet(ws)
@@ -1867,7 +1869,7 @@ Public Sub PreplaceOrdersV2()
                         End If
                     End If
                 End If
-                LogPreOrder ws, sh, r, hasBuy, hasSell, eBuyCol, eSellCol, qtyCol, tpCol, slCol, modeCol, sessionCol, tickerCol, bufferFrac, noteExtra
+                LogPreOrder ws, sh, r, hasBuy, hasSell, eBuyCol, eSellCol, qtyCol, jCol, tpPerJCol, slPerJCol, modeCol, sessionCol, tickerCol, bufferFrac, noteExtra
             End If
         End If
     Next r
@@ -1991,8 +1993,9 @@ End Sub
 Private Sub LogPreOrder(ByVal ws As Worksheet, ByVal orderSheet As Worksheet, ByVal rowIndex As Long, _
     ByVal includeBuy As Boolean, ByVal includeSell As Boolean, _
     ByVal eBuyCol As Long, ByVal eSellCol As Long, ByVal qtyCol As Long, _
-    ByVal tpCol As Long, ByVal slCol As Long, ByVal modeCol As Long, _
-    ByVal sessionCol As Long, ByVal tickerCol As Long, ByVal bufferFrac As Double, ByVal noteExtra As String)
+    ByVal jCol As Long, ByVal tpPerJCol As Long, ByVal slPerJCol As Long, _
+    ByVal modeCol As Long, ByVal sessionCol As Long, ByVal tickerCol As Long, _
+    ByVal bufferFrac As Double, ByVal noteExtra As String)
 
     Dim sh As Worksheet
     Set sh = orderSheet
@@ -2013,11 +2016,14 @@ Private Sub LogPreOrder(ByVal ws As Worksheet, ByVal orderSheet As Worksheet, By
     Dim qtyRef As String
     If qtyCol > 0 Then qtyRef = sheetToken & ws.Cells(rowIndex, qtyCol).Address(True, True, xlA1) Else qtyRef = ""
 
-    Dim tpRef As String
-    If tpCol > 0 Then tpRef = sheetToken & ws.Cells(rowIndex, tpCol).Address(True, True, xlA1) Else tpRef = ""
+    Dim jRef As String
+    If jCol > 0 Then jRef = sheetToken & ws.Cells(rowIndex, jCol).Address(True, True, xlA1) Else jRef = ""
 
-    Dim slRef As String
-    If slCol > 0 Then slRef = sheetToken & ws.Cells(rowIndex, slCol).Address(True, True, xlA1) Else slRef = ""
+    Dim tpPerJRef As String
+    If tpPerJCol > 0 Then tpPerJRef = sheetToken & ws.Cells(rowIndex, tpPerJCol).Address(True, True, xlA1) Else tpPerJRef = ""
+
+    Dim slPerJRef As String
+    If slPerJCol > 0 Then slPerJRef = sheetToken & ws.Cells(rowIndex, slPerJCol).Address(True, True, xlA1) Else slPerJRef = ""
 
     Dim sessionRef As String
     If sessionCol > 0 Then sessionRef = sheetToken & ws.Cells(rowIndex, sessionCol).Address(True, True, xlA1) Else sessionRef = ""
@@ -2058,14 +2064,15 @@ Private Sub LogPreOrder(ByVal ws As Worksheet, ByVal orderSheet As Worksheet, By
         Else
             sh.Cells(nextRow, 8).Value = ""
         End If
-        If tpRef <> "" Then
-            sh.Cells(nextRow, 9).Formula = "=" & tpRef
+        If jRef <> "" And tpPerJRef <> "" And slPerJRef <> "" And eBuyCol > 0 Then
+            Dim buyJRef As String
+            buyJRef = sheetToken & ws.Cells(rowIndex, jCol).Address(True, True, xlA1)
+            Dim buyEntryRef As String
+            buyEntryRef = sheetToken & ws.Cells(rowIndex, eBuyCol).Address(True, True, xlA1)
+            sh.Cells(nextRow, 9).Formula = "=IF(" & buyEntryRef & "=""",""""," & buyEntryRef & "*(1+N(" & tpPerJRef & ")*ABS(N(" & buyJRef & "))/100))"
+            sh.Cells(nextRow, 10).Formula = "=IF(" & buyEntryRef & "=""",""""," & buyEntryRef & "*(1-N(" & slPerJRef & ")*ABS(N(" & buyJRef & "))/100))"
         Else
             sh.Cells(nextRow, 9).Value = ""
-        End If
-        If slRef <> "" Then
-            sh.Cells(nextRow, 10).Formula = "=" & slRef
-        Else
             sh.Cells(nextRow, 10).Value = ""
         End If
         sh.Cells(nextRow, 11).Value = ""
@@ -2099,14 +2106,15 @@ Private Sub LogPreOrder(ByVal ws As Worksheet, ByVal orderSheet As Worksheet, By
         Else
             sh.Cells(nextRow, 8).Value = ""
         End If
-        If tpRef <> "" Then
-            sh.Cells(nextRow, 9).Formula = "=" & tpRef
+        If jRef <> "" And tpPerJRef <> "" And slPerJRef <> "" And eSellCol > 0 Then
+            Dim sellJRef As String
+            sellJRef = sheetToken & ws.Cells(rowIndex, jCol).Address(True, True, xlA1)
+            Dim sellEntryRef As String
+            sellEntryRef = sheetToken & ws.Cells(rowIndex, eSellCol).Address(True, True, xlA1)
+            sh.Cells(nextRow, 9).Formula = "=IF(" & sellEntryRef & "=""",""""," & sellEntryRef & "*(1-N(" & tpPerJRef & ")*ABS(N(" & sellJRef & "))/100))"
+            sh.Cells(nextRow, 10).Formula = "=IF(" & sellEntryRef & "=""",""""," & sellEntryRef & "*(1+N(" & slPerJRef & ")*ABS(N(" & sellJRef & "))/100))"
         Else
             sh.Cells(nextRow, 9).Value = ""
-        End If
-        If slRef <> "" Then
-            sh.Cells(nextRow, 10).Formula = "=" & slRef
-        Else
             sh.Cells(nextRow, 10).Value = ""
         End If
         sh.Cells(nextRow, 11).Value = ""
@@ -3019,10 +3027,10 @@ Private Sub ProcessDemoPreplaceFills(ByVal ws As Worksheet, ByVal sh As Workshee
         Dim fillPrice As Double
         If side = "BUY" Then
             shouldFill = (bestAsk <= limitPrice)
-            If shouldFill Then fillPrice = IIf(bestAsk > 0#, bestAsk, limitPrice)
+            If shouldFill Then fillPrice = limitPrice
         ElseIf side = "SELL" Then
             shouldFill = (bestBid >= limitPrice)
-            If shouldFill Then fillPrice = IIf(bestBid > 0#, bestBid, limitPrice)
+            If shouldFill Then fillPrice = limitPrice
         Else
             GoTo NextPreplace
         End If
@@ -3095,18 +3103,18 @@ Private Sub ProcessDemoExitFills(ByVal ws As Worksheet, ByVal sh As Worksheet, B
         If modeVal = "tp_demo" Then
             If side = "SELL" Then
                 shouldFill = (bestBid >= limitPrice)
-                If shouldFill Then fillPrice = bestBid
+                If shouldFill Then fillPrice = limitPrice
             ElseIf side = "BUY" Then
                 shouldFill = (bestAsk <= limitPrice)
-                If shouldFill Then fillPrice = bestAsk
+                If shouldFill Then fillPrice = limitPrice
             End If
         ElseIf modeVal = "sl_demo" Then
             If side = "SELL" Then
                 shouldFill = (bestBid <= limitPrice)
-                If shouldFill Then fillPrice = bestBid
+                If shouldFill Then fillPrice = limitPrice
             ElseIf side = "BUY" Then
                 shouldFill = (bestAsk >= limitPrice)
-                If shouldFill Then fillPrice = bestAsk
+                If shouldFill Then fillPrice = limitPrice
             End If
         End If
 
