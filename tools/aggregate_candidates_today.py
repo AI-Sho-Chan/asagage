@@ -1,9 +1,10 @@
 import argparse
 import glob
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -62,9 +63,84 @@ def collect_candidate_paths(date_tag: Optional[str] = None) -> List[Path]:
     paths: List[Path] = []
     for pat in patterns:
         for path_str in glob.glob(str(pat)):
-            paths.append(Path(path_str))
+            p = Path(path_str)
+            name_upper = p.name.upper()
+            # Never feed the aggregated outputs back into the aggregation.
+            if name_upper.startswith("CANDIDATES_NEXTDAY"):
+                continue
+            if name_upper.startswith("WEEKLY_CANDIDATES_"):
+                continue
+            paths.append(p)
 
     return sorted(paths)
+
+
+def resolve_latest_date_tag() -> str:
+    """Pick the newest NIGHTLY_YYYYMMDD folder date for default aggregation."""
+    candidates: List[str] = []
+    for p in ROOT.glob("NIGHTLY_*"):
+        m = re.match(r"^NIGHTLY_(\d{8})$", p.name)
+        if m:
+            candidates.append(m.group(1))
+    return max(candidates) if candidates else ""
+
+
+def _date_from_name(path: Path) -> Optional[str]:
+    m = re.search(r"(\d{8})", path.name)
+    return m.group(1) if m else None
+
+
+def _resolve_latest_root_candidate_file() -> Optional[Path]:
+    """Pick the newest single-file candidate set in output/excel/.
+
+    Used as a fallback when NIGHTLY folders exist but contain no candidate rows.
+    Preference order:
+      1) candidates_YYYYMMDD_M3.csv
+      2) candidates_for_YYYYMMDD.csv
+      3) candidates_YYYYMMDD_M0.csv
+      4) candidates_YYYYMMDD.csv (rare)
+
+    NOTE: We explicitly avoid candidates_nextday*.csv and backups.
+    """
+    patterns: List[str] = [
+        "candidates_*_M3.csv",
+        "candidates_for_*.csv",
+        "candidates_*_M0.csv",
+        "candidates_*.csv",
+    ]
+
+    best: Optional[Path] = None
+    best_date: str = ""
+
+    for pat in patterns:
+        for p in sorted(ROOT.glob(pat)):
+            name_upper = p.name.upper()
+            if name_upper.startswith("CANDIDATES_NEXTDAY"):
+                continue
+            if "BACKUP" in name_upper:
+                continue
+            if name_upper.startswith("WEEKLY_CANDIDATES_"):
+                continue
+            date = _date_from_name(p) or ""
+            if date and date > best_date:
+                best = p
+                best_date = date
+    return best
+
+
+def _read_nonempty_csvs(paths: Iterable[Path]) -> Tuple[List[pd.DataFrame], List[Path]]:
+    frames: List[pd.DataFrame] = []
+    used: List[Path] = []
+    for path in paths:
+        try:
+            df = pd.read_csv(path)
+        except Exception:
+            continue
+        if df.empty:
+            continue
+        frames.append(df)
+        used.append(path)
+    return frames, used
 
 
 def _column_lookup(df: pd.DataFrame) -> Dict[str, str]:
@@ -244,13 +320,17 @@ def main() -> None:
         default_no_trade_min=args.default_no_trade_min,
     )
 
-    frames: List[pd.DataFrame] = []
-    date_tag = args.date_tag.strip()
-    for path in collect_candidate_paths(date_tag or None):
-        try:
-            frames.append(pd.read_csv(path))
-        except Exception:
-            continue
+    date_tag = args.date_tag.strip() or resolve_latest_date_tag()
+
+    nightly_paths = collect_candidate_paths(date_tag or None)
+    frames, used_paths = _read_nonempty_csvs(nightly_paths)
+
+    source_label = f"NIGHTLY_{date_tag}" if date_tag else "all"
+    if not frames:
+        fallback = _resolve_latest_root_candidate_file()
+        if fallback is not None:
+            frames, used_paths = _read_nonempty_csvs([fallback])
+            source_label = fallback.name
 
     out = args.output
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -261,9 +341,30 @@ def main() -> None:
         return
 
     combined = aggregate_frames(frames, thresholds)
-    if combined is None:
+
+    if combined is None or combined.empty:
+        # If NIGHTLY candidates exist but yield no usable rows, fall back to the newest
+        # single-file candidate set (typically weekend-derived) so Import Candidates
+        # has something reasonable to work with.
+        if source_label.startswith("NIGHTLY_"):
+            fallback = _resolve_latest_root_candidate_file()
+            if fallback is not None:
+                alt_frames, alt_paths = _read_nonempty_csvs([fallback])
+                alt_combined = aggregate_frames(alt_frames, thresholds) if alt_frames else None
+                if alt_combined is not None and not alt_combined.empty:
+                    frames = alt_frames
+                    used_paths = alt_paths
+                    combined = alt_combined
+                    source_label = fallback.name
+
+    if combined is None or combined.empty:
         pd.DataFrame().to_csv(out, index=False, encoding="utf-8-sig", lineterminator="\r\n")
-        print(json.dumps({"written": str(out), "rows": 0}))
+        print(
+            json.dumps(
+                {"written": str(out), "rows": 0, "source": source_label, "source_files": [str(p) for p in used_paths]},
+                ensure_ascii=False,
+            )
+        )
         return
 
     summary = build_summary(combined, sum(len(frame) for frame in frames))
@@ -271,6 +372,8 @@ def main() -> None:
 
     payload = {"written": str(out), "rows": int(len(combined))}
     payload.update(summary.to_json())
+    payload["source"] = source_label
+    payload["source_files"] = [str(p) for p in used_paths]
     print(json.dumps(payload, ensure_ascii=False))
 
 
