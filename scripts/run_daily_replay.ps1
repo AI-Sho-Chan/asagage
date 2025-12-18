@@ -1,6 +1,8 @@
 param(
   [string]$DateTag = (Get-Date -Format "yyyyMMdd"),
-  [double]$Nominal = 10000000
+  [double]$Nominal = 10000000,
+  [int]$MaxAttempts = 12,
+  [int]$RetrySleepSeconds = 600
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,26 +28,52 @@ function Write-Log {
 
 Write-Log ("=== DailyReplay start (date={0}) ===" -f $DateTag)
 
-try {
-  $pyArgs = @(
-    "tools/simulate_daily_replay.py",
-    "--date", $DateTag,
-    "--nominal", [string][int][math]::Round($Nominal)
-  )
+$summaryPath = Join-Path $repo ("analysis/daily_replay_{0}.json" -f $DateTag)
 
-  $out = & $python @pyArgs 2>&1
-  $out | Out-File -FilePath $logPath -Append -Encoding utf8
-  if ($LASTEXITCODE -ne 0) {
-    throw "simulate_daily_replay.py failed (exit=$LASTEXITCODE)"
+$simulateOk = $false
+$lastSimulateOutput = ""
+$attempt = 1
+while (-not $simulateOk -and $attempt -le $MaxAttempts) {
+  try {
+    Write-Log ("simulate attempt {0}/{1}" -f $attempt, $MaxAttempts)
+
+    $pyArgs = @(
+      "tools/simulate_daily_replay.py",
+      "--date", $DateTag,
+      "--nominal", [string][int][math]::Round($Nominal)
+    )
+
+    $out = & $python @pyArgs 2>&1
+    $lastSimulateOutput = ($out | Out-String)
+    $out | Out-File -FilePath $logPath -Append -Encoding utf8
+    if ($LASTEXITCODE -ne 0) {
+      throw "simulate_daily_replay.py failed (exit=$LASTEXITCODE)"
+    }
+
+    $simulateOk = $true
+  } catch {
+    Write-Log ("[warn] simulate failed: {0}" -f $_.Exception.Message)
+    if ($attempt -lt $MaxAttempts) {
+      Write-Log ("sleep {0}s then retry" -f $RetrySleepSeconds)
+      Start-Sleep -Seconds $RetrySleepSeconds
+    }
+    $attempt += 1
   }
-} catch {
-  Write-Log ("[error] simulate failed: {0}" -f $_.Exception.Message)
-  throw
+}
+
+if (-not $simulateOk) {
+  Write-Log ("[error] simulate did not succeed after {0} attempts; writing placeholder summary" -f $MaxAttempts)
+  $placeholder = @{
+    date = $DateTag
+    status = "NOT_READY"
+    attempts = $MaxAttempts
+    note = "Yahoo 1m data may not be ready yet; rerun later."
+  } | ConvertTo-Json -Depth 4
+  $placeholder | Out-File -FilePath $summaryPath -Encoding utf8
 }
 
 # If `analysis/daily_replay_<date>.json` and `state/smtp.json` exist, send summary email.
 try {
-  $summaryPath = Join-Path $repo ("analysis/daily_replay_{0}.json" -f $DateTag)
   $smtpPath = Join-Path $repo "state/smtp.json"
 
   if ((Test-Path $summaryPath) -and (Test-Path $smtpPath)) {
