@@ -2798,7 +2798,10 @@ End Sub
 Private Function IsDemoMode() As Boolean
     On Error Resume Next
     Dim nm As Name
-    Set nm = Application.Names("RunStatusV2")
+    ' IMPORTANT: Use ThisWorkbook-scoped name first so behavior does not depend on
+    ' which workbook is currently active/focused in Excel.
+    Set nm = ThisWorkbook.Names("RunStatusV2")
+    If nm Is Nothing Then Set nm = Application.Names("RunStatusV2")
     If Not nm Is Nothing Then
         IsDemoMode = (UCase$(Trim$(nm.RefersToRange.Value)) = "DEMO_RUNNING")
     Else
