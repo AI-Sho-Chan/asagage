@@ -114,6 +114,7 @@ try {
       Port       = [int]$smtpConf.port
       UseSsl     = $true
       Credential = $cred
+      Encoding   = [System.Text.Encoding]::UTF8
     }
 
     Send-MailMessage @mailParams
