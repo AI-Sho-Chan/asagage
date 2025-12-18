@@ -3040,6 +3040,16 @@ Private Sub ProcessDemoPreplaceFills(ByVal ws As Worksheet, ByVal sh As Workshee
 
         If Not shouldFill Then GoTo NextPreplace
 
+        ' Freeze key values at fill time so historical records do not drift as dashboard cells change.
+        ' (Orders cells often contain formulas referencing the dashboard.)
+        On Error Resume Next
+        Dim tpNow As Double: tpNow = ToDouble(sh.Cells(r, ORD_COL_TP).Value, 0#)
+        Dim slNow As Double: slNow = ToDouble(sh.Cells(r, ORD_COL_SL).Value, 0#)
+        sh.Cells(r, ORD_COL_PRICE).Value = limitPrice
+        If tpNow > 0# Then sh.Cells(r, ORD_COL_TP).Value = tpNow
+        If slNow > 0# Then sh.Cells(r, ORD_COL_SL).Value = slNow
+        On Error GoTo 0
+
         sh.Cells(r, ORD_COL_STATUS).Value = "RUNNING"
         sh.Cells(r, ORD_COL_FILL_TS).Value = Now
         sh.Cells(r, ORD_COL_FILL_PRICE).Value = fillPrice
