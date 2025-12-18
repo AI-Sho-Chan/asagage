@@ -2034,6 +2034,9 @@ Private Sub LogPreOrder(ByVal ws As Worksheet, ByVal orderSheet As Worksheet, By
     Dim noteFormula As String
     noteFormula = BuildNoteFormula(sessionRef, modeRef, noteExtra)
 
+    Dim q As String
+    q = Chr$(34)
+
     Dim nowStr As String: nowStr = Format$(Now, "yyyy-mm-dd hh:nn:ss")
     Dim nextRow As Long: nextRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row + 1
 
@@ -2069,8 +2072,8 @@ Private Sub LogPreOrder(ByVal ws As Worksheet, ByVal orderSheet As Worksheet, By
             buyJRef = sheetToken & ws.Cells(rowIndex, jCol).Address(True, True, xlA1)
             Dim buyEntryRef As String
             buyEntryRef = sheetToken & ws.Cells(rowIndex, eBuyCol).Address(True, True, xlA1)
-            sh.Cells(nextRow, 9).Formula = "=IF(" & buyEntryRef & "=""",""""," & buyEntryRef & "*(1+N(" & tpPerJRef & ")*ABS(N(" & buyJRef & "))/100))"
-            sh.Cells(nextRow, 10).Formula = "=IF(" & buyEntryRef & "=""",""""," & buyEntryRef & "*(1-N(" & slPerJRef & ")*ABS(N(" & buyJRef & "))/100))"
+            sh.Cells(nextRow, 9).Formula = "=IF(" & buyEntryRef & "=" & q & q & "," & q & q & "," & buyEntryRef & "*(1+N(" & tpPerJRef & ")*ABS(N(" & buyJRef & "))/100))"
+            sh.Cells(nextRow, 10).Formula = "=IF(" & buyEntryRef & "=" & q & q & "," & q & q & "," & buyEntryRef & "*(1-N(" & slPerJRef & ")*ABS(N(" & buyJRef & "))/100))"
         Else
             sh.Cells(nextRow, 9).Value = ""
             sh.Cells(nextRow, 10).Value = ""
@@ -2111,8 +2114,8 @@ Private Sub LogPreOrder(ByVal ws As Worksheet, ByVal orderSheet As Worksheet, By
             sellJRef = sheetToken & ws.Cells(rowIndex, jCol).Address(True, True, xlA1)
             Dim sellEntryRef As String
             sellEntryRef = sheetToken & ws.Cells(rowIndex, eSellCol).Address(True, True, xlA1)
-            sh.Cells(nextRow, 9).Formula = "=IF(" & sellEntryRef & "=""",""""," & sellEntryRef & "*(1-N(" & tpPerJRef & ")*ABS(N(" & sellJRef & "))/100))"
-            sh.Cells(nextRow, 10).Formula = "=IF(" & sellEntryRef & "=""",""""," & sellEntryRef & "*(1+N(" & slPerJRef & ")*ABS(N(" & sellJRef & "))/100))"
+            sh.Cells(nextRow, 9).Formula = "=IF(" & sellEntryRef & "=" & q & q & "," & q & q & "," & sellEntryRef & "*(1-N(" & tpPerJRef & ")*ABS(N(" & sellJRef & "))/100))"
+            sh.Cells(nextRow, 10).Formula = "=IF(" & sellEntryRef & "=" & q & q & "," & q & q & "," & sellEntryRef & "*(1+N(" & slPerJRef & ")*ABS(N(" & sellJRef & "))/100))"
         Else
             sh.Cells(nextRow, 9).Value = ""
             sh.Cells(nextRow, 10).Value = ""
