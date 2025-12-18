@@ -51,6 +51,111 @@ SESSION_WINDOWS: Dict[str, Tuple[dt.time, dt.time]] = {
     "PM1": (dt.time(12, 30), dt.time(13, 30)),
 }
 
+
+def build_mail_report(
+    *,
+    date_tag: str,
+    cand_path: Path,
+    trades_df: pd.DataFrame,
+    summary: Dict[str, object],
+    nominal: float,
+) -> str:
+    lines: List[str] = []
+    lines.append(f"ASAGAKE DailyReplay（仮想売買） {date_tag}")
+    lines.append("")
+    lines.append(f"候補CSV: {cand_path.as_posix()}")
+    lines.append(f"前提: 予算={int(nominal):,}円/プラン、同時1ポジション、決済後のみ再エントリー、クールダウン{COOLDOWN_MINUTES}分、同一銘柄は1日{MAX_TRADES_PER_TICKER}回まで")
+    lines.append("")
+
+    trades = int(summary.get("trades", 0) or 0)
+    pnl_yen = float(summary.get("pnl_yen", 0.0) or 0.0)
+    pnl_bp_mean = summary.get("pnl_bp_mean")
+
+    lines.append(f"結果サマリ: 取引 {trades} 回 / 合計損益 {pnl_yen:,.0f} 円")
+    if pnl_bp_mean is not None:
+        try:
+            lines.append(f"（平均損益 {float(pnl_bp_mean):.1f} bp）")
+        except (TypeError, ValueError):
+            pass
+
+    skip_trend = summary.get("diag_skip_trend_mismatch")
+    no_signal = summary.get("diag_no_signal")
+    if skip_trend is not None or no_signal is not None:
+        parts = []
+        if skip_trend is not None:
+            parts.append(f"方向不一致で見送り {skip_trend} 件")
+        if no_signal is not None:
+            parts.append(f"シグナル無し {no_signal} 件")
+        if parts:
+            lines.append("見送り: " + " / ".join(parts))
+
+    lines.append("")
+    if trades_df.empty:
+        lines.append("この日は、条件に合う取引がありませんでした。")
+        lines.append("")
+        lines.append("補足: これは「取引終了後に、Yahooの1分足で再現した仮想売買」です。Excelの場中ログと一致しないことがあります。")
+        return "\n".join(lines)
+
+    # class breakdown
+    lines.append("クラス別（強/標準/デモ）:")
+    if all(k in summary for k in ("LIVE_STRONG_trades", "LIVE_BASE_trades", "DEMO_ONLY_trades")):
+        lines.append(
+            f"  LIVE_STRONG: {int(summary.get('LIVE_STRONG_trades', 0) or 0)}回 / {float(summary.get('LIVE_STRONG_pnl_yen', 0.0) or 0.0):,.0f}円"
+        )
+        lines.append(
+            f"  LIVE_BASE:   {int(summary.get('LIVE_BASE_trades', 0) or 0)}回 / {float(summary.get('LIVE_BASE_pnl_yen', 0.0) or 0.0):,.0f}円"
+        )
+        lines.append(
+            f"  DEMO_ONLY:   {int(summary.get('DEMO_ONLY_trades', 0) or 0)}回 / {float(summary.get('DEMO_ONLY_pnl_yen', 0.0) or 0.0):,.0f}円"
+        )
+    else:
+        gb = trades_df.groupby("live_demo_class")["pnl_yen"].sum().sort_index()
+        for k, v in gb.items():
+            lines.append(f"  {k}: {v:,.0f}円")
+
+    # top losses / wins
+    cols = [
+        "code",
+        "session",
+        "signal_mode",
+        "side",
+        "pnl_yen",
+        "pnl_bp",
+        "live_demo_class",
+        "budget_factor",
+    ]
+    for c in cols:
+        if c not in trades_df.columns:
+            trades_df[c] = ""
+
+    losses = trades_df.sort_values("pnl_yen", ascending=True).head(5)
+    wins = trades_df.sort_values("pnl_yen", ascending=False).head(5)
+
+    lines.append("")
+    lines.append("負けが大きかった順（上位5件）:")
+    for _, r in losses.iterrows():
+        lines.append(
+            f"  {r['code']} {r['session']} {r['signal_mode']} {r['side']}: {float(r['pnl_yen']):,.0f}円 ({float(r['pnl_bp']):.1f}bp) [{r['live_demo_class']}] x{float(r['budget_factor']) if str(r['budget_factor']) else ''}"
+        )
+
+    lines.append("")
+    lines.append("勝ちが大きかった順（上位5件）:")
+    for _, r in wins.iterrows():
+        lines.append(
+            f"  {r['code']} {r['session']} {r['signal_mode']} {r['side']}: {float(r['pnl_yen']):,.0f}円 ({float(r['pnl_bp']):.1f}bp) [{r['live_demo_class']}] x{float(r['budget_factor']) if str(r['budget_factor']) else ''}"
+        )
+
+    lines.append("")
+    lines.append("かんたんな解説:")
+    min_loss = float(trades_df["pnl_yen"].min())
+    if min_loss < 0 and abs(min_loss) > abs(pnl_yen) * 0.6:
+        lines.append("  1つの大きな負けが、1日の結果をほぼ決めています（大負けを減らすと安定します）。")
+    else:
+        lines.append("  複数の勝ち/負けの合計で結果が決まっています（大負けの有無を確認してください）。")
+    lines.append("  ※これは「取引終了後に、Yahooの1分足データで再現した仮想売買」です。Excelの場中ログと一致しないことがあります。")
+
+    return "\n".join(lines)
+
 INTRADAY_CACHE: Dict[Tuple[str, str], pd.DataFrame] = {}
 PREV_CLOSE_CACHE: Dict[Tuple[str, str], float | None] = {}
 
@@ -701,6 +806,17 @@ def main() -> None:
         import json
         json.dump(summary, f, ensure_ascii=False, indent=2)
     print(f"summary written to {summary_json}")
+
+    report_txt = OUT_DIR / f"daily_replay_{args.date}{suffix}_mail.txt"
+    report = build_mail_report(
+        date_tag=args.date,
+        cand_path=cand_path,
+        trades_df=trades_df,
+        summary=summary,
+        nominal=args.nominal,
+    )
+    report_txt.write_text(report, encoding="utf-8-sig")
+    print(f"mail report written to {report_txt}")
 
 
 if __name__ == "__main__":
