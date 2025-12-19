@@ -35,8 +35,8 @@ COST_BP = 8.0
 # - Re-entry allowed only after exit + cooldown
 # - Cooldown: 5 minutes
 # - Max trades per ticker per day: 2
-COOLDOWN_MINUTES = 5
-MAX_TRADES_PER_TICKER = 2
+DEFAULT_COOLDOWN_MINUTES = 5
+DEFAULT_MAX_TRADES_PER_TICKER = 2
 
 
 SESSION_WINDOWS: Dict[str, Tuple[dt.time, dt.time]] = {
@@ -64,7 +64,19 @@ def build_mail_report(
     lines.append(f"ASAGAKE DailyReplay（仮想売買） {date_tag}")
     lines.append("")
     lines.append(f"候補CSV: {cand_path.as_posix()}")
-    lines.append(f"前提: 予算={int(nominal):,}円/プラン、同時1ポジション、決済後のみ再エントリー、クールダウン{COOLDOWN_MINUTES}分、同一銘柄は1日{MAX_TRADES_PER_TICKER}回まで")
+    cooldown_minutes = int(summary.get("cooldown_minutes", DEFAULT_COOLDOWN_MINUTES) or DEFAULT_COOLDOWN_MINUTES)
+    max_trades = int(summary.get("max_trades_per_ticker", DEFAULT_MAX_TRADES_PER_TICKER) or DEFAULT_MAX_TRADES_PER_TICKER)
+    stop_after_loss = bool(summary.get("stop_after_loss", False))
+    max_trades_label = "制限なし" if max_trades <= 0 else f"1日{max_trades}回まで"
+    extra_rule = "（その銘柄で損失が出たら当日はそれ以上取引しない）" if stop_after_loss else ""
+    lines.append(
+        "前提: "
+        f"予算={int(nominal):,}円/プラン、"
+        "同時1ポジション（同一銘柄は同時に1つまで）、"
+        "決済後のみ再エントリー、"
+        f"クールダウン{cooldown_minutes}分、"
+        f"同一銘柄は{max_trades_label}{extra_rule}"
+    )
     lines.append("")
 
     trades = int(summary.get("trades", 0) or 0)
@@ -584,7 +596,15 @@ def simulate_trade_for_candidate(
     }
 
 
-def simulate_day(cand_path: Path, day: dt.date, nominal: float) -> Tuple[pd.DataFrame, Dict[str, float]]:
+def simulate_day(
+    cand_path: Path,
+    day: dt.date,
+    nominal: float,
+    *,
+    cooldown_minutes: int = DEFAULT_COOLDOWN_MINUTES,
+    max_trades_per_ticker: int = DEFAULT_MAX_TRADES_PER_TICKER,
+    stop_after_loss: bool = False,
+) -> Tuple[pd.DataFrame, Dict[str, object]]:
     df_raw = load_candidates(cand_path)
     df = normalize_columns(df_raw)
     candidate_trades: List[Dict[str, object]] = []
@@ -644,7 +664,10 @@ def simulate_day(cand_path: Path, day: dt.date, nominal: float) -> Tuple[pd.Data
     tdf_all["exit_ts"] = pd.to_datetime(tdf_all["exit_ts"], errors="coerce")
     tdf_all = tdf_all.dropna(subset=["entry_ts", "exit_ts"])
 
-    cooldown = pd.Timedelta(minutes=COOLDOWN_MINUTES)
+    cooldown_minutes_i = int(cooldown_minutes)
+    if cooldown_minutes_i < 0:
+        cooldown_minutes_i = 0
+    cooldown = pd.Timedelta(minutes=cooldown_minutes_i)
     selected_trades: List[Dict[str, object]] = []
 
     for code, sub in tdf_all.groupby("code", dropna=False):
@@ -658,7 +681,7 @@ def simulate_day(cand_path: Path, day: dt.date, nominal: float) -> Tuple[pd.Data
 
         # Process in chronological order; for same entry_ts choose best by priority.
         for entry_ts, bucket in sub.groupby("entry_ts", sort=True):
-            if trade_count >= MAX_TRADES_PER_TICKER:
+            if max_trades_per_ticker > 0 and trade_count >= max_trades_per_ticker:
                 break
 
             bucket = bucket.sort_values(
@@ -682,6 +705,13 @@ def simulate_day(cand_path: Path, day: dt.date, nominal: float) -> Tuple[pd.Data
             selected_trades.append({k: picked[k] for k in tdf_all.columns if not str(k).startswith("_")})
             last_exit = picked["exit_ts"]
             trade_count += 1
+            if stop_after_loss:
+                try:
+                    pnl_yen_val = float(picked.get("pnl_yen", 0.0) or 0.0)
+                    if pnl_yen_val < 0:
+                        break
+                except (TypeError, ValueError):
+                    pass
 
     if not selected_trades:
         return pd.DataFrame(), {"date": day.strftime("%Y-%m-%d"), "trades": 0, "pnl_yen": 0.0, "pnl_bp_mean": 0.0}
@@ -694,8 +724,9 @@ def simulate_day(cand_path: Path, day: dt.date, nominal: float) -> Tuple[pd.Data
         "trades": int(len(tdf)),
         "pnl_yen": pnl_yen,
         "pnl_bp_mean": pnl_bp_mean,
-        "cooldown_minutes": COOLDOWN_MINUTES,
-        "max_trades_per_ticker": MAX_TRADES_PER_TICKER,
+        "cooldown_minutes": cooldown_minutes_i,
+        "max_trades_per_ticker": int(max_trades_per_ticker),
+        "stop_after_loss": bool(stop_after_loss),
     }
     summary.update({f"diag_{k}": int(v) for k, v in counters.items()})
     # Live/Demo 別集計
@@ -734,6 +765,26 @@ def parse_args() -> argparse.Namespace:
         default=10_000_000.0,
         help="Nominal per position in yen (default 10,000,000)",
     )
+    ap.add_argument(
+        "--cooldown-minutes",
+        type=int,
+        default=DEFAULT_COOLDOWN_MINUTES,
+        help=f"Cooldown minutes after exit before re-entry (default {DEFAULT_COOLDOWN_MINUTES})",
+    )
+    ap.add_argument(
+        "--max-trades-per-ticker",
+        type=int,
+        default=DEFAULT_MAX_TRADES_PER_TICKER,
+        help=(
+            "Max trades per ticker per day. "
+            f"Use 0 to disable the limit (default {DEFAULT_MAX_TRADES_PER_TICKER})."
+        ),
+    )
+    ap.add_argument(
+        "--stop-after-loss",
+        action="store_true",
+        help="If set, stop trading the same ticker for the rest of the day after the first losing trade.",
+    )
     return ap.parse_args()
 
 
@@ -767,7 +818,14 @@ def main() -> None:
             )
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    trades_df, summary = simulate_day(cand_path, trade_date, args.nominal)
+    trades_df, summary = simulate_day(
+        cand_path,
+        trade_date,
+        args.nominal,
+        cooldown_minutes=int(args.cooldown_minutes),
+        max_trades_per_ticker=int(args.max_trades_per_ticker),
+        stop_after_loss=bool(args.stop_after_loss),
+    )
 
     label = str(args.label or "").strip()
     safe_label = "".join(ch for ch in label if ch.isalnum() or ch in ("_", "-"))
