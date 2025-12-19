@@ -94,12 +94,13 @@ def run_policy(
     cand_path: Path,
     trading_day: dt.date,
     *,
+    policy_name: str,
     nominal: float,
     cooldown_minutes: int,
     max_trades_per_ticker: int,
     stop_after_loss: bool,
 ) -> Tuple[pd.DataFrame, Dict[str, object]]:
-    return simulate_day(
+    trades, summary = simulate_day(
         cand_path,
         trading_day,
         nominal,
@@ -107,6 +108,9 @@ def run_policy(
         max_trades_per_ticker=max_trades_per_ticker,
         stop_after_loss=stop_after_loss,
     )
+    summary = dict(summary)
+    summary["policy"] = policy_name
+    return trades, summary
 
 
 def parse_args() -> argparse.Namespace:
@@ -181,20 +185,44 @@ def main() -> None:
     deltas: List[Dict[str, object]] = []
 
     for d in picked_days:
+        # Policy A: baseline (max 2 trades per ticker/day)
         base_trades, base_sum = run_policy(
             cand_path,
             d,
+            policy_name="baseline_max2",
             nominal=float(args.nominal),
             cooldown_minutes=int(args.cooldown_minutes),
             max_trades_per_ticker=int(args.baseline_max_trades),
             stop_after_loss=False,
         )
+        # Policy B: no cap, but stop trading the ticker for the rest of the day after the first loss
         alt_trades, alt_sum = run_policy(
             cand_path,
             d,
+            policy_name="no_cap_stop_after_loss",
             nominal=float(args.nominal),
             cooldown_minutes=int(args.cooldown_minutes),
             max_trades_per_ticker=0,  # no cap
+            stop_after_loss=True,
+        )
+        # Policy C: no cap, no stop-after-loss (pure "as many as possible", still one-at-a-time + cooldown)
+        nocap_trades, nocap_sum = run_policy(
+            cand_path,
+            d,
+            policy_name="no_cap_no_stop",
+            nominal=float(args.nominal),
+            cooldown_minutes=int(args.cooldown_minutes),
+            max_trades_per_ticker=0,
+            stop_after_loss=False,
+        )
+        # Policy D: keep max2, but if you lose once on that ticker, stop for that day (more defensive)
+        max2_lossstop_trades, max2_lossstop_sum = run_policy(
+            cand_path,
+            d,
+            policy_name="max2_stop_after_loss",
+            nominal=float(args.nominal),
+            cooldown_minutes=int(args.cooldown_minutes),
+            max_trades_per_ticker=int(args.baseline_max_trades),
             stop_after_loss=True,
         )
 
@@ -215,21 +243,33 @@ def main() -> None:
 
         rows.append(_row("baseline_max2", base_sum))
         rows.append(_row("no_cap_stop_after_loss", alt_sum))
+        rows.append(_row("no_cap_no_stop", nocap_sum))
+        rows.append(_row("max2_stop_after_loss", max2_lossstop_sum))
 
-        if float(base_sum.get("pnl_yen", 0.0) or 0.0) != float(alt_sum.get("pnl_yen", 0.0) or 0.0) or int(
-            base_sum.get("trades", 0) or 0
-        ) != int(alt_sum.get("trades", 0) or 0):
-            deltas.append(
-                {
-                    "date": d.strftime("%Y-%m-%d"),
-                    "baseline_trades": int(base_sum.get("trades", 0) or 0),
-                    "alt_trades": int(alt_sum.get("trades", 0) or 0),
-                    "baseline_pnl_yen": float(base_sum.get("pnl_yen", 0.0) or 0.0),
-                    "alt_pnl_yen": float(alt_sum.get("pnl_yen", 0.0) or 0.0),
-                    "delta_pnl_yen": float(alt_sum.get("pnl_yen", 0.0) or 0.0)
-                    - float(base_sum.get("pnl_yen", 0.0) or 0.0),
-                }
-            )
+        def _pnl(summary: Dict[str, object]) -> float:
+            return float(summary.get("pnl_yen", 0.0) or 0.0)
+
+        def _trades(summary: Dict[str, object]) -> int:
+            return int(summary.get("trades", 0) or 0)
+
+        # Record day-level differences vs baseline.
+        for name, s in (
+            ("no_cap_stop_after_loss", alt_sum),
+            ("no_cap_no_stop", nocap_sum),
+            ("max2_stop_after_loss", max2_lossstop_sum),
+        ):
+            if _pnl(s) != _pnl(base_sum) or _trades(s) != _trades(base_sum):
+                deltas.append(
+                    {
+                        "date": d.strftime("%Y-%m-%d"),
+                        "baseline_trades": _trades(base_sum),
+                        "baseline_pnl_yen": _pnl(base_sum),
+                        "variant": name,
+                        "variant_trades": _trades(s),
+                        "variant_pnl_yen": _pnl(s),
+                        "delta_pnl_yen": _pnl(s) - _pnl(base_sum),
+                    }
+                )
 
     out_df = pd.DataFrame(rows).sort_values(["date", "policy"])
     args.out_csv.parent.mkdir(parents=True, exist_ok=True)
