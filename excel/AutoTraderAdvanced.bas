@@ -41,6 +41,12 @@ Private Const DRIVER_NKY As String = "NKY"
 Private Const DRIVER_TOPIX As String = "TOPIX"
 Private Const BB_DEFAULT_BLOCK_MINUTES As Double = 3#
 
+' Auto tick (V2): keep RefreshTrends/Preplace/Demo processing running without manual button clicks.
+Private Const AUTO_TICK_V2_INTERVAL_SEC As Long = 5
+Private gAutoTickV2Next As Date
+Private gAutoTickV2Scheduled As Boolean
+Private gAutoTickV2InProgress As Boolean
+
 ' Orders sheet columns (V2)
 Private Const ORD_COL_TS As Long = 1
 Private Const ORD_COL_TICKER As Long = 2
@@ -1821,11 +1827,21 @@ Public Sub PreplaceOrdersV2()
     Dim slipDict As Object
     Set slipDict = LoadSlippageOverrides()
 
+    Dim isDemo As Boolean: isDemo = IsDemoMode()
+
     Dim lastOrder As Long: lastOrder = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
     Dim idx As Long
     For idx = lastOrder To 2 Step -1
-        If LCase$(CStr(sh.Cells(idx, 6).Value)) = "preplace" Then
+        Dim modeExisting As String: modeExisting = LCase$(Trim$(CStr(sh.Cells(idx, 6).Value)))
+        Dim statusExisting As String: statusExisting = UCase$(Trim$(CStr(sh.Cells(idx, 7).Value)))
+
+        If modeExisting = "preplace" Then
             sh.Rows(idx).Delete
+        ElseIf isDemo And modeExisting = "preplace_demo" Then
+            ' Keep RUNNING entries (active positions). Refresh only pending/ordered rows.
+            If statusExisting = "ORDERED" Or statusExisting = "CANCELLED_AUTO" Then
+                sh.Rows(idx).Delete
+            End If
         End If
     Next idx
 
@@ -1838,18 +1854,18 @@ Public Sub PreplaceOrdersV2()
             Dim hasSell As Boolean: hasSell = False
             Dim tmpVal As Variant
             If eBuyCol > 0 Then
-                hasBuy = ws.Cells(r, eBuyCol).HasFormula
-                If Not hasBuy Then
-                    tmpVal = ws.Cells(r, eBuyCol).Value
-                    hasBuy = IsNumeric(tmpVal) And tmpVal > 0
-                End If
+                tmpVal = ws.Cells(r, eBuyCol).Value
+                hasBuy = IsNumeric(tmpVal) And tmpVal > 0
             End If
             If eSellCol > 0 Then
-                hasSell = ws.Cells(r, eSellCol).HasFormula
-                If Not hasSell Then
-                    tmpVal = ws.Cells(r, eSellCol).Value
-                    hasSell = IsNumeric(tmpVal) And tmpVal > 0
-                End If
+                tmpVal = ws.Cells(r, eSellCol).Value
+                hasSell = IsNumeric(tmpVal) And tmpVal > 0
+            End If
+            Dim qtyVal As Long: qtyVal = 0
+            If qtyCol > 0 Then qtyVal = CLng(ToDouble(ws.Cells(r, qtyCol).Value, 0#))
+            If qtyVal <= 0 Then
+                hasBuy = False
+                hasSell = False
             End If
             If hasBuy Or hasSell Then
                 Dim modeVal As String: modeVal = ""
@@ -2327,13 +2343,91 @@ End Sub
 
 
 
-Public Sub StartDemoV2(): UpdateStatusV2 "DEMO_RUNNING": End Sub
+Public Sub StartDemoV2()
+    UpdateStatusV2 "DEMO_RUNNING"
+    StartAutoTickV2
+End Sub
 
-Public Sub StopDemoV2():  UpdateStatusV2 "IDLE": End Sub
+Public Sub StopDemoV2()
+    StopAutoTickV2
+    UpdateStatusV2 "IDLE"
+End Sub
 
-Public Sub StartLiveV2(): UpdateStatusV2 "LIVE_RUNNING": End Sub
+Public Sub StartLiveV2()
+    UpdateStatusV2 "LIVE_RUNNING"
+    StartAutoTickV2
+End Sub
 
-Public Sub StopLiveV2():  UpdateStatusV2 "IDLE": End Sub
+Public Sub StopLiveV2()
+    StopAutoTickV2
+    UpdateStatusV2 "IDLE"
+End Sub
+
+Public Sub AutoTickV2()
+    On Error GoTo Fail
+
+    If gAutoTickV2InProgress Then GoTo ScheduleNext
+    gAutoTickV2InProgress = True
+
+    If Not IsRunningModeV2() Then GoTo StopLoop
+    RefreshTrendsV2
+
+ScheduleNext:
+    gAutoTickV2InProgress = False
+    If IsRunningModeV2() Then
+        ScheduleAutoTickV2
+    Else
+        gAutoTickV2Scheduled = False
+    End If
+    Exit Sub
+
+StopLoop:
+    gAutoTickV2InProgress = False
+    StopAutoTickV2
+    Exit Sub
+
+Fail:
+    gAutoTickV2InProgress = False
+    LogVbaEvent "AutoTickV2", "Err " & Err.Number & ": " & Err.Description
+    Resume ScheduleNext
+End Sub
+
+Private Sub StartAutoTickV2()
+    StopAutoTickV2
+    ScheduleAutoTickV2
+    LogVbaEvent "AutoTickV2", "scheduled interval_sec=" & CStr(AUTO_TICK_V2_INTERVAL_SEC)
+End Sub
+
+Private Sub StopAutoTickV2()
+    On Error Resume Next
+    If gAutoTickV2Scheduled Then
+        Application.OnTime gAutoTickV2Next, "AutoTraderAdvanced.AutoTickV2", , False
+    End If
+    On Error GoTo 0
+    gAutoTickV2Scheduled = False
+End Sub
+
+Private Sub ScheduleAutoTickV2()
+    On Error Resume Next
+    gAutoTickV2Next = Now + TimeSerial(0, 0, AUTO_TICK_V2_INTERVAL_SEC)
+    Application.OnTime gAutoTickV2Next, "AutoTraderAdvanced.AutoTickV2"
+    gAutoTickV2Scheduled = True
+    On Error GoTo 0
+End Sub
+
+Private Function IsRunningModeV2() As Boolean
+    On Error Resume Next
+    Dim nm As Name
+    Set nm = ThisWorkbook.Names("RunStatusV2")
+    If nm Is Nothing Then Set nm = Application.Names("RunStatusV2")
+    If Not nm Is Nothing Then
+        Dim mode As String: mode = UCase$(Trim$(CStr(nm.RefersToRange.Value)))
+        IsRunningModeV2 = (mode = "DEMO_RUNNING" Or mode = "LIVE_RUNNING")
+    Else
+        IsRunningModeV2 = False
+    End If
+    On Error GoTo 0
+End Function
 
 Private Sub UpdateStatusV2(ByVal mode As String)
 
