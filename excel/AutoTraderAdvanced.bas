@@ -66,6 +66,15 @@ Private Const ORD_COL_CLOSE_TS As Long = 15
 Private Const ORD_COL_CLOSE_PRICE As Long = 16
 Private Const ORD_COL_PNL_BP As Long = 17
 Private Const ORD_COL_SOURCE As Long = 18
+Private Const ORD_COL_DASH_ROW As Long = 19
+Private Const ORD_COL_BEST_BID_AT_FILL As Long = 20
+Private Const ORD_COL_BEST_ASK_AT_FILL As Long = 21
+Private Const ORD_COL_BEST_BID_AT_CLOSE As Long = 22
+Private Const ORD_COL_BEST_ASK_AT_CLOSE As Long = 23
+Private Const ORD_COL_FILL_TIMER As Long = 24
+Private Const ORD_COL_CLOSE_TIMER As Long = 25
+Private Const ORD_COL_ENTRY_LIMIT As Long = 26
+Private Const ORD_COL_EXIT_LIMIT As Long = 27
 
 Private Enum BbRiskLevel
     bbRiskNone = 0
@@ -392,6 +401,18 @@ Private Function ToDouble(ByVal value As Variant, ByVal defaultValue As Double) 
     Exit Function
 Fail:
     ToDouble = defaultValue
+End Function
+
+Private Function ToLongSafe(ByVal value As Variant, ByVal defaultValue As Long) As Long
+    On Error GoTo Fail
+    If IsNumeric(value) Then
+        ToLongSafe = CLng(value)
+    Else
+        ToLongSafe = defaultValue
+    End If
+    Exit Function
+Fail:
+    ToLongSafe = defaultValue
 End Function
 
 Private Function RowWithFallback(ByVal ws As Worksheet, ByVal rowIndex As Long, ByVal colIndex As Long, ByVal fallbackValue As Double) As Double
@@ -1913,8 +1934,8 @@ Private Function EnsureOrdersSheet(ByVal host As Worksheet) As Worksheet
         sh.Name = "Orders"
     End If
 
-    With sh.Range("A1:R1")
-        .Value = Array("ts", "ticker", "side", "price", "qty", "mode", "status", "note", "tp", "sl", "trail", "fill_ts", "fill_price", "fill_qty", "close_ts", "close_price", "pnl_bp", "source")
+    With sh.Range("A1:AA1")
+        .Value = Array("ts", "ticker", "side", "price", "qty", "mode", "status", "note", "tp", "sl", "trail", "fill_ts", "fill_price", "fill_qty", "close_ts", "close_price", "pnl_bp", "source", "dash_row", "bestBid_at_fill", "bestAsk_at_fill", "bestBid_at_close", "bestAsk_at_close", "fill_timer", "close_timer", "entry_limit", "exit_limit")
     End With
 
     Set EnsureOrdersSheet = sh
@@ -2095,6 +2116,7 @@ Private Sub LogPreOrder(ByVal ws As Worksheet, ByVal orderSheet As Worksheet, By
             sh.Cells(nextRow, 10).Value = ""
         End If
         sh.Cells(nextRow, 11).Value = ""
+        sh.Cells(nextRow, ORD_COL_DASH_ROW).Value = rowIndex
         nextRow = nextRow + 1
     End If
 
@@ -2137,6 +2159,7 @@ Private Sub LogPreOrder(ByVal ws As Worksheet, ByVal orderSheet As Worksheet, By
             sh.Cells(nextRow, 10).Value = ""
         End If
         sh.Cells(nextRow, 11).Value = ""
+        sh.Cells(nextRow, ORD_COL_DASH_ROW).Value = rowIndex
     End If
 
 End Sub
@@ -2985,6 +3008,22 @@ Private Function DashboardRowForTicker(ByVal ws As Worksheet, ByVal tickerCol As
     Next r
 End Function
 
+Private Function DashboardRowForOrderRow(ByVal ws As Worksheet, ByVal tickerCol As Long, ByVal ticker As String, ByVal sh As Worksheet, ByVal orderRow As Long) As Long
+    DashboardRowForOrderRow = 0
+    If ws Is Nothing Or sh Is Nothing Or tickerCol = 0 Or orderRow <= 1 Then Exit Function
+
+    Dim dashRow As Long
+    dashRow = ToLongSafe(sh.Cells(orderRow, ORD_COL_DASH_ROW).Value, 0)
+    If dashRow >= DASH2_DATA_START Then
+        If StrComp(Trim$(CStr(ws.Cells(dashRow, tickerCol).Value)), ticker, vbTextCompare) = 0 Then
+            DashboardRowForOrderRow = dashRow
+            Exit Function
+        End If
+    End If
+
+    DashboardRowForOrderRow = DashboardRowForTicker(ws, tickerCol, ticker)
+End Function
+
 Private Function HasOpenDemoPosition(ByVal sh As Worksheet, ByVal ticker As String) As Boolean
     HasOpenDemoPosition = False
     If sh Is Nothing Then Exit Function
@@ -3044,6 +3083,9 @@ Private Sub EnsureDemoExitOrders(ByVal sh As Worksheet, ByVal entryRow As Long)
     Dim slPrice As Double: slPrice = ToDouble(sh.Cells(entryRow, ORD_COL_SL).Value, 0#)
     If Len(ticker) = 0 Or qty <= 0# Then Exit Sub
 
+    Dim dashRow As Long
+    dashRow = ToLongSafe(sh.Cells(entryRow, ORD_COL_DASH_ROW).Value, 0)
+
     Dim exitSide As String
     If entrySide = "BUY" Then
         exitSide = "SELL"
@@ -3054,14 +3096,14 @@ Private Sub EnsureDemoExitOrders(ByVal sh As Worksheet, ByVal entryRow As Long)
     End If
 
     If tpPrice > 0# Then
-        AppendDemoExitIfMissing sh, ticker, exitSide, tpPrice, qty, "tp_demo", "ORDERED", "DEMO_TP"
+        AppendDemoExitIfMissing sh, ticker, exitSide, tpPrice, qty, "tp_demo", "ORDERED", "DEMO_TP", dashRow
     End If
     If slPrice > 0# Then
-        AppendDemoExitIfMissing sh, ticker, exitSide, slPrice, qty, "sl_demo", "ORDERED", "DEMO_SL"
+        AppendDemoExitIfMissing sh, ticker, exitSide, slPrice, qty, "sl_demo", "ORDERED", "DEMO_SL", dashRow
     End If
 End Sub
 
-Private Sub AppendDemoExitIfMissing(ByVal sh As Worksheet, ByVal ticker As String, ByVal side As String, ByVal price As Double, ByVal qty As Double, ByVal mode As String, ByVal statusVal As String, ByVal note As String)
+Private Sub AppendDemoExitIfMissing(ByVal sh As Worksheet, ByVal ticker As String, ByVal side As String, ByVal price As Double, ByVal qty As Double, ByVal mode As String, ByVal statusVal As String, ByVal note As String, Optional ByVal dashRow As Long = 0)
     If sh Is Nothing Then Exit Sub
     Dim lastRow As Long
     lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
@@ -3090,6 +3132,7 @@ Private Sub AppendDemoExitIfMissing(ByVal sh As Worksheet, ByVal ticker As Strin
     sh.Cells(rowIdx, ORD_COL_STATUS).Value = statusVal
     sh.Cells(rowIdx, ORD_COL_NOTE).Value = note
     sh.Cells(rowIdx, ORD_COL_SOURCE).Value = "DEMO"
+    If dashRow > 0 Then sh.Cells(rowIdx, ORD_COL_DASH_ROW).Value = dashRow
 End Sub
 
 Private Sub ProcessDemoPreplaceFills(ByVal ws As Worksheet, ByVal sh As Worksheet, ByVal tickerCol As Long, ByVal bestBidCol As Long, ByVal bestAskCol As Long)
@@ -3108,7 +3151,7 @@ Private Sub ProcessDemoPreplaceFills(ByVal ws As Worksheet, ByVal sh As Workshee
         If HasOpenDemoPosition(sh, ticker) Then GoTo NextPreplace
 
         Dim dashRow As Long
-        dashRow = DashboardRowForTicker(ws, tickerCol, ticker)
+        dashRow = DashboardRowForOrderRow(ws, tickerCol, ticker, sh, r)
         If dashRow = 0 Then GoTo NextPreplace
 
         Dim bestBid As Double: bestBid = ToDouble(ws.Cells(dashRow, bestBidCol).Value, 0#)
@@ -3140,9 +3183,16 @@ Private Sub ProcessDemoPreplaceFills(ByVal ws As Worksheet, ByVal sh As Workshee
         Dim tpNow As Double: tpNow = ToDouble(sh.Cells(r, ORD_COL_TP).Value, 0#)
         Dim slNow As Double: slNow = ToDouble(sh.Cells(r, ORD_COL_SL).Value, 0#)
         sh.Cells(r, ORD_COL_PRICE).Value = limitPrice
+        sh.Cells(r, ORD_COL_QTY).Value = qty
         If tpNow > 0# Then sh.Cells(r, ORD_COL_TP).Value = tpNow
         If slNow > 0# Then sh.Cells(r, ORD_COL_SL).Value = slNow
         On Error GoTo 0
+
+        sh.Cells(r, ORD_COL_DASH_ROW).Value = dashRow
+        sh.Cells(r, ORD_COL_BEST_BID_AT_FILL).Value = bestBid
+        sh.Cells(r, ORD_COL_BEST_ASK_AT_FILL).Value = bestAsk
+        sh.Cells(r, ORD_COL_FILL_TIMER).Value = Timer
+        sh.Cells(r, ORD_COL_ENTRY_LIMIT).Value = limitPrice
 
         sh.Cells(r, ORD_COL_STATUS).Value = "RUNNING"
         sh.Cells(r, ORD_COL_FILL_TS).Value = Now
@@ -3193,7 +3243,7 @@ Private Sub ProcessDemoExitFills(ByVal ws As Worksheet, ByVal sh As Worksheet, B
         If Len(ticker) = 0 Then GoTo NextExit
 
         Dim dashRow As Long
-        dashRow = DashboardRowForTicker(ws, tickerCol, ticker)
+        dashRow = DashboardRowForOrderRow(ws, tickerCol, ticker, sh, r)
         If dashRow = 0 Then GoTo NextExit
 
         Dim bestBid As Double: bestBid = ToDouble(ws.Cells(dashRow, bestBidCol).Value, 0#)
@@ -3227,6 +3277,14 @@ Private Sub ProcessDemoExitFills(ByVal ws As Worksheet, ByVal sh As Worksheet, B
 
         If Not shouldFill Then GoTo NextExit
 
+        sh.Cells(r, ORD_COL_DASH_ROW).Value = dashRow
+        sh.Cells(r, ORD_COL_BEST_BID_AT_FILL).Value = bestBid
+        sh.Cells(r, ORD_COL_BEST_ASK_AT_FILL).Value = bestAsk
+        sh.Cells(r, ORD_COL_FILL_TIMER).Value = Timer
+        sh.Cells(r, ORD_COL_ENTRY_LIMIT).Value = limitPrice
+        sh.Cells(r, ORD_COL_PRICE).Value = limitPrice
+        sh.Cells(r, ORD_COL_QTY).Value = qty
+
         sh.Cells(r, ORD_COL_STATUS).Value = "FILLED"
         sh.Cells(r, ORD_COL_FILL_TS).Value = Now
         sh.Cells(r, ORD_COL_FILL_PRICE).Value = fillPrice
@@ -3240,6 +3298,16 @@ Private Sub ProcessDemoExitFills(ByVal ws As Worksheet, ByVal sh As Worksheet, B
             entrySide = "BUY"
         Else
             GoTo NextExit
+        End If
+
+        Dim entryRow As Long
+        entryRow = FindOrderRow(sh, ticker, entrySide, Array("RUNNING", "FILLED"))
+        If entryRow > 0 Then
+            sh.Cells(entryRow, ORD_COL_DASH_ROW).Value = dashRow
+            sh.Cells(entryRow, ORD_COL_BEST_BID_AT_CLOSE).Value = bestBid
+            sh.Cells(entryRow, ORD_COL_BEST_ASK_AT_CLOSE).Value = bestAsk
+            sh.Cells(entryRow, ORD_COL_CLOSE_TIMER).Value = Timer
+            sh.Cells(entryRow, ORD_COL_EXIT_LIMIT).Value = limitPrice
         End If
         LogOrderSettled ticker, entrySide, fillPrice, qty, "DEMO_EXIT_" & UCase$(modeVal)
         CancelSiblingExitOrders sh, ticker, modeVal
