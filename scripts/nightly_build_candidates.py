@@ -191,7 +191,10 @@ def aggregate_candidates(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     if "_score" in df.columns:
         df = df.drop(columns=["_score"])
-    df["BatchKind"] = run_type
+    # Defensive: we've seen rare runs where `run_type` was missing at runtime,
+    # causing the final aggregation step to crash and skip exports/sync.
+    batch_kind = locals().get("run_type") or "weekday"
+    df["BatchKind"] = str(batch_kind)
     df.to_csv(out_path, index=False, encoding="utf-8-sig")
 
     latest = Path("output/excel") / "weekly_candidates_latest.csv"
