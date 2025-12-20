@@ -125,6 +125,23 @@ def build_mail_report(
         for k, v in gb.items():
             lines.append(f"  {k}: {v:,.0f}円")
 
+    # exit reason breakdown
+    if "exit_reason" in trades_df.columns:
+        reason_map = {
+            "TP": "利確（TP）",
+            "SL": "損切り（SL）",
+            "EOD": "引け決済（EOD）",
+            "SL_SAME_BAR": "損切り（SL, 同じ1分でTPも到達の可能性）",
+            "TP_SAME_BAR": "利確（TP, 同じ1分でSLも到達の可能性）",
+        }
+        vc = trades_df["exit_reason"].astype(str).fillna("").replace("", "UNKNOWN").value_counts()
+        if not vc.empty:
+            lines.append("")
+            lines.append("決済理由（内訳）:")
+            for k, v in vc.items():
+                label = reason_map.get(k, k)
+                lines.append(f"  {label}: {int(v)}件")
+
     # top losses / wins
     cols = [
         "code",
@@ -133,6 +150,8 @@ def build_mail_report(
         "side",
         "pnl_yen",
         "pnl_bp",
+        "bars",
+        "exit_reason",
         "live_demo_class",
         "budget_factor",
     ]
@@ -146,15 +165,19 @@ def build_mail_report(
     lines.append("")
     lines.append("負けが大きかった順（上位5件）:")
     for _, r in losses.iterrows():
+        exit_reason = str(r.get("exit_reason") or "")
+        bars = int(float(r.get("bars") or 0))
         lines.append(
-            f"  {r['code']} {r['session']} {r['signal_mode']} {r['side']}: {float(r['pnl_yen']):,.0f}円 ({float(r['pnl_bp']):.1f}bp) [{r['live_demo_class']}] x{float(r['budget_factor']) if str(r['budget_factor']) else ''}"
+            f"  {r['code']} {r['session']} {r['signal_mode']} {r['side']}: {float(r['pnl_yen']):,.0f}円 ({float(r['pnl_bp']):.1f}bp) {exit_reason} {bars}分 [{r['live_demo_class']}] x{float(r['budget_factor']) if str(r['budget_factor']) else ''}"
         )
 
     lines.append("")
     lines.append("勝ちが大きかった順（上位5件）:")
     for _, r in wins.iterrows():
+        exit_reason = str(r.get("exit_reason") or "")
+        bars = int(float(r.get("bars") or 0))
         lines.append(
-            f"  {r['code']} {r['session']} {r['signal_mode']} {r['side']}: {float(r['pnl_yen']):,.0f}円 ({float(r['pnl_bp']):.1f}bp) [{r['live_demo_class']}] x{float(r['budget_factor']) if str(r['budget_factor']) else ''}"
+            f"  {r['code']} {r['session']} {r['signal_mode']} {r['side']}: {float(r['pnl_yen']):,.0f}円 ({float(r['pnl_bp']):.1f}bp) {exit_reason} {bars}分 [{r['live_demo_class']}] x{float(r['budget_factor']) if str(r['budget_factor']) else ''}"
         )
 
     lines.append("")
@@ -543,27 +566,47 @@ def simulate_trade_for_candidate(
     bars = 0
     exit_px = None
     exit_ts = None
+    exit_reason = ""
     for ts, row in after.iloc[1:].iterrows():
         hi = float(row["high"])
         lo = float(row["low"])
         bars += 1
         if side == "BUY":
-            if lo <= sl:
+            hit_sl = lo <= sl
+            hit_tp = hi >= tp
+            if hit_sl and hit_tp:
+                # 1分足では「どちらが先に触れたか」が分からないため、保守的に損切り扱い
                 exit_px = sl
                 exit_ts = ts
+                exit_reason = "SL_SAME_BAR"
                 break
-            if hi >= tp:
+            if hit_sl:
+                exit_px = sl
+                exit_ts = ts
+                exit_reason = "SL"
+                break
+            if hit_tp:
                 exit_px = tp
                 exit_ts = ts
+                exit_reason = "TP"
                 break
         else:
-            if hi >= sl:
+            hit_sl = hi >= sl
+            hit_tp = lo <= tp
+            if hit_sl and hit_tp:
                 exit_px = sl
                 exit_ts = ts
+                exit_reason = "SL_SAME_BAR"
                 break
-            if lo <= tp:
+            if hit_sl:
+                exit_px = sl
+                exit_ts = ts
+                exit_reason = "SL"
+                break
+            if hit_tp:
                 exit_px = tp
                 exit_ts = ts
+                exit_reason = "TP"
                 break
 
     if exit_px is None:
@@ -571,6 +614,7 @@ def simulate_trade_for_candidate(
         last_ts = intraday.index[-1]
         exit_ts = last_ts
         exit_px = float(intraday.loc[last_ts, "close"])
+        exit_reason = "EOD"
 
     if side == "BUY":
         pnl_bp = (exit_px - px) / px * 10000.0
@@ -579,6 +623,13 @@ def simulate_trade_for_candidate(
     pnl_bp -= COST_BP
     nominal_eff = nominal * max(budget_factor, 0.0)
     pnl_yen = nominal_eff * pnl_bp / 10000.0
+
+    if side == "BUY":
+        tp_dist_bp = (tp - px) / px * 10000.0
+        sl_dist_bp = (px - sl) / px * 10000.0
+    else:
+        tp_dist_bp = (px - tp) / px * 10000.0
+        sl_dist_bp = (sl - px) / px * 10000.0
 
     return {
         "date": day.strftime("%Y-%m-%d"),
@@ -591,6 +642,11 @@ def simulate_trade_for_candidate(
         "entry_px": px,
         "exit_px": exit_px,
         "bars": bars,
+        "exit_reason": exit_reason,
+        "tp_px": tp,
+        "sl_px": sl,
+        "tp_dist_bp": tp_dist_bp,
+        "sl_dist_bp": sl_dist_bp,
         "pnl_bp": pnl_bp,
         "pnl_yen": pnl_yen,
     }
