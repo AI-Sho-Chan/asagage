@@ -6,10 +6,11 @@
 - [x] DailyReplay（取引後の仮想売買）を平日 18:00 に自動実行し、メール送信する仕組みを運用に乗せた（Windows側）。
 - [x] 週末VMの週末バッチを「金曜 16:30 JST に自動起動 → 完了後に自動停止」へ安定化（`docs/handover_20251216.md`）。
 - [x] 週末バッチを差分更新（新規＋異常＋月次リセットのみフル探索）できるようにした（`docs/handover_20251220.md`）。
+- [x] 「Top200に一度入った銘柄」を永久保存対象にし、1分足データを毎日育てる仕組みを実装（`tools/build_top200_ever_universe.py`, `scripts/run_update_regulars_1m.ps1`）。
 
 ## Next（優先）
-- [ ] Top200「常連」銘柄の 1分足データを“永久保存対象”として毎日育てる（`scripts/run_update_regulars_1m.ps1`）
-- [ ] Top200常連の 1分足を VM 側でも活用できるように同期（Windows → GCS → VM）
+- [ ] `scripts/run_update_regulars_1m.ps1` のタスクが実際に毎日動いて、GCSへアップロードできているか確認（失敗しているとVM側の時短が効かない）
+- [ ] VM が `gs://asagage-weekend-output/yahoo_1m_regulars` を取り込めているか確認（`vm_run_weekend_only.sh` の rsync ログ）
 - [ ] 次の金曜に週末バッチが自動起動・完走したかを確認（ログの見方を固定化）
 - [ ] `abnormal_codes_latest.csv` のアップロードが失敗していないか、DailyReplayログで確認（失敗時はVMの異常時フル探索が効かない）
 

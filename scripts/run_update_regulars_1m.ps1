@@ -82,6 +82,13 @@ if (-not $SkipTopVolBuild) {
 }
 
 Run-Logged @(
+  "tools/build_top200_ever_universe.py",
+  "--topn", $RegularsTopN,
+  "--tag", $tag,
+  "--write-snapshot"
+)
+
+Run-Logged @(
   "tools/build_top_regulars_universe.py",
   "--lookback-files", $RegularsLookbackFiles,
   "--topn", $RegularsTopN,
@@ -89,14 +96,14 @@ Run-Logged @(
   "--update-ever"
 )
 
-$regulars = "data/universe/top_regulars_ever.csv"
-if (-not (Test-Path $regulars)) {
-  throw "Regulars CSV not found: $regulars"
+$persist = "data/universe/top200_ever.csv"
+if (-not (Test-Path $persist)) {
+  throw "Top200 ever CSV not found: $persist"
 }
 
 Run-Logged @(
   "tools/update_minute_cache.py",
-  "--codes-file", $regulars,
+  "--codes-file", $persist,
   "--history-days", $HistoryDays,
   "--backfill-days", $BackfillDays,
   "--batch-size", $BatchSize,
@@ -107,7 +114,7 @@ if (-not $SkipRegularsMirror) {
   $mirrorRoot = Join-Path $Repo "cache\\yahoo_1m_regulars"
   if (-not (Test-Path $mirrorRoot)) { New-Item -ItemType Directory -Force -Path $mirrorRoot | Out-Null }
 
-  $codes = Import-Csv $regulars | ForEach-Object { $_.code } | Where-Object { $_ -and $_.Trim() } | Sort-Object -Unique
+  $codes = Import-Csv $persist | ForEach-Object { $_.code } | Where-Object { $_ -and $_.Trim() } | Sort-Object -Unique
   foreach ($code in $codes) {
     $src = Join-Path $Repo ("data\\raw\\yahoo_1m\\{0}" -f $code)
     $dst = Join-Path $mirrorRoot $code

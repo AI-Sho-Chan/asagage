@@ -44,6 +44,8 @@ data/universe/topvol_*.csv
 data/universe/top_regulars_*.csv
 data/universe/top_regulars_latest.csv
 data/universe/top_regulars_ever.csv
+data/universe/top200_ever*.csv
+data/universe/top200_ever_latest.csv
 data/universe/abnormal_codes_*.csv
 data/universe/abnormal_codes_latest.csv
 
