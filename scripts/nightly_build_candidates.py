@@ -1,6 +1,7 @@
 ﻿import argparse
 import datetime as dt
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -771,6 +772,34 @@ def _main_impl() -> None:
         default=0.6,
         help="Win CI low threshold for degraded detection in weekday mode (default 0.6)",
     )
+    ap.add_argument(
+        "--weekend-incremental",
+        action="store_true",
+        help=(
+            "Weekend mode: reuse last weekend's candidates for 'regular' tickers, and only re-optimize "
+            "new/abnormal tickers (monthly full reset supported)."
+        ),
+    )
+    ap.add_argument(
+        "--weekend-regulars-file",
+        default="data/universe/top_regulars_ever.csv",
+        help="CSV with column 'code' listing 'Top200 regulars' (default: data/universe/top_regulars_ever.csv)",
+    )
+    ap.add_argument(
+        "--weekend-abnormal-file",
+        default="data/universe/abnormal_codes_latest.csv",
+        help="CSV with column 'code' listing abnormal tickers to force re-opt (default: data/universe/abnormal_codes_latest.csv)",
+    )
+    ap.add_argument(
+        "--weekend-monthly-reset",
+        action="store_true",
+        help="Weekend mode: run a full re-optimization on the first Friday of each month.",
+    )
+    ap.add_argument(
+        "--weekend-force-full-reset",
+        action="store_true",
+        help="Weekend mode: force a full re-optimization regardless of incremental settings.",
+    )
     args = ap.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
@@ -1243,6 +1272,41 @@ def _main_impl() -> None:
         )
         base_codes = load_codes_from_excel(Path(args.excel), args.excel_ticker_sheet)
 
+    def _load_codes_list(path: Path) -> List[str]:
+        if not path.exists():
+            return []
+        try:
+            df = pd.read_csv(path)
+        except Exception:
+            return []
+        for col in ("code", "Code", "ticker", "Ticker"):
+            if col in df.columns:
+                return df[col].dropna().astype(str).str.strip().str.upper().tolist()
+        return []
+
+    def _find_prev_weekend_candidates(current_tag: str) -> Optional[Path]:
+        # Prefer dated snapshots to avoid mixing weekday outputs.
+        excel_dir = repo_root / "output/excel"
+        best: Optional[Path] = None
+        best_tag = ""
+        for path in excel_dir.glob("candidates_for_*.csv"):
+            match = re.match(r"candidates_for_(\d{8})\.csv$", path.name, flags=re.IGNORECASE)
+            if not match:
+                continue
+            tag = match.group(1)
+            if tag >= current_tag:
+                continue
+            if tag > best_tag:
+                best_tag = tag
+                best = path
+        if best is not None:
+            return best
+        fallback = excel_dir / "candidates_nextday.csv"
+        return fallback if fallback.exists() else None
+
+    def _is_first_friday(day: dt.date) -> bool:
+        return day.weekday() == 4 and day.day <= 7
+
     # Weekday: optional差分再計算（PF/CIが悪化した銘柄のみ）
     degraded_set: set[str] = set()
     if run_type == "weekday" and args.reopt_degraded_only:
@@ -1275,6 +1339,99 @@ def _main_impl() -> None:
                 completed_plans=0,
             )
             return
+
+    # Weekend: incremental policy (reuse prior weekend candidates for regular tickers)
+    reused_candidates: Optional[pd.DataFrame] = None
+    if is_weekend and args.weekend_incremental:
+        universe_codes: set[str] = {str(c).strip().upper() for c in base_codes if str(c).strip()}
+        if codes_file_for_runs and codes_file_for_runs.exists():
+            universe_codes = set(_load_codes_list(codes_file_for_runs)) or universe_codes
+
+        regulars_path = Path(args.weekend_regulars_file)
+        if not regulars_path.is_absolute():
+            regulars_path = (repo_root / regulars_path).resolve()
+        abnormal_path = Path(args.weekend_abnormal_file)
+        if not abnormal_path.is_absolute():
+            abnormal_path = (repo_root / abnormal_path).resolve()
+
+        regulars_set = set(_load_codes_list(regulars_path))
+        abnormal_set = set(_load_codes_list(abnormal_path))
+
+        monthly_reset = bool(args.weekend_monthly_reset) and _is_first_friday(target_date)
+        full_reset = bool(args.weekend_force_full_reset) or monthly_reset
+
+        if full_reset or not regulars_set:
+            reopt_set = set(universe_codes)
+            keep_set: set[str] = set()
+        else:
+            # Weekly incremental: re-optimize only:
+            # - new tickers (not in Top200 regulars ever)
+            # - abnormal tickers (from DailyReplay last-10-days)
+            new_codes = universe_codes.difference(regulars_set)
+            reopt_set = set(new_codes).union(abnormal_set.intersection(universe_codes))
+            keep_set = universe_codes.difference(reopt_set)
+
+        prev_path = _find_prev_weekend_candidates(date_tag)
+        prev_info = str(prev_path) if prev_path else ""
+        reused_rows = 0
+        if keep_set and prev_path and prev_path.exists():
+            try:
+                df_prev = pd.read_csv(prev_path)
+                if "Ticker" in df_prev.columns:
+                    tickers = df_prev["Ticker"].astype(str).str.strip().str.upper()
+                    mask = tickers.isin(keep_set)
+                    if "BatchKind" in df_prev.columns:
+                        kind = df_prev["BatchKind"].astype(str).str.strip().str.lower()
+                        mask = mask & (kind == "weekend")
+                    reused_candidates = df_prev.loc[mask].copy()
+                    reused_rows = int(len(reused_candidates))
+            except Exception:
+                reused_candidates = None
+
+        # If we intended to reuse but couldn't load a usable previous snapshot,
+        # fall back to full reset to avoid silently dropping most of the universe.
+        if keep_set and reused_rows == 0:
+            full_reset = True
+            monthly_reset = monthly_reset  # keep the signal for status
+            reopt_set = set(universe_codes)
+            keep_set = set()
+            reused_candidates = None
+
+        write_status(
+            state="running",
+            step="weekend_incremental",
+            message="Weekend incremental policy evaluated",
+            weekend_incremental=1,
+            weekend_full_reset=int(full_reset),
+            weekend_monthly_reset=int(monthly_reset),
+            weekend_regulars_file=str(regulars_path),
+            weekend_abnormal_file=str(abnormal_path),
+            weekend_prev_candidates=prev_info,
+            weekend_universe_codes=len(universe_codes),
+            weekend_reopt_codes=len(reopt_set),
+            weekend_keep_codes=len(keep_set),
+            weekend_reused_rows=reused_rows,
+        )
+
+        # Narrow the run universe to the reopt_set to save time.
+        if reopt_set and codes_file_for_runs and codes_file_for_runs.exists() and not full_reset:
+            reduced = night_root / "universe_vwap_reopt.csv"
+            pd.DataFrame({"code": sorted(reopt_set)}).to_csv(reduced, index=False)
+            codes_file_for_runs = reduced
+
+        # If everything is in keep_set (reopt_set empty), skip plan runs.
+        if not reopt_set and reused_candidates is not None:
+            plans = []
+            total_plans = 0
+            plan_counts = {}
+            plan_order = []
+            write_status(
+                state="running",
+                step="weekend_incremental",
+                message="No reopt codes; reuse-only run",
+                total_plans=0,
+                completed_plans=0,
+            )
 
     if not args.disable_minute_cache:
         minute_codes = set(base_codes)
@@ -1589,6 +1746,10 @@ def _main_impl() -> None:
             plans=",".join(plan_order),
             plan_counts=format_plan_counts(plan_counts),
         )
+
+    if reused_candidates is not None and not reused_candidates.empty:
+        # Append reused candidates from prior weekend run so aggregation/export stays complete.
+        candidate_frames.append(reused_candidates)
 
     write_status(
         state="running",

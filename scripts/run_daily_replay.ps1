@@ -84,6 +84,40 @@ LastError: $lastError
 }
 
 try {
+  if ($simulateOk) {
+    Write-Log "build abnormal_codes_latest.csv (last 10 trading days)"
+    $abLatest = Join-Path $repo "data/universe/abnormal_codes_latest.csv"
+    $abTag = Join-Path $repo ("data/universe/abnormal_codes_{0}.csv" -f $DateTag)
+    $pyArgs = @(
+      "tools/build_abnormal_codes.py",
+      "--days", "10",
+      "--min-trades", "5",
+      "--pf-th", "1.0",
+      "--winrate-th", "0.5",
+      "--require-pnl-nonneg",
+      "--out-latest", $abLatest,
+      "--out-tag", $abTag,
+      "--tag", $DateTag
+    )
+    $out = & $python @pyArgs 2>&1
+    $out | Out-File -FilePath $logPath -Append -Encoding utf8
+
+    # Best-effort upload for the weekend VM to consume.
+    $gsutilCmd = Get-Command "gsutil.cmd" -ErrorAction SilentlyContinue
+    if (-not $gsutilCmd) { $gsutilCmd = Get-Command "gsutil" -ErrorAction SilentlyContinue }
+    if ($gsutilCmd -and (Test-Path $abLatest)) {
+      $dst = "gs://asagage-weekend-output/universe/abnormal_codes_latest.csv"
+      Write-Log ("upload abnormal list to {0}" -f $dst)
+      & $gsutilCmd.Source @("cp", $abLatest, $dst) 2>&1 | Out-File -FilePath $logPath -Append -Encoding utf8
+    } else {
+      Write-Log "gsutil not found or abnormal list missing; skip upload."
+    }
+  }
+} catch {
+  Write-Log ("[warn] abnormal codes build/upload failed: {0}" -f $_.Exception.Message)
+}
+
+try {
   $smtpPath = Join-Path $repo "state/smtp.json"
   if ((Test-Path $summaryPath) -and (Test-Path $smtpPath)) {
     $summary = Get-Content $summaryPath -Raw -Encoding UTF8 | ConvertFrom-Json

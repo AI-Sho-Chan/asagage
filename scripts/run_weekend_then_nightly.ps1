@@ -107,6 +107,7 @@ function Get-WeekendBaseArgs {
     '--enable-asha','--enable-bayes','--bayes-trials',"$BayesTrialsWeekend",'--bayes-timeout','600',
     '--mask-ineffective','--mask-window','20','--mask-threshold','1.05','--cache-refresh-weekend',
     '--enable-rd-windows','--enable-market-features','--headless','--coeff-history-days','5',
+    '--weekend-incremental','--weekend-monthly-reset',
     '--target-date', $TargetDate
   )
 }
@@ -209,4 +210,3 @@ Write-SeqLog 'Sequential runner completed'
 try {
   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\register_boardlogger_task.ps1 | Out-Null
 } catch {}
-

@@ -62,9 +62,20 @@ trap cleanup_and_shutdown EXIT
     echo "[vm_run_weekend_only] gsutil not found; skip regulars cache sync" >&2
   fi
 
+  # Pull the latest abnormal ticker list (built by Windows DailyReplay) if available.
+  ABNORMAL_CODES_OBJECT="${ABNORMAL_CODES_OBJECT:-gs://asagage-weekend-output/universe/abnormal_codes_latest.csv}"
+  if command -v gsutil >/dev/null 2>&1; then
+    echo "[vm_run_weekend_only] fetching abnormal list from ${ABNORMAL_CODES_OBJECT} ..." >&2
+    gsutil cp "${ABNORMAL_CODES_OBJECT}" "$HOME/asagage/data/universe/abnormal_codes_latest.csv" || true
+  fi
+
   # Build weekly Top300 universe (close * weekly volume)
   python tools/build_master_topvol_universe.py --topn 300 --lookback 5 --tag "$TARGET_DATE"
   UNIVERSE_FILE="$HOME/asagage/data/universe/topvol_${TARGET_DATE}.csv"
+
+  # Update "Top200 regulars (ever)" list locally (used by weekend incremental policy).
+  # Best-effort: if topvol history is not sufficient yet, the script still runs.
+  python tools/build_top_regulars_universe.py --lookback-files 20 --topn 200 --tag "$TARGET_DATE" --update-ever || true
 
   # Extended minute-cache for Top300 (60 history days, 120 backfill, best-effort)
   if [ -f "$UNIVERSE_FILE" ]; then
@@ -76,6 +87,16 @@ trap cleanup_and_shutdown EXIT
       --backfill-days 120 \
       --batch-size 120 \
       --pause 0.2 || true
+  fi
+
+  WEEKEND_INCREMENTAL="${WEEKEND_INCREMENTAL:-1}"
+  WEEKEND_FORCE_FULL_RESET="${WEEKEND_FORCE_FULL_RESET:-0}"
+  EXTRA_WEEKEND_FLAGS=()
+  if [ "$WEEKEND_INCREMENTAL" = "1" ]; then
+    EXTRA_WEEKEND_FLAGS+=(--weekend-incremental --weekend-monthly-reset)
+  fi
+  if [ "$WEEKEND_FORCE_FULL_RESET" = "1" ]; then
+    EXTRA_WEEKEND_FLAGS+=(--weekend-force-full-reset)
   fi
 
   # Weekend batch (coarse + refine, longer window, VWAP filter applied inside script)
@@ -92,7 +113,8 @@ trap cleanup_and_shutdown EXIT
     --mask-ineffective --mask-window 20 --mask-threshold 1.05 \
     --enable-rd-windows \
     --enable-market-features --headless --coeff-history-days 5 \
-    --target-date "$TARGET_DATE"
+    --target-date "$TARGET_DATE" \
+    "${EXTRA_WEEKEND_FLAGS[@]}"
 
   # Optional weekday-style sanity run on the same universe (smaller size).
   # Disabled by default on the weekend VM because it can create very large opt30 caches.

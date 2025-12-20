@@ -43,6 +43,9 @@ data/universe/master_codes_*.csv
 data/universe/topvol_*.csv
 data/universe/top_regulars_*.csv
 data/universe/top_regulars_latest.csv
+data/universe/top_regulars_ever.csv
+data/universe/abnormal_codes_*.csv
+data/universe/abnormal_codes_latest.csv
 
 # local logs (generated)
 logs/daily_replay_task_*.log
