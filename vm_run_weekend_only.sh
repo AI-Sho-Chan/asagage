@@ -12,6 +12,8 @@ fi
 
 LOG_DIR="$HOME/cloud_logs"
 mkdir -p "$LOG_DIR"
+# Force JST for file naming and date tags, even if cron's environment is UTC.
+export TZ="${TZ:-Asia/Tokyo}"
 STAMP=$(date +%Y%m%d_%H%M%S)
 LOG_FILE="$LOG_DIR/weekend_${STAMP}.log"
 
@@ -32,7 +34,15 @@ trap cleanup_and_shutdown EXIT
   # Keep VM repo up-to-date (best-effort, do not fail the batch on git issues).
   if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     git fetch origin || true
+    # The batch updates tracked state/log files during runs; auto-stash so git pull works reliably.
+    if [ -n "$(git status --porcelain)" ]; then
+      git stash push -u -m "autostash before pull (weekend batch)" || true
+    fi
     git pull --ff-only || true
+    # Best-effort restore local batch state after pulling updates.
+    if git stash list | grep -q "autostash before pull (weekend batch)"; then
+      git stash pop || true
+    fi
   fi
   # Activate Python virtualenv for weekend batch
   source "$HOME/asagake-venv/bin/activate"
