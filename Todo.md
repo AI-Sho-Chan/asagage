@@ -18,5 +18,6 @@
 ## Later（改善）
 - [ ] GapBanPct / NoTradeMin の適正値を、DailyReplay の複数日（例: 20営業日）で検証して提案する（実装は別途判断）。
 - [ ] 時間帯の切り方（区切る/区切らない/粗い区切り）を“同一条件”で比較する（比較表を `analysis/` に出力）。
+- [ ] ABテスト（A: coarse=5/refine=5 vs B: coarse=3/refine=5）を20営業日で比較し、差が出るかを判断する（B候補は週末VMで「別出力」にして現行を汚さない）。
 - [ ] Live/Demo 判定や BudgetFactor の基準を、実績（DailyReplay/DEMO）に合わせて自動提案できるようにする。
 - [ ] Orders（負け/勝ちの原因）を定期的に棚卸しして、改善候補（除外銘柄・守り条件）を提案できる形にする（例: 5801.Tは“戻らない系”としてDEMO_ONLY/予算減、8105.Tは“急変で即死しやすい系”としてGapBan/NoTradeMin調整対象）。
