@@ -1,7 +1,9 @@
 import argparse
 import glob
 import json
+import os
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
@@ -10,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path("output/excel")
+LOG_DIR = Path("logs")
 
 
 @dataclass
@@ -369,7 +372,70 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--dd-scale", type=float, default=1000.0)
     ap.add_argument("--default-gapban-pct", type=float, default=3.0)
     ap.add_argument("--default-no-trade-min", type=int, default=5)
+    ap.add_argument(
+        "--allow-empty-overwrite",
+        action="store_true",
+        help=(
+            "Allow overwriting the output CSV with an empty file when no candidates are available. "
+            "By default we keep the previous non-empty candidates_nextday.csv to avoid wiping the dashboard input."
+        ),
+    )
+    ap.add_argument(
+        "--diag-json",
+        type=Path,
+        default=None,
+        help="Optional path to write a JSON diagnostic record (default: logs/aggregate_candidates_*.json).",
+    )
     return ap.parse_args()
+
+
+def _timestamp() -> str:
+    return time.strftime("%Y%m%d_%H%M%S", time.localtime())
+
+
+def _read_nonempty_row_count(path: Path) -> int:
+    if not path.exists() or not path.is_file():
+        return 0
+    try:
+        df = pd.read_csv(path)
+    except Exception:
+        return 0
+    return int(len(df))
+
+
+def _atomic_write_csv(df: pd.DataFrame, out: Path) -> None:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out.with_name(f".{out.name}.{os.getpid()}.{_timestamp()}.tmp")
+    df.to_csv(tmp, index=False, encoding="utf-8-sig", lineterminator="\r\n")
+    os.replace(tmp, out)
+
+
+def _backup_existing(out: Path, keep: int = 10) -> Optional[Path]:
+    if not out.exists() or not out.is_file():
+        return None
+
+    base = out.name
+    backup = out.with_name(f"{base}.backup_{_timestamp()}")
+    try:
+        backup.write_bytes(out.read_bytes())
+    except OSError:
+        return None
+
+    backups = sorted(out.parent.glob(f"{base}.backup_*"), key=lambda p: p.name, reverse=True)
+    for old in backups[keep:]:
+        try:
+            old.unlink()
+        except OSError:
+            pass
+    return backup
+
+
+def _write_diag(path: Path, payload: Dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        pass
 
 
 def main() -> None:
@@ -385,24 +451,94 @@ def main() -> None:
         default_no_trade_min=args.default_no_trade_min,
     )
 
-    date_tag = args.date_tag.strip() or resolve_latest_date_tag()
+    requested_date_tag = args.date_tag.strip()
+    nightly_date_tag = resolve_latest_date_tag()
+    latest_root = _resolve_latest_root_candidate_file()
+    latest_root_date = _date_from_name(latest_root) if latest_root else None
 
-    nightly_paths = collect_candidate_paths(date_tag or None)
-    frames, used_paths = _read_nonempty_csvs(nightly_paths)
+    # Default behaviour: pick the newest run we have. When nightly folders are stale
+    # (e.g. nightly is disabled but weekend candidates_for_YYYYMMDD.csv is new),
+    # we prefer the newest single-file candidate export to avoid clobbering
+    # candidates_nextday.csv with an old NIGHTLY folder.
+    prefer_root = False
+    if not requested_date_tag and latest_root_date:
+        if not nightly_date_tag or latest_root_date > nightly_date_tag:
+            prefer_root = True
 
-    source_label = f"NIGHTLY_{date_tag}" if date_tag else "all"
+    date_tag = requested_date_tag or (latest_root_date or nightly_date_tag)
+
+    source_label = "all"
+    frames: List[pd.DataFrame] = []
+    used_paths: List[Path] = []
+    nightly_tag_to_use = ""
+    if requested_date_tag:
+        nightly_tag_to_use = requested_date_tag
+    elif not prefer_root and nightly_date_tag:
+        nightly_tag_to_use = nightly_date_tag
+
+    if nightly_tag_to_use:
+        nightly_paths = collect_candidate_paths(nightly_tag_to_use)
+        frames, used_paths = _read_nonempty_csvs(nightly_paths)
+        source_label = f"NIGHTLY_{nightly_tag_to_use}"
+
     if not frames:
-        fallback = _resolve_latest_root_candidate_file()
+        fallback = latest_root
         if fallback is not None:
             frames, used_paths = _read_nonempty_csvs([fallback])
             source_label = fallback.name
 
     out = args.output
-    out.parent.mkdir(parents=True, exist_ok=True)
+
+    diag: Dict[str, object] = {
+        "ts": _timestamp(),
+        "output": str(out),
+        "date_tag": date_tag,
+        "selected_source": source_label,
+        "prefer_root": prefer_root,
+        "requested_date_tag": requested_date_tag or None,
+        "latest_nightly_date_tag": nightly_date_tag or None,
+        "latest_root_candidate": str(latest_root) if latest_root else None,
+        "thresholds": {
+            "min_j": thresholds.min_j,
+            "min_win_ci": thresholds.min_win_ci,
+            "min_pf": thresholds.min_pf,
+            "min_trades": thresholds.min_trades,
+            "win_power": thresholds.win_power,
+            "dd_scale": thresholds.dd_scale,
+            "default_gapban_pct": thresholds.default_gapban_pct,
+            "default_no_trade_min": thresholds.default_no_trade_min,
+        },
+        "source": source_label,
+        "source_files": [str(p) for p in used_paths],
+    }
+
+    diag_path = args.diag_json or (LOG_DIR / f"aggregate_candidates_{_timestamp()}.json")
 
     if not frames:
-        pd.DataFrame().to_csv(out, index=False, encoding="utf-8-sig", lineterminator="\r\n")
-        print(json.dumps({"written": str(out), "rows": 0}))
+        existing_rows = _read_nonempty_row_count(out)
+        diag["result"] = {
+            "reason": "no_source_candidates",
+            "existing_rows": existing_rows,
+            "action": "overwrite_empty" if args.allow_empty_overwrite else "keep_previous",
+        }
+        _write_diag(diag_path, diag)
+
+        if args.allow_empty_overwrite:
+            _backup_existing(out)
+            _atomic_write_csv(pd.DataFrame(), out)
+            print(json.dumps({"written": str(out), "rows": 0, "kept_previous": False}, ensure_ascii=False))
+        else:
+            print(
+                json.dumps(
+                    {
+                        "written": str(out),
+                        "rows": existing_rows,
+                        "kept_previous": True,
+                        "message": "No candidates found; keeping previous candidates_nextday.csv",
+                    },
+                    ensure_ascii=False,
+                )
+            )
         return
 
     combined = aggregate_frames(frames, thresholds)
@@ -423,22 +559,67 @@ def main() -> None:
                     source_label = fallback.name
 
     if combined is None or combined.empty:
-        pd.DataFrame().to_csv(out, index=False, encoding="utf-8-sig", lineterminator="\r\n")
+        existing_rows = _read_nonempty_row_count(out)
+        diag["result"] = {
+            "reason": "filters_removed_all_rows",
+            "existing_rows": existing_rows,
+            "action": "overwrite_empty" if args.allow_empty_overwrite else "keep_previous",
+        }
+        diag["source_after_fallback"] = source_label
+        diag["source_files_after_fallback"] = [str(p) for p in used_paths]
+        _write_diag(diag_path, diag)
+
+        if not args.allow_empty_overwrite:
+            print(
+                json.dumps(
+                    {
+                        "written": str(out),
+                        "rows": existing_rows,
+                        "kept_previous": True,
+                        "source": source_label,
+                        "source_files": [str(p) for p in used_paths],
+                        "message": "All candidates filtered out; keeping previous candidates_nextday.csv",
+                    },
+                    ensure_ascii=False,
+                )
+            )
+            return
+
+        _backup_existing(out)
+        _atomic_write_csv(pd.DataFrame(), out)
         print(
             json.dumps(
-                {"written": str(out), "rows": 0, "source": source_label, "source_files": [str(p) for p in used_paths]},
+                {
+                    "written": str(out),
+                    "rows": 0,
+                    "kept_previous": False,
+                    "source": source_label,
+                    "source_files": [str(p) for p in used_paths],
+                },
                 ensure_ascii=False,
             )
         )
         return
 
     summary = build_summary(combined, sum(len(frame) for frame in frames))
-    combined.to_csv(out, index=False, encoding="utf-8-sig", lineterminator="\r\n")
+    _backup_existing(out)
+    _atomic_write_csv(combined, out)
 
     payload = {"written": str(out), "rows": int(len(combined))}
     payload.update(summary.to_json())
     payload["source"] = source_label
     payload["source_files"] = [str(p) for p in used_paths]
+    payload["kept_previous"] = False
+
+    diag["result"] = {
+        "reason": "ok",
+        "written_rows": int(len(combined)),
+        "rows_in": summary.rows_in,
+        "rows_filtered_out": summary.rows_filtered_out,
+    }
+    diag["source_after_fallback"] = source_label
+    diag["source_files_after_fallback"] = [str(p) for p in used_paths]
+    _write_diag(diag_path, diag)
     print(json.dumps(payload, ensure_ascii=False))
 
 

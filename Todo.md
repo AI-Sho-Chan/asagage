@@ -9,6 +9,7 @@
 - [x] 週末バッチを差分更新（新規＋異常＋月次リセットのみフル探索）できるようにした（`docs/handover_20251220.md`）。
 - [x] 「Top200に一度入った銘柄」を永久保存対象にし、1分足データを毎日育てる仕組みを実装（`tools/build_top200_ever_universe.py`, `scripts/run_update_regulars_1m.ps1`）。
 - [x] 週末VMで Optuna を利用可能にし、`--enable-bayes` が実際に効くようにした（refineの高速化目的）。
+- [x] 候補が0件のときに `candidates_nextday.csv` が空で上書きされないように保護（前回の候補を保持し、診断ログを出す）。
 
 ## Next（優先）
 - [x] 週末差分更新の前提ファイル `output/excel/candidates_for_YYYYMMDD.csv` が空にならないようにする（`scripts/nightly_build_candidates.py` のスナップショット生成位置の不具合を修正済み）

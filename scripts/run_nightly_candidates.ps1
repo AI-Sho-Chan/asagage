@@ -98,8 +98,11 @@ try {
     try {
         $aggScript = Join-Path $repo 'tools/aggregate_candidates_today.py'
         $aggOut = Join-Path $repo 'output/excel/candidates_nextday.csv'
-        & $python $aggScript --output $aggOut | Out-Null
+        $aggPayload = & $python $aggScript --output $aggOut 2>&1
         "[$([DateTime]::Now.ToString('s'))] aggregate_candidates_today exit 0" | Out-File -FilePath $logPath -Append -Encoding utf8
+        if ($aggPayload) {
+            "[$([DateTime]::Now.ToString('s'))] aggregate_candidates_today payload $aggPayload" | Out-File -FilePath $logPath -Append -Encoding utf8
+        }
     }
     catch {
         "[$([DateTime]::Now.ToString('s'))] aggregate_candidates_today error $_" | Out-File -FilePath $logPath -Append -Encoding utf8
