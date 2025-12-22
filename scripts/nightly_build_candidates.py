@@ -639,6 +639,15 @@ def _main_impl() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--excel", default="ASAGAKE.xlsm")
     ap.add_argument("--base-out", default="output/bt30")
+    ap.add_argument(
+        "--output-tag",
+        default="",
+        help=(
+            "Optional suffix to separate outputs (e.g. 'B_coarse3'). "
+            "When set, writes to NIGHTLY_<date>_<tag> and candidates_nextday_<tag>.csv "
+            "so experimental runs do not overwrite production files."
+        ),
+    )
     ap.add_argument("--lookback", type=int, default=60)
     ap.add_argument("--chunk-days", type=int, default=5)
     ap.add_argument("--train-days", type=int, default=12)
@@ -837,7 +846,10 @@ def _main_impl() -> None:
 
     base = Path(args.base_out)
     date_tag = target_date.strftime("%Y%m%d")
-    night_root = base / f"NIGHTLY_{date_tag}"
+    raw_tag = str(getattr(args, "output_tag", "") or "").strip()
+    safe_tag = "".join(ch for ch in raw_tag if ch.isalnum() or ch in ("_", "-"))
+    out_suffix = f"_{safe_tag}" if safe_tag else ""
+    night_root = base / f"NIGHTLY_{date_tag}{out_suffix}"
     night_root.mkdir(parents=True, exist_ok=True)
 
     # Plan entries: (label, session_start, session_end, signal_mode)
@@ -1529,7 +1541,7 @@ def _main_impl() -> None:
 
         out_coarse = night_root / f"RUN_coarse_{tag}"
         out_refine = night_root / f"RUN_refine_{tag}"
-        cand_dir = Path("output/excel") / f"NIGHTLY_{date_tag}" / tag
+        cand_dir = Path("output/excel") / f"NIGHTLY_{date_tag}{out_suffix}" / tag
         cand_dir.mkdir(parents=True, exist_ok=True)
 
         # Session-specific directional guard tuning (AM1000 SELL auto)
@@ -1799,7 +1811,7 @@ def _main_impl() -> None:
         else {}
     )
 
-    out_all = Path("output/excel") / "candidates_nextday.csv"
+    out_all = Path("output/excel") / f"candidates_nextday{out_suffix}.csv"
     summary = aggregate_candidates(
         candidate_frames,
         out_all,
@@ -1844,7 +1856,7 @@ def _main_impl() -> None:
         except SystemExit:
             pass
 
-    coeff_latest = repo_root / "output/excel/dashboard_coeffs_latest.csv"
+    coeff_latest = repo_root / f"output/excel/dashboard_coeffs_latest{out_suffix}.csv"
     if not args.disable_dashboard_coeffs:
         try:
             run(
@@ -1855,6 +1867,8 @@ def _main_impl() -> None:
                     str(out_all),
                     "--history-days",
                     str(args.coeff_history_days),
+                    "--output",
+                    str(coeff_latest),
                 ],
                 cwd=repo_root,
             )
@@ -1866,7 +1880,7 @@ def _main_impl() -> None:
     # Keep a dated snapshot of the FINAL candidates file for DailyReplay / weekend reuse.
     # (Important: do this after any fallback aggregation / enrichment so the snapshot is not empty.)
     try:
-        snapshot_name = f"candidates_for_{date_tag}.csv"
+        snapshot_name = f"candidates_for_{date_tag}{out_suffix}.csv"
         snapshot_path = Path("output/excel") / snapshot_name
         shutil.copy2(out_all, snapshot_path)
         summary["candidates_snapshot"] = str(snapshot_path.resolve())
