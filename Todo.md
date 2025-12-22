@@ -8,10 +8,11 @@
 - [x] 週末VMの週末バッチを「金曜 16:30 JST に自動起動 → 完了後に自動停止」へ安定化（`docs/handover_20251216.md`）。
 - [x] 週末バッチを差分更新（新規＋異常＋月次リセットのみフル探索）できるようにした（`docs/handover_20251220.md`）。
 - [x] 「Top200に一度入った銘柄」を永久保存対象にし、1分足データを毎日育てる仕組みを実装（`tools/build_top200_ever_universe.py`, `scripts/run_update_regulars_1m.ps1`）。
+- [x] 週末VMで Optuna を利用可能にし、`--enable-bayes` が実際に効くようにした（refineの高速化目的）。
 
 ## Next（優先）
-- [ ] 週末差分更新の前提ファイル `output/excel/candidates_for_YYYYMMDD.csv` が空にならないようにする（`scripts/nightly_build_candidates.py` のスナップショット生成位置の不具合を修正済み、VMで次回確認）
-- [ ] 2025/12/19 の `candidates_for_20251219.csv` がヘッダのみなので、VMで `candidates_nextday.csv` をコピーして復旧（次回差分更新が効く前提を満たす）
+- [x] 週末差分更新の前提ファイル `output/excel/candidates_for_YYYYMMDD.csv` が空にならないようにする（`scripts/nightly_build_candidates.py` のスナップショット生成位置の不具合を修正済み）
+- [x] 2025/12/19 の `candidates_for_20251219.csv` がヘッダのみ問題を復旧（VMで `candidates_nextday.csv` をコピーして暫定復旧）
 - [ ] `scripts/run_update_regulars_1m.ps1` のタスクが実際に毎日動いて、GCSへアップロードできているか確認（失敗しているとVM側の時短が効かない）
 - [ ] VM が `gs://asagage-weekend-output/yahoo_1m_regulars` を取り込めているか確認（`vm_run_weekend_only.sh` の rsync ログ）
 - [ ] 次の金曜に週末バッチが自動起動・完走したかを確認（ログの見方を固定化）
