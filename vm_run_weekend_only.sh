@@ -101,12 +101,21 @@ trap cleanup_and_shutdown EXIT
 
   WEEKEND_INCREMENTAL="${WEEKEND_INCREMENTAL:-1}"
   WEEKEND_FORCE_FULL_RESET="${WEEKEND_FORCE_FULL_RESET:-0}"
+  # A/B test knobs for Walk-Forward slice count (0 keeps bt_opt30_forward default).
+  COARSE_FORWARD_SLICES="${COARSE_FORWARD_SLICES:-0}"
+  REFINE_FORWARD_SLICES="${REFINE_FORWARD_SLICES:-0}"
   EXTRA_WEEKEND_FLAGS=()
   if [ "$WEEKEND_INCREMENTAL" = "1" ]; then
     EXTRA_WEEKEND_FLAGS+=(--weekend-incremental --weekend-monthly-reset)
   fi
   if [ "$WEEKEND_FORCE_FULL_RESET" = "1" ]; then
     EXTRA_WEEKEND_FLAGS+=(--weekend-force-full-reset)
+  fi
+  if [ "${COARSE_FORWARD_SLICES}" -gt 0 ] 2>/dev/null; then
+    EXTRA_WEEKEND_FLAGS+=(--coarse-forward-slices "${COARSE_FORWARD_SLICES}")
+  fi
+  if [ "${REFINE_FORWARD_SLICES}" -gt 0 ] 2>/dev/null; then
+    EXTRA_WEEKEND_FLAGS+=(--refine-forward-slices "${REFINE_FORWARD_SLICES}")
   fi
 
   # Weekend batch (coarse + refine, longer window, VWAP filter applied inside script)

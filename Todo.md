@@ -10,6 +10,8 @@
 - [x] 「Top200に一度入った銘柄」を永久保存対象にし、1分足データを毎日育てる仕組みを実装（`tools/build_top200_ever_universe.py`, `scripts/run_update_regulars_1m.ps1`）。
 
 ## Next（優先）
+- [ ] 週末差分更新の前提ファイル `output/excel/candidates_for_YYYYMMDD.csv` が空にならないようにする（`scripts/nightly_build_candidates.py` のスナップショット生成位置の不具合を修正済み、VMで次回確認）
+- [ ] 2025/12/19 の `candidates_for_20251219.csv` がヘッダのみなので、VMで `candidates_nextday.csv` をコピーして復旧（次回差分更新が効く前提を満たす）
 - [ ] `scripts/run_update_regulars_1m.ps1` のタスクが実際に毎日動いて、GCSへアップロードできているか確認（失敗しているとVM側の時短が効かない）
 - [ ] VM が `gs://asagage-weekend-output/yahoo_1m_regulars` を取り込めているか確認（`vm_run_weekend_only.sh` の rsync ログ）
 - [ ] 次の金曜に週末バッチが自動起動・完走したかを確認（ログの見方を固定化）

@@ -49,16 +49,42 @@ def collect_candidate_paths(date_tag: Optional[str] = None) -> List[Path]:
 
     When date_tag is provided (YYYYMMDD), only reads `output/excel/NIGHTLY_YYYYMMDD/*/candidates_*.csv`.
     """
-    patterns: List[Path] = []
+    # When aggregating a specific NIGHTLY folder, only keep the newest
+    # `candidates_*.csv` per plan directory. This avoids mixing rows from
+    # restarts/re-runs that leave multiple candidate snapshots under the same plan.
     if date_tag:
-        patterns.append(ROOT / f"NIGHTLY_{date_tag}" / "*" / "candidates_*.csv")
-    else:
-        patterns.extend(
-            [
-                ROOT / "NIGHTLY_*" / "*" / "candidates_*.csv",
-                ROOT / "candidates_*.csv",
-            ]
-        )
+        root = ROOT / f"NIGHTLY_{date_tag}"
+        if not root.exists():
+            return []
+
+        picked: List[Path] = []
+        for plan_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+            candidates = sorted(plan_dir.glob("candidates_*.csv"))
+            if not candidates:
+                continue
+
+            def sort_key(path: Path) -> Tuple[str, float, str]:
+                tag = _date_from_name(path) or ""
+                try:
+                    mtime = path.stat().st_mtime
+                except OSError:
+                    mtime = 0.0
+                return (tag, mtime, path.name)
+
+            best = max(candidates, key=sort_key)
+            name_upper = best.name.upper()
+            if name_upper.startswith("CANDIDATES_NEXTDAY"):
+                continue
+            if name_upper.startswith("WEEKLY_CANDIDATES_"):
+                continue
+            picked.append(best)
+
+        return sorted(picked)
+
+    patterns: List[Path] = [
+        ROOT / "NIGHTLY_*" / "*" / "candidates_*.csv",
+        ROOT / "candidates_*.csv",
+    ]
 
     paths: List[Path] = []
     for pat in patterns:

@@ -800,6 +800,18 @@ def _main_impl() -> None:
         action="store_true",
         help="Weekend mode: force a full re-optimization regardless of incremental settings.",
     )
+    ap.add_argument(
+        "--coarse-forward-slices",
+        type=int,
+        default=0,
+        help="Override bt_opt30_forward --forward-slices for coarse runs (0=use bt default).",
+    )
+    ap.add_argument(
+        "--refine-forward-slices",
+        type=int,
+        default=0,
+        help="Override bt_opt30_forward --forward-slices for refine runs (0=use bt default).",
+    )
     args = ap.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
@@ -1569,6 +1581,11 @@ def _main_impl() -> None:
             str(args.liquidity_quantile),
             "--jobs",
             str(args.jobs),
+            *(
+                ["--forward-slices", str(args.coarse_forward_slices)]
+                if int(getattr(args, "coarse_forward_slices", 0) or 0) > 0
+                else []
+            ),
             "--use-local-raw",
             "--run-type",
             run_type,
@@ -1690,6 +1707,11 @@ def _main_impl() -> None:
             str(args.liquidity_quantile),
             "--jobs",
             str(args.jobs),
+            *(
+                ["--forward-slices", str(args.refine_forward_slices)]
+                if int(getattr(args, "refine_forward_slices", 0) or 0) > 0
+                else []
+            ),
             "--codes-file",
             str(codes_file),
             "--candidate-dir",
@@ -1800,16 +1822,6 @@ def _main_impl() -> None:
         }
     )
 
-    # Also keep a dated snapshot of candidates for DailyReplay
-    try:
-        date_tag = date_tag  # type: ignore[name-defined]
-        snapshot_name = f"candidates_for_{date_tag}.csv"
-        snapshot_path = Path("output/excel") / snapshot_name
-        shutil.copy2(out_all, snapshot_path)
-        summary["candidates_snapshot"] = str(snapshot_path.resolve())
-    except Exception:
-        pass
-
     # Fallback aggregator when no candidates from in-process aggregation
     try:
         total_cand = int(summary.get("total_candidates", "0"))
@@ -1850,6 +1862,16 @@ def _main_impl() -> None:
             pass
     enrich_dashboard_columns(out_all, coeff_latest)
     apply_trend_preferences(out_all, (repo_root / args.trend_pref).resolve(), args.trend_bp_th)
+
+    # Keep a dated snapshot of the FINAL candidates file for DailyReplay / weekend reuse.
+    # (Important: do this after any fallback aggregation / enrichment so the snapshot is not empty.)
+    try:
+        snapshot_name = f"candidates_for_{date_tag}.csv"
+        snapshot_path = Path("output/excel") / snapshot_name
+        shutil.copy2(out_all, snapshot_path)
+        summary["candidates_snapshot"] = str(snapshot_path.resolve())
+    except Exception:
+        pass
 
     if not args.headless:
         ensure_dashboard_formulas(repo_root, excel_path)
