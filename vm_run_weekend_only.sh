@@ -83,8 +83,11 @@ trap cleanup_and_shutdown EXIT
   python tools/build_master_topvol_universe.py --topn 300 --lookback 5 --tag "$TARGET_DATE"
   UNIVERSE_FILE="$HOME/asagage/data/universe/topvol_${TARGET_DATE}.csv"
 
-  # Update "Top200 regulars (ever)" list locally (used by weekend incremental policy).
-  # Best-effort: if topvol history is not sufficient yet, the script still runs.
+  # Update "Top200 ever" list locally (used by weekend incremental policy).
+  # Policy: once a ticker appears in weekly Top200, keep it forever.
+  python tools/build_top200_ever_universe.py --topn 200 --tag "$TARGET_DATE" --write-snapshot || true
+
+  # Also maintain "Top200 regulars" stats (optional, useful for cache planning/visibility).
   python tools/build_top_regulars_universe.py --lookback-files 20 --topn 200 --tag "$TARGET_DATE" --update-ever || true
 
   # Extended minute-cache for Top300 (60 history days, 120 backfill, best-effort)

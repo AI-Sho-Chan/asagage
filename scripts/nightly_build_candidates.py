@@ -782,8 +782,8 @@ def _main_impl() -> None:
     )
     ap.add_argument(
         "--weekend-regulars-file",
-        default="data/universe/top_regulars_ever.csv",
-        help="CSV with column 'code' listing 'Top200 regulars' (default: data/universe/top_regulars_ever.csv)",
+        default="data/universe/top200_ever.csv",
+        help="CSV with column 'code' listing tickers to treat as 'known' for weekend incremental (default: data/universe/top200_ever.csv)",
     )
     ap.add_argument(
         "--weekend-abnormal-file",
