@@ -82,6 +82,30 @@ Private Enum BbRiskLevel
     bbRiskBlock = 2
 End Enum
 
+Private Function IsWithinNoTradeWindow(ByVal ws As Worksheet) As Boolean
+    Dim noTradeCol As Long: noTradeCol = FindParamColumn(ws, "NoTradeMin")
+    If noTradeCol = 0 Then
+        IsWithinNoTradeWindow = False
+        Exit Function
+    End If
+
+    Dim minutesVal As Double: minutesVal = ToDouble(ws.Cells(2, noTradeCol).Value, 0#)
+    If minutesVal <= 0# Then
+        IsWithinNoTradeWindow = False
+        Exit Function
+    End If
+
+    Dim openTime As Date: openTime = Date + TimeSerial(9, 0, 0)
+    Dim nowTime As Date: nowTime = Now
+
+    If nowTime < openTime Then
+        IsWithinNoTradeWindow = True
+        Exit Function
+    End If
+
+    IsWithinNoTradeWindow = (nowTime < (openTime + (minutesVal / 1440#)))
+End Function
+
 
 Private Function HeaderTickerJP() As String: HeaderTickerJP = "Ticker": End Function
 
@@ -1866,6 +1890,8 @@ Public Sub PreplaceOrdersV2()
         End If
     Next idx
 
+    If IsWithinNoTradeWindow(ws) Then Exit Sub
+
     Dim r As Long, lastR As Long
     lastR = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
 
@@ -3136,6 +3162,8 @@ Private Sub AppendDemoExitIfMissing(ByVal sh As Worksheet, ByVal ticker As Strin
 End Sub
 
 Private Sub ProcessDemoPreplaceFills(ByVal ws As Worksheet, ByVal sh As Worksheet, ByVal tickerCol As Long, ByVal bestBidCol As Long, ByVal bestAskCol As Long)
+    If IsWithinNoTradeWindow(ws) Then Exit Sub
+
     Dim lastRow As Long
     lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
 
