@@ -106,6 +106,31 @@ Private Function IsWithinNoTradeWindow(ByVal ws As Worksheet) As Boolean
     IsWithinNoTradeWindow = (nowTime < (openTime + (minutesVal / 1440#)))
 End Function
 
+Private Function ToDateSafe(ByVal value As Variant, ByVal defaultValue As Date) As Date
+    On Error GoTo Fail
+    If IsDate(value) Then
+        ToDateSafe = CDate(value)
+    Else
+        ToDateSafe = defaultValue
+    End If
+    Exit Function
+Fail:
+    ToDateSafe = defaultValue
+End Function
+
+Private Function ToTimeOfDaySafe(ByVal value As String, ByVal defaultValue As Date) As Date
+    On Error GoTo Fail
+    Dim raw As String: raw = Trim$(value)
+    If Len(raw) = 0 Then
+        ToTimeOfDaySafe = defaultValue
+    Else
+        ToTimeOfDaySafe = TimeValue(raw)
+    End If
+    Exit Function
+Fail:
+    ToTimeOfDaySafe = defaultValue
+End Function
+
 
 Private Function HeaderTickerJP() As String: HeaderTickerJP = "Ticker": End Function
 
@@ -3013,10 +3038,141 @@ Private Sub ProcessDemoOrdersV2(ByVal ws As Worksheet)
 
     ProcessDemoPreplaceFills ws, sh, tickerCol, bestBidCol, bestAskCol
     ProcessDemoExitFills ws, sh, tickerCol, bestBidCol, bestAskCol
+    ProcessDemoForcedExits ws, sh, tickerCol, bestBidCol, bestAskCol
     Exit Sub
 
 Fail:
     LogVbaEvent "ProcessDemoOrdersV2", "Err " & Err.Number & ": " & Err.Description
+End Sub
+
+Private Sub CancelAllExitOrdersForTicker(ByVal sh As Worksheet, ByVal ticker As String)
+    If sh Is Nothing Then Exit Sub
+    If Len(Trim$(ticker)) = 0 Then Exit Sub
+
+    Dim lastRow As Long
+    lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
+
+    Dim r As Long
+    For r = 2 To lastRow
+        If StrComp(Trim$(CStr(sh.Cells(r, ORD_COL_TICKER).Value)), ticker, vbTextCompare) <> 0 Then GoTo NextCancel
+
+        Dim modeVal As String: modeVal = LCase$(Trim$(CStr(sh.Cells(r, ORD_COL_MODE).Value)))
+        If modeVal <> "tp_demo" And modeVal <> "sl_demo" Then GoTo NextCancel
+
+        Dim statusVal As String: statusVal = UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_STATUS).Value)))
+        If statusVal = "ORDERED" Or statusVal = "PENDING" Then
+            sh.Cells(r, ORD_COL_STATUS).Value = "CANCELLED_AUTO"
+            If Len(Trim$(CStr(sh.Cells(r, ORD_COL_NOTE).Value))) = 0 Then
+                sh.Cells(r, ORD_COL_NOTE).Value = "DEMO_EXIT_CANCEL"
+            End If
+        End If
+
+NextCancel:
+    Next r
+End Sub
+
+Private Sub ProcessDemoForcedExits(ByVal ws As Worksheet, ByVal sh As Worksheet, ByVal tickerCol As Long, ByVal bestBidCol As Long, ByVal bestAskCol As Long)
+    On Error GoTo Fail
+    If ws Is Nothing Or sh Is Nothing Then Exit Sub
+    If Not IsDemoMode() Then Exit Sub
+
+    Dim nowTime As Date: nowTime = Now
+
+    Dim maxHoldMin As Double
+    maxHoldMin = GetStrategyRuleDouble("demo_max_hold_min", 30#)
+
+    Dim softTimeRaw As String
+    softTimeRaw = GetStrategyRule("demo_soft_flat_time", "14:50")
+    Dim hardTimeRaw As String
+    hardTimeRaw = GetStrategyRule("demo_flat_time", "14:55")
+
+    Dim softTime As Date
+    softTime = Date + ToTimeOfDaySafe(softTimeRaw, TimeSerial(14, 50, 0))
+    Dim hardTime As Date
+    hardTime = Date + ToTimeOfDaySafe(hardTimeRaw, TimeSerial(14, 55, 0))
+
+    Dim forceAll As Boolean: forceAll = (nowTime >= hardTime)
+    Dim softMode As Boolean: softMode = (nowTime >= softTime)
+
+    Dim lastRow As Long
+    lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
+
+    Dim r As Long
+    For r = lastRow To 2 Step -1
+        Dim modeVal As String: modeVal = LCase$(Trim$(CStr(sh.Cells(r, ORD_COL_MODE).Value)))
+        If modeVal <> "preplace_demo" Then GoTo NextRow
+
+        Dim statusVal As String: statusVal = UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_STATUS).Value)))
+        If statusVal <> "RUNNING" Then GoTo NextRow
+
+        Dim ticker As String: ticker = Trim$(CStr(sh.Cells(r, ORD_COL_TICKER).Value))
+        If Len(ticker) = 0 Then GoTo NextRow
+
+        Dim dashRow As Long
+        dashRow = DashboardRowForOrderRow(ws, tickerCol, ticker, sh, r)
+        If dashRow = 0 Then GoTo NextRow
+
+        Dim bestBid As Double: bestBid = ToDouble(ws.Cells(dashRow, bestBidCol).Value, 0#)
+        Dim bestAsk As Double: bestAsk = ToDouble(ws.Cells(dashRow, bestAskCol).Value, 0#)
+        If bestBid <= 0# Or bestAsk <= 0# Then GoTo NextRow
+
+        Dim entrySide As String: entrySide = UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_SIDE).Value)))
+        If entrySide <> "BUY" And entrySide <> "SELL" Then GoTo NextRow
+
+        Dim fillPrice As Double: fillPrice = ToDouble(sh.Cells(r, ORD_COL_FILL_PRICE).Value, 0#)
+        Dim qty As Double: qty = ToDouble(sh.Cells(r, ORD_COL_QTY).Value, 0#)
+        If fillPrice <= 0# Or qty <= 0# Then GoTo NextRow
+
+        Dim fillTs As Date
+        fillTs = ToDateSafe(sh.Cells(r, ORD_COL_FILL_TS).Value, 0)
+        If fillTs = 0 Then fillTs = ToDateSafe(sh.Cells(r, ORD_COL_TS).Value, 0)
+        If fillTs = 0 Then GoTo NextRow
+
+        Dim holdMin As Double
+        holdMin = (nowTime - fillTs) * 1440#
+
+        Dim markPrice As Double
+        If entrySide = "BUY" Then
+            markPrice = bestBid
+        Else
+            markPrice = bestAsk
+        End If
+        If markPrice <= 0# Then GoTo NextRow
+
+        Dim dir As Double: dir = IIf(entrySide = "BUY", 1#, -1#)
+        Dim pnlBpNow As Double
+        pnlBpNow = dir * (markPrice - fillPrice) / fillPrice * 10000#
+
+        Dim shouldClose As Boolean: shouldClose = False
+        Dim reason As String: reason = ""
+
+        If forceAll Then
+            shouldClose = True
+            reason = "DEMO_EOD_FLAT"
+        ElseIf maxHoldMin > 0# And holdMin >= maxHoldMin Then
+            shouldClose = True
+            reason = "DEMO_TIMEOUT"
+        ElseIf softMode And pnlBpNow >= 0# Then
+            shouldClose = True
+            reason = "DEMO_EOD_SOFT"
+        End If
+
+        If shouldClose Then
+            sh.Cells(r, ORD_COL_DASH_ROW).Value = dashRow
+            sh.Cells(r, ORD_COL_BEST_BID_AT_CLOSE).Value = bestBid
+            sh.Cells(r, ORD_COL_BEST_ASK_AT_CLOSE).Value = bestAsk
+            sh.Cells(r, ORD_COL_CLOSE_TIMER).Value = Timer
+            sh.Cells(r, ORD_COL_EXIT_LIMIT).Value = markPrice
+            LogOrderSettled ticker, entrySide, markPrice, qty, reason
+            CancelAllExitOrdersForTicker sh, ticker
+        End If
+
+NextRow:
+    Next r
+    Exit Sub
+
+Fail:
+    LogVbaEvent "ProcessDemoForcedExits", "Err " & Err.Number & ": " & Err.Description
 End Sub
 
 Private Function DashboardRowForTicker(ByVal ws As Worksheet, ByVal tickerCol As Long, ByVal ticker As String) As Long
