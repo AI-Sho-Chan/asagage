@@ -1,0 +1,43 @@
+title: ASAGAKE VWAP Reversion Scalping - Audit Pack Manifest
+language: ja
+generated_by: Codex CLI
+generated_at_local: 2025-12-23
+scope:
+  - system_overview
+  - strategy_hypothesis
+  - execution_architecture
+  - candidate_generation_and_backtest
+  - daily_replay_validation
+  - performance_and_limitations
+  - known_issues_and_risks
+entrypoint_doc:
+  - docs/audit_pack_vwap_revert_ja.md
+core_artifacts:
+  excel_workbook:
+    - C:\AI\asagake\ASAGAKE.xlsm
+  vba_source:
+    - excel/AutoTraderAdvanced.bas
+  vba_update_script:
+    - scripts/update_asagake_vba.ps1
+  runtime_config:
+    - state/strategy_rules.ini
+  candidate_output_for_excel:
+    - output/excel/candidates_nextday.csv
+  weekend_batch_vm:
+    - vm_run_weekend_only.sh
+    - scripts/nightly_build_candidates.py
+    - scripts/bt_opt30_forward.py
+  daily_replay:
+    - scripts/run_daily_replay.ps1
+    - tools/simulate_daily_replay.py
+    - analysis/daily_trades_YYYYMMDD.csv
+  logging:
+    - logs/vba_events.log
+    - docs/handover_*.md
+    - Todo.md
+credentials_and_secrets:
+  - state/smtp.json  # redact before sharing
+notes:
+  - Excel imports candidates_nextday.csv (not nightly_strong_candidates.csv).
+  - Demo vs Live behavior differs; audit should consider both.
+  - Yahoo 1m history availability is a known limitation; cache mitigations exist.
