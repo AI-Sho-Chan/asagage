@@ -15,7 +15,8 @@
 - [x] 週末差分更新の前提ファイル `output/excel/candidates_for_YYYYMMDD.csv` が空にならないようにする（`scripts/nightly_build_candidates.py` のスナップショット生成位置の不具合を修正済み）
 - [x] 2025/12/19 の `candidates_for_20251219.csv` がヘッダのみ問題を復旧（VMで `candidates_nextday.csv` をコピーして暫定復旧）
 - [x] 取引時間中に邪魔になるため、5分スナップショット/1分足更新系のタスクは一旦停止（必要になれば後で復活）
-- [ ] 次の金曜に週末バッチが自動起動・完走したかを確認（ログの見方を固定化）
+- [x] 週末VMの `cron` を「16:30＋16:40（ロック付き）」の2段構えにし、起動遅延で16:30を逃しても走るようにした（`docs/handover_20251223.md`）。
+- [ ] 次の金曜に週末バッチが自動起動・完走したかを確認（`~/cloud_logs/weekend_*.log` と `output/bt30/NIGHTLY_YYYYMMDD` で確認）
 - [ ] `abnormal_codes_latest.csv` のアップロードが失敗していないか、DailyReplayログで確認（失敗時はVMの異常時フル探索が効かない）
 
 ## Later（改善）
