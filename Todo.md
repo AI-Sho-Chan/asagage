@@ -14,12 +14,13 @@
 ## Next（優先）
 - [x] 週末差分更新の前提ファイル `output/excel/candidates_for_YYYYMMDD.csv` が空にならないようにする（`scripts/nightly_build_candidates.py` のスナップショット生成位置の不具合を修正済み）
 - [x] 2025/12/19 の `candidates_for_20251219.csv` がヘッダのみ問題を復旧（VMで `candidates_nextday.csv` をコピーして暫定復旧）
-- [ ] `scripts/run_update_regulars_1m.ps1` のタスクが実際に毎日動いて、GCSへアップロードできているか確認（失敗しているとVM側の時短が効かない）
-- [ ] VM が `gs://asagage-weekend-output/yahoo_1m_regulars` を取り込めているか確認（`vm_run_weekend_only.sh` の rsync ログ）
+- [x] 取引時間中に邪魔になるため、5分スナップショット/1分足更新系のタスクは一旦停止（必要になれば後で復活）
 - [ ] 次の金曜に週末バッチが自動起動・完走したかを確認（ログの見方を固定化）
 - [ ] `abnormal_codes_latest.csv` のアップロードが失敗していないか、DailyReplayログで確認（失敗時はVMの異常時フル探索が効かない）
 
 ## Later（改善）
+- [ ] `scripts/run_update_regulars_1m.ps1`（Top200常連の1分足更新）を再開する場合は、タスクの実行時刻/負荷/アップロード先を再点検してから有効化する
+- [ ] VM が `gs://asagage-weekend-output/yahoo_1m_regulars` を取り込めているか確認（`vm_run_weekend_only.sh` の rsync ログ）
 - [ ] GapBanPct / NoTradeMin の適正値を、DailyReplay の複数日（例: 20営業日）で検証して提案する（実装は別途判断）。
 - [ ] 時間帯の切り方（区切る/区切らない/粗い区切り）を“同一条件”で比較する（比較表を `analysis/` に出力）。
 - [ ] ABテスト（A: coarse=5/refine=5 vs B: coarse=3/refine=5）を20営業日で比較し、差が出るかを判断する（B候補は週末VMで「別出力」にして現行を汚さない）。

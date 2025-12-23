@@ -3082,9 +3082,12 @@ Private Sub ProcessDemoForcedExits(ByVal ws As Worksheet, ByVal sh As Worksheet,
     maxHoldMin = GetStrategyRuleDouble("demo_max_hold_min", 30#)
 
     Dim softTimeRaw As String
-    softTimeRaw = GetStrategyRule("demo_soft_flat_time", "14:50")
+    ' DEMO: force-flat schedule (defaults are conservative and can be overridden via state/strategy_rules.ini)
+    ' - Start "soft" exits at 15:15 (avoid holding into the close)
+    ' - Force remaining exits at 15:25 (avoid the most volatile close prints)
+    softTimeRaw = GetStrategyRule("demo_soft_flat_time", "15:15")
     Dim hardTimeRaw As String
-    hardTimeRaw = GetStrategyRule("demo_flat_time", "14:55")
+    hardTimeRaw = GetStrategyRule("demo_flat_time", "15:25")
 
     Dim softTime As Date
     softTime = Date + ToTimeOfDaySafe(softTimeRaw, TimeSerial(14, 50, 0))
