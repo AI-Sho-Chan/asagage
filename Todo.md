@@ -16,6 +16,9 @@
 - [x] 2025/12/19 の `candidates_for_20251219.csv` がヘッダのみ問題を復旧（VMで `candidates_nextday.csv` をコピーして暫定復旧）
 - [x] 取引時間中に邪魔になるため、5分スナップショット/1分足更新系のタスクは一旦停止（必要になれば後で復活）
 - [x] 週末VMの `cron` を「16:30＋16:40（ロック付き）」の2段構えにし、起動遅延で16:30を逃しても走るようにした（`docs/handover_20251223.md`）。
+- [x] DecisionTrace（DT.v1）と Bridge.v1（inbox/outbox）の“壊さずに足す”スキーマ＋Python I/O骨格を追加（`schemas/*_v1.yaml`, `src/asagake_io/*`）。
+- [x] DailyReplay（`tools/simulate_daily_replay.py`）に `--decision-trace` を追加し、DT.v1 を `analysis/decision_trace_YYYYMMDD.csv` に追記できるようにした。
+- [x] Bridge.v1 のVBA側実装計画（まだ未実装）を `docs/bridge_v1_vba_plan.md` に固定し、スキーマ一致テスト（`tests/test_bridge_v1_schemas.py`）を追加。
 - [ ] 次の金曜に週末バッチが自動起動・完走したかを確認（`~/cloud_logs/weekend_*.log` と `output/bt30/NIGHTLY_YYYYMMDD` で確認）
 - [ ] `abnormal_codes_latest.csv` のアップロードが失敗していないか、DailyReplayログで確認（失敗時はVMの異常時フル探索が効かない）
 
@@ -27,3 +30,4 @@
 - [ ] ABテスト（A: coarse=5/refine=5 vs B: coarse=3/refine=5）を20営業日で比較し、差が出るかを判断する（B候補は週末VMで「別出力」にして現行を汚さない）。
 - [ ] Live/Demo 判定や BudgetFactor の基準を、実績（DailyReplay/DEMO）に合わせて自動提案できるようにする。
 - [ ] Orders（負け/勝ちの原因）を定期的に棚卸しして、改善候補（除外銘柄・守り条件）を提案できる形にする（例: 5801.Tは“戻らない系”としてDEMO_ONLY/予算減、8105.Tは“急変で即死しやすい系”としてGapBan/NoTradeMin調整対象）。
+- [ ] Bridge.v1（Excel薄化）を進める：Excel(outbox)→Python(MS/EE)→Excel(inbox)の3CSVをVBAに段階導入し、Ordersシートは“人が見るビュー”に寄せる（追加列でJOIN可能にする）。

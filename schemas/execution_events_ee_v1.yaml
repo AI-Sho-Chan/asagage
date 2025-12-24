@@ -1,0 +1,119 @@
+{
+  "schema_version": "EE.v1",
+  "primary_key": [
+    "run_id",
+    "event_seq"
+  ],
+  "columns": [
+    {
+      "name": "schema_version",
+      "type": "str",
+      "required": true,
+      "description": "Schema tag (fixed EE.v1). Must be the first column."
+    },
+    {
+      "name": "run_id",
+      "type": "str",
+      "required": true,
+      "description": "Run identifier."
+    },
+    {
+      "name": "event_ts",
+      "type": "str",
+      "required": true,
+      "description": "Event timestamp (ISO8601)."
+    },
+    {
+      "name": "event_seq",
+      "type": "int",
+      "required": true,
+      "description": "Monotonic increasing integer within run_id."
+    },
+    {
+      "name": "cmd_seq",
+      "type": "int",
+      "required": false,
+      "description": "Command sequence this event corresponds to."
+    },
+    {
+      "name": "client_order_id",
+      "type": "str",
+      "required": true,
+      "description": "Client order id."
+    },
+    {
+      "name": "broker_order_id",
+      "type": "str",
+      "required": false,
+      "description": "Broker order id (if available)."
+    },
+    {
+      "name": "exec_event",
+      "type": "str",
+      "required": true,
+      "enum": [
+        "SENT",
+        "ACK",
+        "REJECT",
+        "PARTIAL_FILL",
+        "FILL",
+        "CANCELLED",
+        "EXPIRED"
+      ],
+      "description": "Execution event kind."
+    },
+    {
+      "name": "ticker",
+      "type": "str",
+      "required": true,
+      "description": "Ticker code."
+    },
+    {
+      "name": "side",
+      "type": "str",
+      "required": false,
+      "enum": [
+        "BUY",
+        "SELL"
+      ],
+      "description": "Order side."
+    },
+    {
+      "name": "qty",
+      "type": "int",
+      "required": false,
+      "description": "Order qty (requested)."
+    },
+    {
+      "name": "limit_price",
+      "type": "float",
+      "required": false,
+      "description": "Limit price (requested)."
+    },
+    {
+      "name": "fill_qty",
+      "type": "int",
+      "required": false,
+      "description": "Filled qty."
+    },
+    {
+      "name": "fill_price",
+      "type": "float",
+      "required": false,
+      "description": "Filled price."
+    },
+    {
+      "name": "error_code",
+      "type": "str",
+      "required": false,
+      "description": "Error code."
+    },
+    {
+      "name": "error_message",
+      "type": "str",
+      "required": false,
+      "description": "Error message."
+    }
+  ]
+}
+

@@ -1,0 +1,142 @@
+{
+  "schema_version": "OC.v1",
+  "primary_key": [
+    "run_id",
+    "cmd_seq"
+  ],
+  "columns": [
+    {
+      "name": "schema_version",
+      "type": "str",
+      "required": true,
+      "description": "Schema tag (fixed OC.v1). Must be the first column."
+    },
+    {
+      "name": "run_id",
+      "type": "str",
+      "required": true,
+      "description": "Run identifier."
+    },
+    {
+      "name": "cmd_ts",
+      "type": "str",
+      "required": true,
+      "description": "Command timestamp (ISO8601)."
+    },
+    {
+      "name": "cmd_seq",
+      "type": "int",
+      "required": true,
+      "description": "Monotonic increasing integer within run_id."
+    },
+    {
+      "name": "action",
+      "type": "str",
+      "required": true,
+      "enum": [
+        "PLACE",
+        "MODIFY",
+        "CANCEL"
+      ],
+      "description": "Command action."
+    },
+    {
+      "name": "ticker",
+      "type": "str",
+      "required": true,
+      "description": "Ticker code."
+    },
+    {
+      "name": "side",
+      "type": "str",
+      "required": true,
+      "enum": [
+        "BUY",
+        "SELL"
+      ],
+      "description": "Order side."
+    },
+    {
+      "name": "qty",
+      "type": "int",
+      "required": true,
+      "description": "Order quantity."
+    },
+    {
+      "name": "order_type",
+      "type": "str",
+      "required": true,
+      "enum": [
+        "LIMIT"
+      ],
+      "description": "Order type."
+    },
+    {
+      "name": "limit_price",
+      "type": "float",
+      "required": true,
+      "description": "Limit price."
+    },
+    {
+      "name": "time_in_force",
+      "type": "str",
+      "required": false,
+      "description": "Time-in-force (DAY/IOC/etc)."
+    },
+    {
+      "name": "candidate_id",
+      "type": "str",
+      "required": false,
+      "description": "Candidate identifier."
+    },
+    {
+      "name": "decision_id",
+      "type": "str",
+      "required": false,
+      "description": "Decision identifier."
+    },
+    {
+      "name": "client_order_id",
+      "type": "str",
+      "required": true,
+      "description": "Client order id."
+    },
+    {
+      "name": "tp_price",
+      "type": "float",
+      "required": false,
+      "description": "TP price."
+    },
+    {
+      "name": "sl_price",
+      "type": "float",
+      "required": false,
+      "description": "SL price."
+    },
+    {
+      "name": "trail_type",
+      "type": "str",
+      "required": false,
+      "description": "Trail type."
+    },
+    {
+      "name": "trail_value",
+      "type": "float",
+      "required": false,
+      "description": "Trail value."
+    },
+    {
+      "name": "tmax_sec",
+      "type": "int",
+      "required": false,
+      "description": "Max holding seconds."
+    },
+    {
+      "name": "reason",
+      "type": "str",
+      "required": false,
+      "description": "Reason code."
+    }
+  ]
+}
+

@@ -1,0 +1,106 @@
+{
+  "schema_version": "MS.v1",
+  "primary_key": [
+    "run_id",
+    "snap_ts",
+    "ticker"
+  ],
+  "columns": [
+    {
+      "name": "schema_version",
+      "type": "str",
+      "required": true,
+      "description": "Schema tag (fixed MS.v1). Must be the first column."
+    },
+    {
+      "name": "run_id",
+      "type": "str",
+      "required": true,
+      "description": "Run identifier."
+    },
+    {
+      "name": "snap_ts",
+      "type": "str",
+      "required": true,
+      "description": "Snapshot timestamp (ISO8601)."
+    },
+    {
+      "name": "ticker",
+      "type": "str",
+      "required": true,
+      "description": "Ticker code."
+    },
+    {
+      "name": "last",
+      "type": "float",
+      "required": false,
+      "description": "Last price."
+    },
+    {
+      "name": "bid",
+      "type": "float",
+      "required": false,
+      "description": "Best bid."
+    },
+    {
+      "name": "ask",
+      "type": "float",
+      "required": false,
+      "description": "Best ask."
+    },
+    {
+      "name": "vwap",
+      "type": "float",
+      "required": false,
+      "description": "VWAP."
+    },
+    {
+      "name": "cum_volume",
+      "type": "float",
+      "required": false,
+      "description": "Cumulative volume."
+    },
+    {
+      "name": "prev_close",
+      "type": "float",
+      "required": false,
+      "description": "Previous close."
+    },
+    {
+      "name": "bid_size",
+      "type": "float",
+      "required": false,
+      "description": "Bid size."
+    },
+    {
+      "name": "ask_size",
+      "type": "float",
+      "required": false,
+      "description": "Ask size."
+    },
+    {
+      "name": "nky_last",
+      "type": "float",
+      "required": false,
+      "description": "Nikkei last."
+    },
+    {
+      "name": "topix_last",
+      "type": "float",
+      "required": false,
+      "description": "TOPIX last."
+    },
+    {
+      "name": "data_quality",
+      "type": "str",
+      "required": true,
+      "enum": [
+        "OK",
+        "MISSING",
+        "STALE"
+      ],
+      "description": "Data quality label."
+    }
+  ]
+}
+

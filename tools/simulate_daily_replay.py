@@ -18,12 +18,23 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
+import subprocess
+import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
 from yahooquery import Ticker
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if SRC.exists():
+    sys.path.insert(0, str(SRC))
+
+from asagake_io.csv_schemas import DT_V1, schema_columns
+from asagake_io.csv_writer import DecisionTraceWriter, make_append_only_writer
 
 DATA_ROOT = Path("data/raw/yahoo_1m")
 OUT_DIR = Path("analysis")
@@ -37,6 +48,55 @@ COST_BP = 8.0
 # - Max trades per ticker per day: 2
 DEFAULT_COOLDOWN_MINUTES = 5
 DEFAULT_MAX_TRADES_PER_TICKER = 2
+
+JST = dt.timezone(dt.timedelta(hours=9))
+
+
+def _iso_ts_jst(ts: dt.datetime | pd.Timestamp) -> str:
+    if isinstance(ts, pd.Timestamp):
+        ts = ts.to_pydatetime()
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=JST)
+    return ts.isoformat()
+
+
+def _detect_engine_version() -> str:
+    try:
+        r = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        v = (r.stdout or "").strip()
+        return v or "unknown"
+    except Exception:
+        return "unknown"
+
+
+def _make_candidate_id(row: dict) -> str:
+    ticker = str(row.get("code") or "").strip()
+    session = str(row.get("session") or "").strip()
+    payload = "|".join(
+        [
+            ticker,
+            session,
+            str(row.get("signal_mode") or ""),
+            f"{float(row.get('J_th') or 0.0):.6g}",
+            f"{float(row.get('TPk') or 0.0):.6g}",
+            f"{float(row.get('SLk') or 0.0):.6g}",
+            f"{float(row.get('ATR_n') or 0.0):.6g}",
+            f"{float(row.get('BudgetFactor_row') or 1.0):.6g}",
+            f"{float(row.get('NoTradeMin') or 0.0):.6g}",
+            f"{float(row.get('GapBanPct') or 0.0):.6g}",
+            str(row.get("trend_driver") or ""),
+            str(row.get("trend_window") or ""),
+            f"{float(row.get('trend_bp_th') or 0.0):.6g}",
+            str(row.get("trend_allowed_policy") or ""),
+        ]
+    )
+    h = hashlib.sha1(payload.encode("utf-8")).hexdigest()[:8]
+    return f"C_{ticker}_{session}_{h}"
 
 
 SESSION_WINDOWS: Dict[str, Tuple[dt.time, dt.time]] = {
@@ -468,6 +528,9 @@ def simulate_trade_for_candidate(
     gapban_pct: float,
     no_trade_min: float,
     counters: Dict[str, int],
+    *,
+    dtw: DecisionTraceWriter | None = None,
+    candidate_id: str = "",
 ) -> Dict[str, object] | None:
     intraday = load_intraday(code, day)
     if intraday.empty:
@@ -510,12 +573,75 @@ def simulate_trade_for_candidate(
     entry_row = intraday.loc[entry_ts]
     side = "BUY" if float(J.loc[entry_ts]) < 0 else "SELL"
 
+    decision_id = f"D_{day.strftime('%Y%m%d')}_{entry_ts.strftime('%H%M%S')}_{candidate_id[-8:] or '00000000'}"
+    client_order_id = f"O_{day.strftime('%Y%m%d')}_{entry_ts.strftime('%H%M%S')}_{candidate_id[-8:] or '00000000'}"
+
+    def _dt_emit(event_type: str, **fields: object) -> None:
+        if dtw is None:
+            return
+        base = {
+            "event_ts": _iso_ts_jst(entry_ts),
+            "event_type": event_type,
+            "ticker": code,
+            "session": session,
+            "candidate_id": candidate_id,
+            "decision_id": decision_id,
+        }
+        base.update(fields)
+        dtw.append_event(base)
+
+    def _emit_snapshot() -> None:
+        last = float(entry_row.get("close")) if "close" in entry_row else ""
+        vwap_val = float(entry_row.get("vwap")) if "vwap" in entry_row else ""
+        _dt_emit(
+            "MARKET_SNAPSHOT",
+            snap_ts=_iso_ts_jst(entry_ts),
+            last=last,
+            bid="",
+            ask="",
+            vwap=vwap_val,
+            prev_close=_prev_trading_close(code, day) or "",
+        )
+
+    def _emit_features() -> None:
+        atr_val = float(entry_row.get("atr")) if "atr" in entry_row else ""
+        j_raw = float(J.loc[entry_ts]) if entry_ts in J.index else ""
+        _dt_emit(
+            "FEATURES_COMPUTED",
+            atr_n=int(atr_n),
+            atr=atr_val,
+            j_raw=j_raw,
+            j_bias_adj=0.0,
+            j_gap_adj=0.0,
+            j=j_raw,
+            j_th=float(j_th),
+            signal_mode=signal_mode,
+            j_cross_state=("NONE" if not signal_mode.lower().startswith("j-cross") else "NONE"),
+        )
+
+    _emit_snapshot()
+    _emit_features()
+
     prev_close = _prev_trading_close(code, day)
     if prev_close is not None and prev_close > 0:
         day_open = float(intraday["open"].iloc[0])
         gap_bp = (day_open - prev_close) / prev_close * 10000.0
         if abs(gap_bp) > float(gapban_pct) * 100.0:
             counters["skip_gapban"] = counters.get("skip_gapban", 0) + 1
+            _dt_emit(
+                "FILTER_EVAL",
+                allowed=0,
+                deny_reasons="GAP_BAN",
+                no_trade_min=int(no_trade_min),
+                minutes_from_open=int((entry_ts.to_pydatetime() - market_open).total_seconds() // 60),
+                gap_pct=float(gap_bp / 100.0),
+                gap_ban_pct=float(gapban_pct),
+                trend_driver=trend_driver,
+                trend_window=trend_window,
+                trend_bp_th=float(trend_bp_th),
+                trend_allowed_policy=str(trend_policy or ""),
+                trend_aligned="",
+            )
             return None
 
     # AllowedSide filter: allow only BUY/SELL direction if specified (default BOTH).
@@ -532,6 +658,20 @@ def simulate_trade_for_candidate(
     # Policy B: treat empty policy as ALIGNED_ONLY (=always apply direction checks).
     if not (_allow(allowed_side_nky, side) and _allow(allowed_side_topix, side)):
         counters["skip_allowed_side"] = counters.get("skip_allowed_side", 0) + 1
+        _dt_emit(
+            "FILTER_EVAL",
+            allowed=0,
+            deny_reasons="ALLOWED_SIDE",
+            no_trade_min=int(no_trade_min),
+            minutes_from_open=int((entry_ts.to_pydatetime() - market_open).total_seconds() // 60),
+            gap_pct="",
+            gap_ban_pct=float(gapban_pct),
+            trend_driver=trend_driver,
+            trend_window=trend_window,
+            trend_bp_th=float(trend_bp_th),
+            trend_allowed_policy=str(trend_policy or ""),
+            trend_aligned="",
+        )
         return None
 
     policy = (trend_policy or "").strip().upper() or "ALIGNED_ONLY"
@@ -546,12 +686,42 @@ def simulate_trade_for_candidate(
         )
         if trend_side in {"BUY", "SELL"} and trend_side != side:
             counters["skip_trend_mismatch"] = counters.get("skip_trend_mismatch", 0) + 1
+            _dt_emit(
+                "FILTER_EVAL",
+                allowed=0,
+                deny_reasons="TREND_MISMATCH",
+                no_trade_min=int(no_trade_min),
+                minutes_from_open=int((entry_ts.to_pydatetime() - market_open).total_seconds() // 60),
+                gap_pct="",
+                gap_ban_pct=float(gapban_pct),
+                trend_driver=trend_driver,
+                trend_window=trend_window,
+                trend_bp_th=float(trend_bp_th),
+                trend_allowed_policy=policy,
+                trend_aligned=0,
+            )
             return None
+
+    _dt_emit(
+        "FILTER_EVAL",
+        allowed=1,
+        deny_reasons="",
+        no_trade_min=int(no_trade_min),
+        minutes_from_open=int((entry_ts.to_pydatetime() - market_open).total_seconds() // 60),
+        gap_pct="",
+        gap_ban_pct=float(gapban_pct),
+        trend_driver=trend_driver,
+        trend_window=trend_window,
+        trend_bp_th=float(trend_bp_th),
+        trend_allowed_policy=policy,
+        trend_aligned=1,
+    )
 
     px = float(entry_row["close"])
     atr_val = float(entry_row["atr"])
     if not (np.isfinite(atr_val) and atr_val > 0):
         counters["bad_atr"] = counters.get("bad_atr", 0) + 1
+        _dt_emit("ERROR", notes="bad_atr")
         return None
 
     if side == "BUY":
@@ -560,6 +730,22 @@ def simulate_trade_for_candidate(
     else:
         tp = px - tpk * atr_val
         sl = px + slk * atr_val
+
+    _dt_emit(
+        "DECISION",
+        signal=("LONG" if side == "BUY" else "SHORT"),
+        action="PLACE",
+        entry_style="LIMIT_AHEAD",
+        limit_price=float(px),
+        qty="",
+        tp_price=float(tp),
+        sl_price=float(sl),
+        trail_type="NONE",
+        trail_value="",
+        tmax_sec="",
+        client_order_id=client_order_id,
+        order_status="NEW",
+    )
 
     # simulate bar-by-bar after entry
     after = intraday.loc[entry_ts:]
@@ -631,6 +817,22 @@ def simulate_trade_for_candidate(
         tp_dist_bp = (px - tp) / px * 10000.0
         sl_dist_bp = (sl - px) / px * 10000.0
 
+    if dtw is not None and exit_ts is not None:
+        dtw.append_event(
+            {
+                "event_ts": _iso_ts_jst(exit_ts),
+                "event_type": "EXIT",
+                "ticker": code,
+                "session": session,
+                "candidate_id": candidate_id,
+                "decision_id": decision_id,
+                "client_order_id": client_order_id,
+                "order_status": "CLOSED",
+                "pnl_realized_yen": float(pnl_yen),
+                "notes": str(exit_reason),
+            }
+        )
+
     return {
         "date": day.strftime("%Y-%m-%d"),
         "code": code,
@@ -660,6 +862,7 @@ def simulate_day(
     cooldown_minutes: int = DEFAULT_COOLDOWN_MINUTES,
     max_trades_per_ticker: int = DEFAULT_MAX_TRADES_PER_TICKER,
     stop_after_loss: bool = False,
+    dtw: DecisionTraceWriter | None = None,
 ) -> Tuple[pd.DataFrame, Dict[str, object]]:
     df_raw = load_candidates(cand_path)
     df = normalize_columns(df_raw)
@@ -674,6 +877,24 @@ def simulate_day(
         tpk = float(row.get("TPk") or 1.0)
         slk = float(row.get("SLk") or 2.0)
         j_th = float(row.get("J_th") or 0.8)
+        cand_id = _make_candidate_id(
+            {
+                "code": code,
+                "session": session,
+                "signal_mode": mode,
+                "J_th": j_th,
+                "TPk": tpk,
+                "SLk": slk,
+                "ATR_n": atr_n,
+                "BudgetFactor_row": float(row.get("BudgetFactor_row", 1.0) or 1.0),
+                "NoTradeMin": float(row.get("NoTradeMin") or 5.0),
+                "GapBanPct": float(row.get("GapBanPct") or 3.0),
+                "trend_driver": str(row.get("trend_driver") or "NKY"),
+                "trend_window": str(row.get("trend_window") or "window"),
+                "trend_bp_th": float(row.get("trend_bp_th") or 15.0),
+                "trend_allowed_policy": str(row.get("trend_allowed_policy") or ""),
+            }
+        )
         sim = simulate_trade_for_candidate(
             code,
             session,
@@ -694,6 +915,8 @@ def simulate_day(
             float(row.get("GapBanPct") or 3.0),
             float(row.get("NoTradeMin") or 5.0),
             counters,
+            dtw=dtw,
+            candidate_id=cand_id,
         )
         if sim:
             sim["live_demo_class"] = str(row.get("live_demo_class") or "LIVE_BASE")
@@ -841,6 +1064,21 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="If set, stop trading the same ticker for the rest of the day after the first losing trade.",
     )
+    ap.add_argument(
+        "--decision-trace",
+        action="store_true",
+        help="If set, append DecisionTrace DT.v1 rows to analysis/decision_trace_<date>.csv",
+    )
+    ap.add_argument(
+        "--run-id",
+        default="",
+        help="Optional run_id for DecisionTrace (default: auto-generated).",
+    )
+    ap.add_argument(
+        "--engine-version",
+        default="",
+        help="Optional engine_version for DecisionTrace (default: git short sha if available).",
+    )
     return ap.parse_args()
 
 
@@ -874,6 +1112,28 @@ def main() -> None:
             )
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    dtw: DecisionTraceWriter | None = None
+    if bool(getattr(args, "decision_trace", False)):
+        safe_label0 = "".join(ch for ch in str(args.label or "") if ch.isalnum() or ch in ("_", "-"))
+        run_id = str(getattr(args, "run_id", "") or "").strip()
+        if not run_id:
+            now = dt.datetime.now(JST).strftime("%H%M%S")
+            tag = safe_label0 or "DEFAULT"
+            run_id = f"{args.date}_REPLAY_{tag}_{now}"
+        engine_version = str(getattr(args, "engine_version", "") or "").strip() or _detect_engine_version()
+        dt_path = OUT_DIR / f"decision_trace_{args.date}.csv"
+        dt_cols = schema_columns(DT_V1)
+        dt_writer = make_append_only_writer(dt_path, schema_version=DT_V1, columns=dt_cols)
+        dtw = DecisionTraceWriter(
+            writer=dt_writer,
+            run_id=run_id,
+            env="REPLAY",
+            engine="PY",
+            engine_version=engine_version,
+            trade_date=trade_date.strftime("%Y-%m-%d"),
+            source="YAHOO_1M",
+        )
     trades_df, summary = simulate_day(
         cand_path,
         trade_date,
@@ -881,6 +1141,7 @@ def main() -> None:
         cooldown_minutes=int(args.cooldown_minutes),
         max_trades_per_ticker=int(args.max_trades_per_ticker),
         stop_after_loss=bool(args.stop_after_loss),
+        dtw=dtw,
     )
 
     label = str(args.label or "").strip()

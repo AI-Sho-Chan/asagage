@@ -1,0 +1,488 @@
+{
+  "schema_version": "DT.v1",
+  "primary_key": [
+    "run_id",
+    "event_seq"
+  ],
+  "columns": [
+    {
+      "name": "schema_version",
+      "type": "str",
+      "required": true,
+      "description": "Schema tag (fixed DT.v1). Must be the first column."
+    },
+    {
+      "name": "run_id",
+      "type": "str",
+      "required": true,
+      "description": "Run identifier (unique per execution). Example: 20251224_REPLAY_PC01_001"
+    },
+    {
+      "name": "env",
+      "type": "str",
+      "required": true,
+      "enum": [
+        "DEMO",
+        "LIVE",
+        "REPLAY",
+        "BT"
+      ],
+      "description": "Execution environment."
+    },
+    {
+      "name": "engine",
+      "type": "str",
+      "required": true,
+      "enum": [
+        "VBA",
+        "PY",
+        "HYBRID"
+      ],
+      "description": "Decision engine origin."
+    },
+    {
+      "name": "engine_version",
+      "type": "str",
+      "required": true,
+      "description": "Git commit/tag, or an explicit version string."
+    },
+    {
+      "name": "trade_date",
+      "type": "str",
+      "required": true,
+      "description": "Trading date in YYYY-MM-DD (JST)."
+    },
+    {
+      "name": "event_ts",
+      "type": "str",
+      "required": true,
+      "description": "Event timestamp in ISO8601 (prefer JST offset)."
+    },
+    {
+      "name": "event_seq",
+      "type": "int",
+      "required": true,
+      "description": "Monotonic increasing integer within run_id."
+    },
+    {
+      "name": "event_type",
+      "type": "str",
+      "required": true,
+      "enum": [
+        "MARKET_SNAPSHOT",
+        "FEATURES_COMPUTED",
+        "FILTER_EVAL",
+        "DECISION",
+        "ORDER_CMD",
+        "ORDER_ACK",
+        "FILL",
+        "POSITION",
+        "EXIT",
+        "RISK_STOP",
+        "ERROR"
+      ],
+      "description": "Event kind."
+    },
+    {
+      "name": "source",
+      "type": "str",
+      "required": true,
+      "description": "Data source: EXCEL_RSS / YAHOO_1M / SIM / BROKER, etc."
+    },
+    {
+      "name": "ticker",
+      "type": "str",
+      "required": true,
+      "description": "Ticker code (e.g. 7203)."
+    },
+    {
+      "name": "session",
+      "type": "str",
+      "required": false,
+      "description": "Session label aligned with candidates (e.g. AM0930)."
+    },
+    {
+      "name": "candidate_id",
+      "type": "str",
+      "required": false,
+      "description": "Stable candidate identifier for join across artifacts."
+    },
+    {
+      "name": "decision_id",
+      "type": "str",
+      "required": false,
+      "description": "Decision identifier (one per judgment)."
+    },
+    {
+      "name": "snap_ts",
+      "type": "str",
+      "required": false,
+      "description": "Snapshot timestamp (can match event_ts)."
+    },
+    {
+      "name": "last",
+      "type": "float",
+      "required": false,
+      "description": "Last price."
+    },
+    {
+      "name": "bid",
+      "type": "float",
+      "required": false,
+      "description": "Best bid."
+    },
+    {
+      "name": "ask",
+      "type": "float",
+      "required": false,
+      "description": "Best ask."
+    },
+    {
+      "name": "bid_size",
+      "type": "float",
+      "required": false,
+      "description": "Bid size (if available)."
+    },
+    {
+      "name": "ask_size",
+      "type": "float",
+      "required": false,
+      "description": "Ask size (if available)."
+    },
+    {
+      "name": "vwap",
+      "type": "float",
+      "required": false,
+      "description": "VWAP (prefer RSS if available)."
+    },
+    {
+      "name": "cum_volume",
+      "type": "float",
+      "required": false,
+      "description": "Cumulative volume (if available)."
+    },
+    {
+      "name": "prev_close",
+      "type": "float",
+      "required": false,
+      "description": "Previous close."
+    },
+    {
+      "name": "spread",
+      "type": "float",
+      "required": false,
+      "description": "ask-bid (computed ok)."
+    },
+    {
+      "name": "mid",
+      "type": "float",
+      "required": false,
+      "description": "(bid+ask)/2 (computed ok)."
+    },
+    {
+      "name": "nky_last",
+      "type": "float",
+      "required": false,
+      "description": "Nikkei index last."
+    },
+    {
+      "name": "topix_last",
+      "type": "float",
+      "required": false,
+      "description": "TOPIX last."
+    },
+    {
+      "name": "nky_ret_bp",
+      "type": "float",
+      "required": false,
+      "description": "Nikkei return (bp)."
+    },
+    {
+      "name": "topix_ret_bp",
+      "type": "float",
+      "required": false,
+      "description": "TOPIX return (bp)."
+    },
+    {
+      "name": "atr_n",
+      "type": "int",
+      "required": false,
+      "description": "ATR period."
+    },
+    {
+      "name": "atr",
+      "type": "float",
+      "required": false,
+      "description": "ATR value."
+    },
+    {
+      "name": "j_raw",
+      "type": "float",
+      "required": false,
+      "description": "Raw J before adjustments."
+    },
+    {
+      "name": "j_bias_adj",
+      "type": "float",
+      "required": false,
+      "description": "Bias adjustment component."
+    },
+    {
+      "name": "j_gap_adj",
+      "type": "float",
+      "required": false,
+      "description": "Gap adjustment component."
+    },
+    {
+      "name": "j",
+      "type": "float",
+      "required": false,
+      "description": "Final J used for decision."
+    },
+    {
+      "name": "j_th",
+      "type": "float",
+      "required": false,
+      "description": "Threshold J_th used for decision."
+    },
+    {
+      "name": "signal_mode",
+      "type": "str",
+      "required": false,
+      "description": "j-only / j-cross."
+    },
+    {
+      "name": "j_cross_state",
+      "type": "str",
+      "required": false,
+      "enum": [
+        "CROSS_UP",
+        "CROSS_DOWN",
+        "NONE"
+      ],
+      "description": "Cross state if signal_mode is j-cross."
+    },
+    {
+      "name": "allowed",
+      "type": "int",
+      "required": false,
+      "description": "1 if allowed to trade, else 0."
+    },
+    {
+      "name": "deny_reasons",
+      "type": "str",
+      "required": false,
+      "description": "Deny reason codes separated by ';'."
+    },
+    {
+      "name": "no_trade_min",
+      "type": "int",
+      "required": false,
+      "description": "No-trade minutes after open."
+    },
+    {
+      "name": "minutes_from_open",
+      "type": "int",
+      "required": false,
+      "description": "Minutes from market open."
+    },
+    {
+      "name": "gap_pct",
+      "type": "float",
+      "required": false,
+      "description": "Gap percentage."
+    },
+    {
+      "name": "gap_ban_pct",
+      "type": "float",
+      "required": false,
+      "description": "Gap ban threshold percentage."
+    },
+    {
+      "name": "trend_driver",
+      "type": "str",
+      "required": false,
+      "description": "NKY / TOPIX."
+    },
+    {
+      "name": "trend_window",
+      "type": "str",
+      "required": false,
+      "description": "Trend window label (e.g. day/window)."
+    },
+    {
+      "name": "trend_bp_th",
+      "type": "float",
+      "required": false,
+      "description": "Trend bp threshold."
+    },
+    {
+      "name": "trend_allowed_policy",
+      "type": "str",
+      "required": false,
+      "description": "ALIGNED_ONLY / BOTH / empty."
+    },
+    {
+      "name": "trend_aligned",
+      "type": "int",
+      "required": false,
+      "description": "1 if aligned, 0 if mismatch."
+    },
+    {
+      "name": "signal",
+      "type": "str",
+      "required": false,
+      "enum": [
+        "LONG",
+        "SHORT",
+        "NONE"
+      ],
+      "description": "Signal direction."
+    },
+    {
+      "name": "action",
+      "type": "str",
+      "required": false,
+      "enum": [
+        "PLACE",
+        "MODIFY",
+        "CANCEL",
+        "NONE"
+      ],
+      "description": "Intended order action."
+    },
+    {
+      "name": "entry_style",
+      "type": "str",
+      "required": false,
+      "description": "Entry style label (e.g. LIMIT_AHEAD)."
+    },
+    {
+      "name": "limit_price",
+      "type": "float",
+      "required": false,
+      "description": "Limit price."
+    },
+    {
+      "name": "qty",
+      "type": "int",
+      "required": false,
+      "description": "Order quantity."
+    },
+    {
+      "name": "tp_price",
+      "type": "float",
+      "required": false,
+      "description": "Take-profit price."
+    },
+    {
+      "name": "sl_price",
+      "type": "float",
+      "required": false,
+      "description": "Stop-loss price."
+    },
+    {
+      "name": "trail_type",
+      "type": "str",
+      "required": false,
+      "description": "Trail type."
+    },
+    {
+      "name": "trail_value",
+      "type": "float",
+      "required": false,
+      "description": "Trail value."
+    },
+    {
+      "name": "tmax_sec",
+      "type": "int",
+      "required": false,
+      "description": "Max holding seconds."
+    },
+    {
+      "name": "client_order_id",
+      "type": "str",
+      "required": false,
+      "description": "Client order id generated by engine."
+    },
+    {
+      "name": "broker_order_id",
+      "type": "str",
+      "required": false,
+      "description": "Broker order id (if available)."
+    },
+    {
+      "name": "order_status",
+      "type": "str",
+      "required": false,
+      "description": "Order status."
+    },
+    {
+      "name": "fill_qty",
+      "type": "int",
+      "required": false,
+      "description": "Filled quantity."
+    },
+    {
+      "name": "fill_price",
+      "type": "float",
+      "required": false,
+      "description": "Filled price."
+    },
+    {
+      "name": "pos_qty",
+      "type": "int",
+      "required": false,
+      "description": "Position quantity."
+    },
+    {
+      "name": "pos_avg_price",
+      "type": "float",
+      "required": false,
+      "description": "Position average price."
+    },
+    {
+      "name": "pnl_realized_yen",
+      "type": "float",
+      "required": false,
+      "description": "Realized PnL (yen)."
+    },
+    {
+      "name": "pnl_unrealized_yen",
+      "type": "float",
+      "required": false,
+      "description": "Unrealized PnL (yen)."
+    },
+    {
+      "name": "daily_pnl_yen",
+      "type": "float",
+      "required": false,
+      "description": "Daily PnL (yen)."
+    },
+    {
+      "name": "kill_switch",
+      "type": "int",
+      "required": false,
+      "description": "1 if kill switch triggered."
+    },
+    {
+      "name": "daily_loss_limit_yen",
+      "type": "float",
+      "required": false,
+      "description": "Daily loss limit (yen)."
+    },
+    {
+      "name": "consecutive_losses",
+      "type": "int",
+      "required": false,
+      "description": "Consecutive losses counter."
+    },
+    {
+      "name": "notes",
+      "type": "str",
+      "required": false,
+      "description": "Free-form notes."
+    }
+  ]
+}
+
