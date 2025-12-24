@@ -14,12 +14,19 @@ def atomic_write_csv(
     encoding: str = "utf-8-sig",
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp = path.with_suffix(path.suffix + f".{os.getpid()}.tmp")
 
-    with open(tmp, "w", newline="", encoding=encoding) as f:
-        w = csv.DictWriter(f, fieldnames=list(columns), extrasaction="ignore")
-        w.writeheader()
-        for row in rows:
-            w.writerow({k: ("" if v is None else v) for k, v in row.items()})
+    try:
+        with open(tmp, "w", newline="", encoding=encoding) as f:
+            w = csv.DictWriter(f, fieldnames=list(columns), extrasaction="ignore")
+            w.writeheader()
+            for row in rows:
+                w.writerow({k: ("" if v is None else v) for k, v in row.items()})
 
-    os.replace(tmp, path)
+        os.replace(tmp, path)
+    finally:
+        try:
+            if tmp.exists():
+                tmp.unlink()
+        except OSError:
+            pass

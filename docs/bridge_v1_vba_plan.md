@@ -1,7 +1,7 @@
-﻿# Bridge.v1（Excel/VBAを薄くするための入出力CSV）実装計画（VBA側は次工程）
+﻿# Bridge.v1（Excel/VBAを薄くするための入出力CSV）実装計画（DEMOは最小実装済み）
 
 この文書は「今動いているASAGAKE.xlsm（Import Candidates / Ordersシート）」を壊さずに、あとから **ファイルI/Oの形だけ** 追加するための計画です。
-（今回は “仕様固定＋Python側の準備” まで。VBAへはまだ実装しません）
+2025-12-24 時点で、`excel/AutoTraderAdvanced.bas` に **DEMO向けの最小Bridge実装**（MarketSnapshotの追記、OrdersCmdのポーリング、ExecutionEventsの追記）を追加しました。LIVE側は次工程です。
 
 ## 1. ディレクトリ（既存のoutput配下に追加）
 - Excelが読む: `output/excel/inbox/`

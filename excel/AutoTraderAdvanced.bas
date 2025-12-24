@@ -47,6 +47,20 @@ Private gAutoTickV2Next As Date
 Private gAutoTickV2Scheduled As Boolean
 Private gAutoTickV2InProgress As Boolean
 
+' Bridge v1 (DEMO): file IO inbox/outbox (ASCII-only, append-only where applicable)
+Private Const BRIDGE_MS_INTERVAL_SEC As Long = 5
+Private Const BRIDGE_MS_MAX_ROWS As Long = 5
+
+Private Const BRIDGE_MS_SCHEMA As String = "MS.v1"
+Private Const BRIDGE_OC_SCHEMA As String = "OC.v1"
+Private Const BRIDGE_EE_SCHEMA As String = "EE.v1"
+
+Private gBridgeRunId As String
+Private gBridgeLastCmdSeq As Long
+Private gBridgeEventSeq As Long
+Private gBridgeNextSnapshotAt As Date
+Private gBridgeInitialized As Boolean
+
 ' Orders sheet columns (V2)
 Private Const ORD_COL_TS As Long = 1
 Private Const ORD_COL_TICKER As Long = 2
@@ -2445,6 +2459,7 @@ Public Sub AutoTickV2()
 
     If Not IsRunningModeV2() Then GoTo StopLoop
     RefreshTrendsV2
+    BridgeTickV1
 
 ScheduleNext:
     gAutoTickV2InProgress = False
@@ -2464,6 +2479,426 @@ Fail:
     gAutoTickV2InProgress = False
     LogVbaEvent "AutoTickV2", "Err " & Err.Number & ": " & Err.Description
     Resume ScheduleNext
+End Sub
+
+
+' Bridge v1 (DEMO only): outbox snapshots + inbox cmd consumption + outbox exec events.
+' This is an additive integration path; existing candidates_nextday/Orders logic remains untouched.
+Private Sub BridgeTickV1()
+    On Error GoTo Fail
+    If Not IsDemoMode() Then Exit Sub
+
+    If Not gBridgeInitialized Then
+        BridgeInitV1
+        If Not gBridgeInitialized Then Exit Sub
+    End If
+
+    BridgeAppendMarketSnapshotsV1
+    BridgePollOrdersCmdV1
+    Exit Sub
+
+Fail:
+    LogVbaEvent "BridgeTickV1", "Err " & Err.Number & ": " & Err.Description
+End Sub
+
+Private Sub BridgeInitV1()
+    On Error GoTo Fail
+
+    Dim dt As String: dt = Format$(Date, "yyyymmdd")
+
+    gBridgeRunId = BridgeGetOrInitNameStringV1("BridgeRunIdV1", BridgeDefaultRunIdV1(dt))
+    gBridgeLastCmdSeq = BridgeGetOrInitNameLongV1("BridgeLastCmdSeqV1", 0)
+    gBridgeEventSeq = BridgeGetOrInitNameLongV1("BridgeEventSeqV1", 0)
+    gBridgeNextSnapshotAt = Now
+
+    gBridgeInitialized = True
+    Exit Sub
+
+Fail:
+    gBridgeInitialized = False
+    LogVbaEvent "BridgeInitV1", "Err " & Err.Number & ": " & Err.Description
+End Sub
+
+Private Function BridgeDefaultRunIdV1(ByVal dateTag As String) As String
+    Dim pc As String: pc = Environ$("COMPUTERNAME")
+    If Len(pc) = 0 Then pc = "PC"
+    pc = BridgeSanitizeIdV1(pc)
+    BridgeDefaultRunIdV1 = dateTag & "_DEMO_" & pc & "_001"
+End Function
+
+Private Function BridgeSanitizeIdV1(ByVal s As String) As String
+    Dim i As Long
+    Dim ch As String
+    Dim out As String: out = ""
+    For i = 1 To Len(s)
+        ch = Mid$(s, i, 1)
+        If (ch >= "0" And ch <= "9") Or (ch >= "A" And ch <= "Z") Or (ch >= "a" And ch <= "z") Or ch = "_" Or ch = "-" Then
+            out = out & ch
+        Else
+            out = out & "_"
+        End If
+    Next i
+    BridgeSanitizeIdV1 = out
+End Function
+
+Private Function BridgeIsoNowJstV1() As String
+    ' Workbook runs on JST machines; keep the "+09:00" suffix to make it explicit.
+    BridgeIsoNowJstV1 = Format$(Now, "yyyy-mm-ddThh:nn:ss") & "+09:00"
+End Function
+
+Private Function BridgeBasePathV1() As String
+    BridgeBasePathV1 = ThisWorkbook.path
+    If Len(BridgeBasePathV1) = 0 Then BridgeBasePathV1 = "C:\AI\asagake"
+End Function
+
+Private Function BridgeOutboxPathV1(ByVal kind As String, ByVal dateTag As String) As String
+    BridgeOutboxPathV1 = BridgeBasePathV1() & "\output\excel\outbox\" & kind & "_" & dateTag & ".csv"
+End Function
+
+Private Function BridgeInboxOrdersCmdPathV1(ByVal dateTag As String) As String
+    BridgeInboxOrdersCmdPathV1 = BridgeBasePathV1() & "\output\excel\inbox\orders_cmd_" & dateTag & ".csv"
+End Function
+
+Private Sub BridgeEnsureDirTreeV1(ByVal dirPath As String)
+    On Error Resume Next
+    Dim parts As Variant: parts = Split(dirPath, "\")
+    Dim cur As String: cur = parts(0) & "\"
+    Dim i As Long
+    For i = 1 To UBound(parts)
+        cur = cur & parts(i)
+        If Len(Dir$(cur, vbDirectory)) = 0 Then MkDir cur
+        cur = cur & "\"
+    Next i
+    On Error GoTo 0
+End Sub
+
+Private Function BridgeGetOrInitNameStringV1(ByVal nameKey As String, ByVal defaultValue As String) As String
+    On Error Resume Next
+    Dim nm As Name
+    Set nm = ThisWorkbook.Names(nameKey)
+    If nm Is Nothing Then Set nm = Application.Names(nameKey)
+    On Error GoTo 0
+
+    If nm Is Nothing Then
+        BridgeSetNameStringV1 nameKey, defaultValue
+        BridgeGetOrInitNameStringV1 = defaultValue
+        Exit Function
+    End If
+
+    Dim refers As String: refers = CStr(nm.RefersTo)
+    BridgeGetOrInitNameStringV1 = BridgeParseNameLiteralV1(refers, defaultValue)
+End Function
+
+Private Function BridgeGetOrInitNameLongV1(ByVal nameKey As String, ByVal defaultValue As Long) As Long
+    Dim s As String: s = BridgeGetOrInitNameStringV1(nameKey, CStr(defaultValue))
+    If Len(s) = 0 Then
+        BridgeGetOrInitNameLongV1 = defaultValue
+    Else
+        On Error Resume Next
+        BridgeGetOrInitNameLongV1 = CLng(Val(s))
+        On Error GoTo 0
+    End If
+End Function
+
+Private Sub BridgeSetNameStringV1(ByVal nameKey As String, ByVal value As String)
+    On Error Resume Next
+    ThisWorkbook.Names.Add Name:=nameKey, RefersTo:="=" & DQ & value & DQ
+    On Error GoTo 0
+End Sub
+
+Private Sub BridgeSetNameLongV1(ByVal nameKey As String, ByVal value As Long)
+    BridgeSetNameStringV1 nameKey, CStr(value)
+End Sub
+
+Private Function BridgeParseNameLiteralV1(ByVal refersTo As String, ByVal defaultValue As String) As String
+    Dim s As String: s = Trim$(refersTo)
+    If Left$(s, 1) = "=" Then s = Mid$(s, 2)
+    s = Trim$(s)
+    If Len(s) = 0 Then
+        BridgeParseNameLiteralV1 = defaultValue
+        Exit Function
+    End If
+    If Left$(s, 1) = DQ And Right$(s, 1) = DQ Then
+        s = Mid$(s, 2, Len(s) - 2)
+    End If
+    BridgeParseNameLiteralV1 = s
+End Function
+
+Private Sub BridgeAppendMarketSnapshotsV1()
+    On Error GoTo Fail
+
+    If Now < gBridgeNextSnapshotAt Then Exit Sub
+    gBridgeNextSnapshotAt = Now + TimeSerial(0, 0, BRIDGE_MS_INTERVAL_SEC)
+
+    Dim ws As Worksheet: Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
+
+    Dim tickerCol As Long: tickerCol = FindColumn(ws, DASH2_HEADER_ROW, "Ticker")
+    Dim lastCol As Long: lastCol = FindColumn(ws, DASH2_HEADER_ROW, "Last")
+    Dim bidCol As Long: bidCol = FindColumn(ws, DASH2_HEADER_ROW, "BestBid")
+    Dim askCol As Long: askCol = FindColumn(ws, DASH2_HEADER_ROW, "BestAsk")
+    Dim vwapCol As Long: vwapCol = FindColumn(ws, DASH2_HEADER_ROW, "VWAP")
+    Dim prevCol As Long: prevCol = FindColumn(ws, DASH2_HEADER_ROW, "PrevClose")
+
+    If tickerCol = 0 Then Exit Sub
+
+    Dim dt As String: dt = Format$(Date, "yyyymmdd")
+    Dim path As String: path = BridgeOutboxPathV1("market_snapshots", dt)
+    BridgeEnsureDirTreeV1 BridgeBasePathV1() & "\output\excel\outbox"
+
+    Dim header As String
+    header = "schema_version,run_id,snap_ts,ticker,last,bid,ask,vwap,cum_volume,prev_close,nky_last,topix_last,data_quality" & vbCrLf
+
+    Dim snapTs As String: snapTs = BridgeIsoNowJstV1()
+    Dim r As Long
+    Dim count As Long: count = 0
+
+    For r = DASH2_DATA_START To DASH2_DATA_START + 200
+        Dim tkr As String: tkr = Trim$(CStr(ws.Cells(r, tickerCol).Value))
+        If Len(tkr) = 0 Then Exit For
+
+        Dim lastV As Variant: If lastCol > 0 Then lastV = ws.Cells(r, lastCol).Value Else lastV = ""
+        Dim bidV As Variant: If bidCol > 0 Then bidV = ws.Cells(r, bidCol).Value Else bidV = ""
+        Dim askV As Variant: If askCol > 0 Then askV = ws.Cells(r, askCol).Value Else askV = ""
+        Dim vwapV As Variant: If vwapCol > 0 Then vwapV = ws.Cells(r, vwapCol).Value Else vwapV = ""
+        Dim prevV As Variant: If prevCol > 0 Then prevV = ws.Cells(r, prevCol).Value Else prevV = ""
+
+        Dim dqStatus As String: dqStatus = "OK"
+        If IsError(lastV) Or IsError(bidV) Or IsError(askV) Then dqStatus = "MISSING"
+
+        Dim line As String
+        line = BRIDGE_MS_SCHEMA & "," & gBridgeRunId & "," & snapTs & "," & tkr & "," & CStr(lastV) & "," & CStr(bidV) & "," & CStr(askV) & "," & CStr(vwapV) & ",," & CStr(prevV) & ",,," & dqStatus & vbCrLf
+
+        BridgeAppendCsvUtf8SigV1 path, header, line
+
+        count = count + 1
+        If count >= BRIDGE_MS_MAX_ROWS Then Exit For
+    Next r
+
+    Exit Sub
+
+Fail:
+    LogVbaEvent "BridgeMarketSnapshotV1", "Err " & Err.Number & ": " & Err.Description
+End Sub
+
+Private Sub BridgePollOrdersCmdV1()
+    On Error GoTo Fail
+
+    Dim dt As String: dt = Format$(Date, "yyyymmdd")
+    Dim path As String: path = BridgeInboxOrdersCmdPathV1(dt)
+    If Len(Dir$(path)) = 0 Then Exit Sub
+
+    Dim text As String: text = BridgeReadAllTextUtf8V1(path)
+    text = Replace(text, vbCrLf, vbLf)
+    Dim lines As Variant: lines = Split(text, vbLf)
+    If UBound(lines) < 1 Then Exit Sub
+
+    Dim header As Variant: header = Split(CStr(lines(0)), ",")
+    Dim idx As Object: Set idx = CreateObject("Scripting.Dictionary")
+    idx.CompareMode = 1 ' vbTextCompare
+
+    Dim i As Long
+    For i = LBound(header) To UBound(header)
+        idx(CStr(header(i))) = i
+    Next i
+
+    Dim required As Variant
+    required = Array("cmd_seq", "action", "ticker", "side", "qty", "limit_price", "client_order_id", "candidate_id", "decision_id")
+
+    Dim k As Long
+    For k = LBound(required) To UBound(required)
+        If Not idx.Exists(CStr(required(k))) Then Exit Sub
+    Next k
+
+    Dim ws As Worksheet: Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
+    Dim sh As Worksheet: Set sh = ThisWorkbook.Worksheets("Orders")
+
+    Dim maxSeen As Long: maxSeen = gBridgeLastCmdSeq
+
+    For i = 1 To UBound(lines)
+        Dim ln As String: ln = Trim$(CStr(lines(i)))
+        If Len(ln) = 0 Then GoTo ContinueLine
+
+        Dim parts As Variant: parts = Split(ln, ",")
+        If UBound(parts) < idx("cmd_seq") Then GoTo ContinueLine
+
+        Dim seq As Long: seq = CLng(Val(CStr(parts(idx("cmd_seq")))))
+        If seq <= gBridgeLastCmdSeq Then GoTo ContinueLine
+
+        Dim action As String: action = UCase$(Trim$(CStr(parts(idx("action")))))
+        Dim tkr As String: tkr = Trim$(CStr(parts(idx("ticker"))))
+        Dim side As String: side = UCase$(Trim$(CStr(parts(idx("side")))))
+        Dim qty As Long: qty = CLng(Val(CStr(parts(idx("qty")))))
+        Dim limitPrice As Double: limitPrice = CDbl(Val(CStr(parts(idx("limit_price")))))
+        Dim clientOrderId As String: clientOrderId = Trim$(CStr(parts(idx("client_order_id"))))
+        Dim candId As String: candId = Trim$(CStr(parts(idx("candidate_id"))))
+        Dim decisionId As String: decisionId = Trim$(CStr(parts(idx("decision_id"))))
+
+        BridgeHandleOrdersCmdV1 sh, seq, action, tkr, side, qty, limitPrice, clientOrderId, candId, decisionId
+        If seq > maxSeen Then maxSeen = seq
+
+ContinueLine:
+    Next i
+
+    If maxSeen > gBridgeLastCmdSeq Then
+        gBridgeLastCmdSeq = maxSeen
+        BridgeSetNameLongV1 "BridgeLastCmdSeqV1", gBridgeLastCmdSeq
+    End If
+
+    Exit Sub
+
+Fail:
+    LogVbaEvent "BridgePollOrdersCmdV1", "Err " & Err.Number & ": " & Err.Description
+End Sub
+
+Private Sub BridgeHandleOrdersCmdV1(ByVal orderSheet As Worksheet, ByVal cmdSeq As Long, ByVal action As String, ByVal ticker As String, ByVal side As String, ByVal qty As Long, ByVal limitPrice As Double, ByVal clientOrderId As String, ByVal candidateId As String, ByVal decisionId As String)
+    On Error GoTo Fail
+
+    Dim dt As String: dt = Format$(Date, "yyyymmdd")
+
+    If action = "PLACE" Then
+        Dim lastRow As Long: lastRow = orderSheet.Cells(orderSheet.Rows.count, 1).End(xlUp).Row
+        If lastRow < 1 Then lastRow = 1
+        Dim r As Long: r = lastRow + 1
+
+        orderSheet.Cells(r, ORD_COL_TS).Value = Now
+        orderSheet.Cells(r, ORD_COL_TICKER).Value = ticker
+        orderSheet.Cells(r, ORD_COL_SIDE).Value = side
+        orderSheet.Cells(r, ORD_COL_PRICE).Value = limitPrice
+        orderSheet.Cells(r, ORD_COL_QTY).Value = qty
+        orderSheet.Cells(r, ORD_COL_MODE).Value = "bridge_cmd"
+        orderSheet.Cells(r, ORD_COL_STATUS).Value = "ORDERED"
+        orderSheet.Cells(r, ORD_COL_NOTE).Value = "BRIDGE cmd_seq=" & CStr(cmdSeq) & " " & candidateId
+        orderSheet.Cells(r, ORD_COL_SOURCE).Value = "BRIDGE"
+    End If
+
+    BridgeAppendExecEventV1 dt, cmdSeq, clientOrderId, ticker, side, qty, limitPrice, "ACK", "", ""
+    Exit Sub
+
+Fail:
+    BridgeAppendExecEventV1 dt, cmdSeq, clientOrderId, ticker, side, qty, limitPrice, "REJECT", CStr(Err.Number), Err.Description
+End Sub
+
+Private Sub BridgeAppendExecEventV1(ByVal dateTag As String, ByVal cmdSeq As Long, ByVal clientOrderId As String, ByVal ticker As String, ByVal side As String, ByVal qty As Long, ByVal limitPrice As Double, ByVal execEvent As String, ByVal errCode As String, ByVal errMsg As String)
+    On Error GoTo Fail
+
+    Dim path As String: path = BridgeOutboxPathV1("execution_events", dateTag)
+    BridgeEnsureDirTreeV1 BridgeBasePathV1() & "\output\excel\outbox"
+
+    Dim header As String
+    header = "schema_version,run_id,event_ts,event_seq,cmd_seq,client_order_id,broker_order_id,exec_event,ticker,side,qty,limit_price,fill_qty,fill_price,error_code,error_message" & vbCrLf
+
+    gBridgeEventSeq = gBridgeEventSeq + 1
+    BridgeSetNameLongV1 "BridgeEventSeqV1", gBridgeEventSeq
+
+    Dim eventTs As String: eventTs = BridgeIsoNowJstV1()
+
+    Dim line As String
+    line = BRIDGE_EE_SCHEMA & "," & gBridgeRunId & "," & eventTs & "," & CStr(gBridgeEventSeq) & "," & CStr(cmdSeq) & "," & clientOrderId & ",," & execEvent & "," & ticker & "," & side & "," & CStr(qty) & "," & CStr(limitPrice) & ",,," & errCode & "," & BridgeCsvEscapeV1(errMsg) & vbCrLf
+
+    BridgeAppendCsvUtf8SigV1 path, header, line
+    Exit Sub
+
+Fail:
+    LogVbaEvent "BridgeAppendExecEventV1", "Err " & Err.Number & ": " & Err.Description
+End Sub
+
+Private Function BridgeCsvEscapeV1(ByVal s As String) As String
+    Dim t As String: t = Replace(s, DQ, DQ & DQ)
+    If InStr(t, ",") > 0 Or InStr(t, vbCr) > 0 Or InStr(t, vbLf) > 0 Then
+        BridgeCsvEscapeV1 = DQ & t & DQ
+    Else
+        BridgeCsvEscapeV1 = t
+    End If
+End Function
+
+Private Function BridgeReadAllTextUtf8V1(ByVal path As String) As String
+    On Error GoTo Fail
+    Dim stm As Object
+    Set stm = CreateObject("ADODB.Stream")
+    stm.Type = 2 ' adTypeText
+    stm.Charset = "utf-8"
+    stm.Open
+    stm.LoadFromFile path
+    BridgeReadAllTextUtf8V1 = stm.ReadText(-1)
+    stm.Close
+    Exit Function
+Fail:
+    BridgeReadAllTextUtf8V1 = ""
+End Function
+
+Private Function BridgeUtf8BytesNoBomV1(ByVal text As String) As Variant
+    Dim stm As Object
+    Set stm = CreateObject("ADODB.Stream")
+    stm.Type = 2 ' adTypeText
+    stm.Charset = "utf-8"
+    stm.Open
+    stm.WriteText text
+    stm.Position = 0
+    stm.Type = 1 ' adTypeBinary
+    Dim bytes As Variant: bytes = stm.Read
+    stm.Close
+
+    ' Strip UTF-8 BOM if present.
+    Dim b() As Byte
+    b = bytes
+    If UBound(b) >= 2 Then
+        If b(0) = 239 And b(1) = 187 And b(2) = 191 Then
+            Dim b2() As Byte
+            Dim n As Long: n = UBound(b) - 2
+            ReDim b2(0 To n - 1) As Byte
+            Dim i As Long
+            For i = 0 To n - 1
+                b2(i) = b(i + 3)
+            Next i
+            BridgeUtf8BytesNoBomV1 = b2
+            Exit Function
+        End If
+    End If
+
+    BridgeUtf8BytesNoBomV1 = b
+End Function
+
+Private Function BridgeConcatBomAndBytesV1(ByVal bytes As Variant) As Variant
+    Dim b() As Byte: b = bytes
+    Dim out() As Byte
+    Dim i As Long
+    ReDim out(0 To UBound(b) + 3) As Byte
+    out(0) = 239: out(1) = 187: out(2) = 191
+    For i = 0 To UBound(b)
+        out(i + 3) = b(i)
+    Next i
+    BridgeConcatBomAndBytesV1 = out
+End Function
+
+Private Sub BridgeAppendBytesV1(ByVal path As String, ByVal bytes As Variant)
+    Dim f As Integer: f = FreeFile
+    Open path For Binary Access Write As #f
+    Seek #f, LOF(f) + 1
+    Put #f, , bytes
+    Close #f
+End Sub
+
+Private Sub BridgeWriteBytesV1(ByVal path As String, ByVal bytes As Variant)
+    Dim f As Integer: f = FreeFile
+    Open path For Binary Access Write As #f
+    Put #f, , bytes
+    Close #f
+End Sub
+
+Private Sub BridgeAppendCsvUtf8SigV1(ByVal path As String, ByVal headerLine As String, ByVal dataLine As String)
+    On Error GoTo Fail
+    Dim exists As Boolean: exists = (Len(Dir$(path)) > 0)
+    Dim bytes As Variant
+    If Not exists Then
+        bytes = BridgeConcatBomAndBytesV1(BridgeUtf8BytesNoBomV1(headerLine & dataLine))
+        BridgeWriteBytesV1 path, bytes
+    Else
+        bytes = BridgeUtf8BytesNoBomV1(dataLine)
+        BridgeAppendBytesV1 path, bytes
+    End If
+    Exit Sub
+Fail:
+    LogVbaEvent "BridgeAppendCsvUtf8SigV1", "Err " & Err.Number & ": " & Err.Description & " path=" & path
 End Sub
 
 Private Sub StartAutoTickV2()

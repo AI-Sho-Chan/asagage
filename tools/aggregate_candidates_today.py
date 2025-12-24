@@ -3,13 +3,20 @@ import glob
 import json
 import os
 import re
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
+SRC = (Path(__file__).resolve().parents[1] / "src").resolve()
+if SRC.exists():
+    sys.path.insert(0, str(SRC))
+
 import numpy as np
 import pandas as pd
+
+from asagake_core.candidates import append_candidate_metadata, make_candidate_metadata_defaults
 
 ROOT = Path("output/excel")
 LOG_DIR = Path("logs")
@@ -393,6 +400,20 @@ def _timestamp() -> str:
     return time.strftime("%Y%m%d_%H%M%S", time.localtime())
 
 
+def _git_short_sha() -> Optional[str]:
+    try:
+        import subprocess
+
+        out = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=Path(__file__).resolve().parents[1],
+            stderr=subprocess.DEVNULL,
+        )
+        return out.decode("utf-8", errors="ignore").strip() or None
+    except Exception:
+        return None
+
+
 def _read_nonempty_row_count(path: Path) -> int:
     if not path.exists() or not path.is_file():
         return 0
@@ -602,6 +623,8 @@ def main() -> None:
         return
 
     summary = build_summary(combined, sum(len(frame) for frame in frames))
+    defaults = make_candidate_metadata_defaults(date_tag=date_tag, git_short_sha=_git_short_sha())
+    combined = append_candidate_metadata(combined, defaults=defaults)
     _backup_existing(out)
     _atomic_write_csv(combined, out)
 
