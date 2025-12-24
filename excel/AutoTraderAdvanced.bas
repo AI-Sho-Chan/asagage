@@ -1,4 +1,4 @@
-﻿Attribute VB_Name = "AutoTraderAdvanced"
+Attribute VB_Name = "AutoTraderAdvanced"
 
 Option Explicit
 

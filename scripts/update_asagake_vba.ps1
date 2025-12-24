@@ -10,6 +10,33 @@ function New-Timestamp {
   (Get-Date).ToString("yyyyMMdd_HHmmss")
 }
 
+function New-TempBasWithoutBom {
+  param(
+    [Parameter(Mandatory = $true)][string]$SourcePath
+  )
+
+  $bytes = [System.IO.File]::ReadAllBytes($SourcePath)
+  $outBytes = $bytes
+
+  if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+    # UTF-8 BOM -> strip only
+    $outBytes = $bytes[3..($bytes.Length - 1)]
+  } elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
+    # UTF-16LE BOM -> decode and re-encode as UTF-8 (no BOM)
+    $text = [System.Text.Encoding]::Unicode.GetString($bytes, 2, $bytes.Length - 2)
+    $outBytes = [System.Text.Encoding]::UTF8.GetBytes($text)
+  } elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) {
+    # UTF-16BE BOM -> decode and re-encode as UTF-8 (no BOM)
+    $enc = [System.Text.Encoding]::BigEndianUnicode
+    $text = $enc.GetString($bytes, 2, $bytes.Length - 2)
+    $outBytes = [System.Text.Encoding]::UTF8.GetBytes($text)
+  }
+
+  $tmp = Join-Path $env:TEMP ("asagake_vba_import_{0}.bas" -f (New-Timestamp))
+  [System.IO.File]::WriteAllBytes($tmp, $outBytes)
+  return $tmp
+}
+
 if (!(Test-Path -LiteralPath $WorkbookPath)) {
   throw "Workbook not found: $WorkbookPath"
 }
@@ -46,6 +73,7 @@ $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $false
 $excel.DisplayAlerts = $false
 
+$tmpBas = $null
 try {
   $wb = $excel.Workbooks.Open($WorkbookPath, $null, $false)
 
@@ -68,8 +96,9 @@ try {
     }
   }
 
-  # Import .bas
-  $imported = $components.Import($ModuleBasPath)
+  # Import .bas (strip/convert BOM to avoid invisible char issues in VBE)
+  $tmpBas = New-TempBasWithoutBom -SourcePath $ModuleBasPath
+  $imported = $components.Import($tmpBas)
   if ($imported.Name -ne $targetName) {
     $imported.Name = $targetName
   }
@@ -77,6 +106,9 @@ try {
   $wb.Save()
   Write-Host "Updated VBA module '$targetName' from: $ModuleBasPath"
 } finally {
+  if ($tmpBas -ne $null) {
+    try { Remove-Item -LiteralPath $tmpBas -Force } catch {}
+  }
   try { $wb.Close($true) } catch {}
   $excel.Quit() | Out-Null
   [System.GC]::Collect()
