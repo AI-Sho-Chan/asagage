@@ -25,7 +25,8 @@
         "DEMO",
         "LIVE",
         "REPLAY",
-        "BT"
+        "BT",
+        "BRIDGE_SHADOW"
       ],
       "description": "Execution environment."
     },
@@ -485,4 +486,3 @@
     }
   ]
 }
-

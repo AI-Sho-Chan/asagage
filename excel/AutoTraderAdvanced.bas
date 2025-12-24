@@ -2488,6 +2488,12 @@ Private Sub BridgeTickV1()
     On Error GoTo Fail
     If Not IsDemoMode() Then Exit Sub
 
+    ' Re-initialize per trading day so cmd_seq/event_seq do not get stuck from previous days.
+    If gBridgeInitialized Then
+        Dim dt As String: dt = BridgeDateTagV1()
+        If Left$(gBridgeRunId, 8) <> dt Then gBridgeInitialized = False
+    End If
+
     If Not gBridgeInitialized Then
         BridgeInitV1
         If Not gBridgeInitialized Then Exit Sub
@@ -2504,11 +2510,17 @@ End Sub
 Private Sub BridgeInitV1()
     On Error GoTo Fail
 
-    Dim dt As String: dt = Format$(Date, "yyyymmdd")
+    Dim dt As String: dt = BridgeDateTagV1()
 
-    gBridgeRunId = BridgeGetOrInitNameStringV1("BridgeRunIdV1", BridgeDefaultRunIdV1(dt))
-    gBridgeLastCmdSeq = BridgeGetOrInitNameLongV1("BridgeLastCmdSeqV1", 0)
-    gBridgeEventSeq = BridgeGetOrInitNameLongV1("BridgeEventSeqV1", 0)
+    Dim runKey As String: runKey = BridgeNameKeyV1("BridgeRunIdV1", dt)
+    Dim lastKey As String: lastKey = BridgeNameKeyV1("BridgeLastCmdSeqV1", dt)
+    Dim evtKey As String: evtKey = BridgeNameKeyV1("BridgeEventSeqV1", dt)
+
+    ' Per-day persistence to avoid "cmd_seq stuck from yesterday".
+    ' Legacy keys are used only to seed the first per-day value after upgrade.
+    gBridgeRunId = BridgeGetOrInitNameStringV1(runKey, BridgeDefaultRunIdV1(dt), "BridgeRunIdV1")
+    gBridgeLastCmdSeq = BridgeGetOrInitNameLongV1(lastKey, 0, "BridgeLastCmdSeqV1")
+    gBridgeEventSeq = BridgeGetOrInitNameLongV1(evtKey, 0, "BridgeEventSeqV1")
     gBridgeNextSnapshotAt = Now
 
     gBridgeInitialized = True
@@ -2524,6 +2536,14 @@ Private Function BridgeDefaultRunIdV1(ByVal dateTag As String) As String
     If Len(pc) = 0 Then pc = "PC"
     pc = BridgeSanitizeIdV1(pc)
     BridgeDefaultRunIdV1 = dateTag & "_DEMO_" & pc & "_001"
+End Function
+
+Private Function BridgeDateTagV1() As String
+    BridgeDateTagV1 = Format$(Date, "yyyymmdd")
+End Function
+
+Private Function BridgeNameKeyV1(ByVal baseKey As String, ByVal dateTag As String) As String
+    BridgeNameKeyV1 = baseKey & "_" & dateTag
 End Function
 
 Private Function BridgeSanitizeIdV1(ByVal s As String) As String
@@ -2572,14 +2592,27 @@ Private Sub BridgeEnsureDirTreeV1(ByVal dirPath As String)
     On Error GoTo 0
 End Sub
 
-Private Function BridgeGetOrInitNameStringV1(ByVal nameKey As String, ByVal defaultValue As String) As String
+Private Function BridgeGetOrInitNameStringV1(ByVal nameKey As String, ByVal defaultValue As String, Optional ByVal legacyKey As String = "") As String
     On Error Resume Next
     Dim nm As Name
     Set nm = ThisWorkbook.Names(nameKey)
-    If nm Is Nothing Then Set nm = Application.Names(nameKey)
     On Error GoTo 0
 
     If nm Is Nothing Then
+        If Len(legacyKey) > 0 Then
+            On Error Resume Next
+            Dim nmLegacy As Name
+            Set nmLegacy = ThisWorkbook.Names(legacyKey)
+            On Error GoTo 0
+            If Not nmLegacy Is Nothing Then
+                Dim refersLegacy As String: refersLegacy = CStr(nmLegacy.RefersTo)
+                Dim legacyValue As String: legacyValue = BridgeParseNameLiteralV1(refersLegacy, defaultValue)
+                BridgeSetNameStringV1 nameKey, legacyValue
+                BridgeGetOrInitNameStringV1 = legacyValue
+                Exit Function
+            End If
+        End If
+
         BridgeSetNameStringV1 nameKey, defaultValue
         BridgeGetOrInitNameStringV1 = defaultValue
         Exit Function
@@ -2589,8 +2622,8 @@ Private Function BridgeGetOrInitNameStringV1(ByVal nameKey As String, ByVal defa
     BridgeGetOrInitNameStringV1 = BridgeParseNameLiteralV1(refers, defaultValue)
 End Function
 
-Private Function BridgeGetOrInitNameLongV1(ByVal nameKey As String, ByVal defaultValue As Long) As Long
-    Dim s As String: s = BridgeGetOrInitNameStringV1(nameKey, CStr(defaultValue))
+Private Function BridgeGetOrInitNameLongV1(ByVal nameKey As String, ByVal defaultValue As Long, Optional ByVal legacyKey As String = "") As Long
+    Dim s As String: s = BridgeGetOrInitNameStringV1(nameKey, CStr(defaultValue), legacyKey)
     If Len(s) = 0 Then
         BridgeGetOrInitNameLongV1 = defaultValue
     Else
@@ -2602,7 +2635,17 @@ End Function
 
 Private Sub BridgeSetNameStringV1(ByVal nameKey As String, ByVal value As String)
     On Error Resume Next
-    ThisWorkbook.Names.Add Name:=nameKey, RefersTo:="=" & DQ & value & DQ
+    Dim nm As Name
+    Set nm = ThisWorkbook.Names(nameKey)
+    On Error GoTo 0
+
+    On Error Resume Next
+    If nm Is Nothing Then
+        Set nm = ThisWorkbook.Names.Add(Name:=nameKey, RefersTo:="=" & DQ & value & DQ)
+    Else
+        nm.RefersTo = "=" & DQ & value & DQ
+    End If
+    If Not nm Is Nothing Then nm.Visible = False
     On Error GoTo 0
 End Sub
 
@@ -2641,7 +2684,7 @@ Private Sub BridgeAppendMarketSnapshotsV1()
 
     If tickerCol = 0 Then Exit Sub
 
-    Dim dt As String: dt = Format$(Date, "yyyymmdd")
+    Dim dt As String: dt = BridgeDateTagV1()
     Dim path As String: path = BridgeOutboxPathV1("market_snapshots", dt)
     BridgeEnsureDirTreeV1 BridgeBasePathV1() & "\output\excel\outbox"
 
@@ -2683,7 +2726,7 @@ End Sub
 Private Sub BridgePollOrdersCmdV1()
     On Error GoTo Fail
 
-    Dim dt As String: dt = Format$(Date, "yyyymmdd")
+    Dim dt As String: dt = BridgeDateTagV1()
     Dim path As String: path = BridgeInboxOrdersCmdPathV1(dt)
     If Len(Dir$(path)) = 0 Then Exit Sub
 
@@ -2741,7 +2784,7 @@ ContinueLine:
 
     If maxSeen > gBridgeLastCmdSeq Then
         gBridgeLastCmdSeq = maxSeen
-        BridgeSetNameLongV1 "BridgeLastCmdSeqV1", gBridgeLastCmdSeq
+        BridgeSetNameLongV1 BridgeNameKeyV1("BridgeLastCmdSeqV1", dt), gBridgeLastCmdSeq
     End If
 
     Exit Sub
@@ -2753,7 +2796,7 @@ End Sub
 Private Sub BridgeHandleOrdersCmdV1(ByVal orderSheet As Worksheet, ByVal cmdSeq As Long, ByVal action As String, ByVal ticker As String, ByVal side As String, ByVal qty As Long, ByVal limitPrice As Double, ByVal clientOrderId As String, ByVal candidateId As String, ByVal decisionId As String)
     On Error GoTo Fail
 
-    Dim dt As String: dt = Format$(Date, "yyyymmdd")
+    Dim dt As String: dt = BridgeDateTagV1()
 
     If action = "PLACE" Then
         Dim lastRow As Long: lastRow = orderSheet.Cells(orderSheet.Rows.count, 1).End(xlUp).Row
@@ -2788,7 +2831,7 @@ Private Sub BridgeAppendExecEventV1(ByVal dateTag As String, ByVal cmdSeq As Lon
     header = "schema_version,run_id,event_ts,event_seq,cmd_seq,client_order_id,broker_order_id,exec_event,ticker,side,qty,limit_price,fill_qty,fill_price,error_code,error_message" & vbCrLf
 
     gBridgeEventSeq = gBridgeEventSeq + 1
-    BridgeSetNameLongV1 "BridgeEventSeqV1", gBridgeEventSeq
+    BridgeSetNameLongV1 BridgeNameKeyV1("BridgeEventSeqV1", dateTag), gBridgeEventSeq
 
     Dim eventTs As String: eventTs = BridgeIsoNowJstV1()
 

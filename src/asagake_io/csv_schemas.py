@@ -33,7 +33,13 @@ SCHEMAS: Dict[str, List[ColumnSpec]] = {
     DT_V1: [
         _col("schema_version", "str", True, "Schema tag (DT.v1). Must be first."),
         _col("run_id", "str", True, "Run identifier."),
-        _col("env", "str", True, "DEMO/LIVE/REPLAY/BT.", enum=["DEMO", "LIVE", "REPLAY", "BT"]),
+        _col(
+            "env",
+            "str",
+            True,
+            "DEMO/LIVE/REPLAY/BT/BRIDGE_SHADOW.",
+            enum=["DEMO", "LIVE", "REPLAY", "BT", "BRIDGE_SHADOW"],
+        ),
         _col("engine", "str", True, "VBA/PY/HYBRID.", enum=["VBA", "PY", "HYBRID"]),
         _col("engine_version", "str", True, "Git commit/tag."),
         _col("trade_date", "str", True, "Trading date YYYY-MM-DD (JST)."),
