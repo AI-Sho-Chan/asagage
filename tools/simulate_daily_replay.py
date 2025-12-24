@@ -508,6 +508,20 @@ def _trend_direction(
     return "BUY" if bp > 0 else "SELL"
 
 
+def _minutes_from_open(entry_ts: pd.Timestamp, market_open: dt.datetime) -> int:
+    """Minutes from market open (09:00) for diagnostics/logging.
+
+    Some intraday sources can yield tz-aware timestamps; for this coarse metric
+    we treat the datetime as local clock time and drop tzinfo to avoid
+    naive/aware subtraction errors.
+    """
+
+    entry_dt = entry_ts.to_pydatetime()
+    if getattr(entry_dt, "tzinfo", None) is not None:
+        entry_dt = entry_dt.replace(tzinfo=None)
+    return int((entry_dt - market_open).total_seconds() // 60)
+
+
 def simulate_trade_for_candidate(
     code: str,
     session: str,
@@ -633,7 +647,7 @@ def simulate_trade_for_candidate(
                 allowed=0,
                 deny_reasons="GAP_BAN",
                 no_trade_min=int(no_trade_min),
-                minutes_from_open=int((entry_ts.to_pydatetime() - market_open).total_seconds() // 60),
+                minutes_from_open=_minutes_from_open(entry_ts, market_open),
                 gap_pct=float(gap_bp / 100.0),
                 gap_ban_pct=float(gapban_pct),
                 trend_driver=trend_driver,
@@ -663,7 +677,7 @@ def simulate_trade_for_candidate(
             allowed=0,
             deny_reasons="ALLOWED_SIDE",
             no_trade_min=int(no_trade_min),
-            minutes_from_open=int((entry_ts.to_pydatetime() - market_open).total_seconds() // 60),
+            minutes_from_open=_minutes_from_open(entry_ts, market_open),
             gap_pct="",
             gap_ban_pct=float(gapban_pct),
             trend_driver=trend_driver,
@@ -691,7 +705,7 @@ def simulate_trade_for_candidate(
                 allowed=0,
                 deny_reasons="TREND_MISMATCH",
                 no_trade_min=int(no_trade_min),
-                minutes_from_open=int((entry_ts.to_pydatetime() - market_open).total_seconds() // 60),
+                minutes_from_open=_minutes_from_open(entry_ts, market_open),
                 gap_pct="",
                 gap_ban_pct=float(gapban_pct),
                 trend_driver=trend_driver,
@@ -707,7 +721,7 @@ def simulate_trade_for_candidate(
         allowed=1,
         deny_reasons="",
         no_trade_min=int(no_trade_min),
-        minutes_from_open=int((entry_ts.to_pydatetime() - market_open).total_seconds() // 60),
+        minutes_from_open=_minutes_from_open(entry_ts, market_open),
         gap_pct="",
         gap_ban_pct=float(gapban_pct),
         trend_driver=trend_driver,
