@@ -2516,11 +2516,16 @@ Private Sub BridgeInitV1()
     Dim lastKey As String: lastKey = BridgeNameKeyV1("BridgeLastCmdSeqV1", dt)
     Dim evtKey As String: evtKey = BridgeNameKeyV1("BridgeEventSeqV1", dt)
 
-    ' Per-day persistence to avoid "cmd_seq stuck from yesterday".
+    ' Step0: disk-based restore to avoid duplicate ACK after restart/macro reset.
+    Dim restored As Boolean: restored = BridgeRestoreStateFromExecEventsV1(dt, runKey, lastKey, evtKey)
+
+    ' Fallback: per-day persistence via hidden Names.
     ' Legacy keys are used only to seed the first per-day value after upgrade.
-    gBridgeRunId = BridgeGetOrInitNameStringV1(runKey, BridgeDefaultRunIdV1(dt), "BridgeRunIdV1")
-    gBridgeLastCmdSeq = BridgeGetOrInitNameLongV1(lastKey, 0, "BridgeLastCmdSeqV1")
-    gBridgeEventSeq = BridgeGetOrInitNameLongV1(evtKey, 0, "BridgeEventSeqV1")
+    If Not restored Then
+        gBridgeRunId = BridgeGetOrInitNameStringV1(runKey, BridgeDefaultRunIdV1(dt), "BridgeRunIdV1")
+        gBridgeLastCmdSeq = BridgeGetOrInitNameLongV1(lastKey, 0, "BridgeLastCmdSeqV1")
+        gBridgeEventSeq = BridgeGetOrInitNameLongV1(evtKey, 0, "BridgeEventSeqV1")
+    End If
     gBridgeNextSnapshotAt = Now
 
     gBridgeInitialized = True
@@ -2530,6 +2535,69 @@ Fail:
     gBridgeInitialized = False
     LogVbaEvent "BridgeInitV1", "Err " & Err.Number & ": " & Err.Description
 End Sub
+
+Private Function BridgeRestoreStateFromExecEventsV1(ByVal dateTag As String, ByVal runKey As String, ByVal lastKey As String, ByVal evtKey As String) As Boolean
+    On Error GoTo Fail
+
+    BridgeRestoreStateFromExecEventsV1 = False
+
+    Dim path As String: path = BridgeOutboxPathV1("execution_events", dateTag)
+    If Len(Dir$(path)) = 0 Then Exit Function
+
+    Dim text As String: text = BridgeReadAllTextUtf8V1(path)
+    If Len(text) = 0 Then Exit Function
+
+    ' Strip BOM anywhere (header or accidental line prefix).
+    text = Replace(text, ChrW(&HFEFF), "")
+    text = Replace(text, vbCrLf, vbLf)
+    Dim lines As Variant: lines = Split(text, vbLf)
+    If UBound(lines) < 1 Then Exit Function
+
+    Dim maxCmd As Long: maxCmd = 0
+    Dim maxEvt As Long: maxEvt = 0
+    Dim existingRun As String: existingRun = ""
+
+    Dim i As Long
+    For i = 1 To UBound(lines)
+        Dim ln As String: ln = LTrim$(Trim$(CStr(lines(i))))
+        If Len(ln) = 0 Then GoTo ContinueLine
+        If Left$(ln, Len(BRIDGE_EE_SCHEMA)) <> BRIDGE_EE_SCHEMA Then GoTo ContinueLine
+
+        Dim parts As Variant: parts = Split(ln, ",")
+        If UBound(parts) < 4 Then GoTo ContinueLine
+
+        If Len(existingRun) = 0 Then existingRun = Trim$(CStr(parts(1)))
+
+        Dim evtSeq As Long: evtSeq = CLng(Val(CStr(parts(3))))
+        Dim cmdSeq As Long: cmdSeq = CLng(Val(CStr(parts(4))))
+        If evtSeq > maxEvt Then maxEvt = evtSeq
+        If cmdSeq > maxCmd Then maxCmd = cmdSeq
+
+ContinueLine:
+    Next i
+
+    If maxCmd < 0 Then maxCmd = 0
+    If maxEvt < 0 Then maxEvt = 0
+
+    gBridgeLastCmdSeq = maxCmd
+    gBridgeEventSeq = maxEvt
+    If Len(existingRun) > 0 Then
+        gBridgeRunId = existingRun
+    Else
+        gBridgeRunId = BridgeDefaultRunIdV1(dateTag)
+    End If
+
+    BridgeSetNameStringV1 runKey, gBridgeRunId
+    BridgeSetNameLongV1 lastKey, gBridgeLastCmdSeq
+    BridgeSetNameLongV1 evtKey, gBridgeEventSeq
+
+    BridgeRestoreStateFromExecEventsV1 = True
+    Exit Function
+
+Fail:
+    LogVbaEvent "BridgeRestoreStateV1", "Err " & Err.Number & ": " & Err.Description
+    BridgeRestoreStateFromExecEventsV1 = False
+End Function
 
 Private Function BridgeDefaultRunIdV1(ByVal dateTag As String) As String
     Dim pc As String: pc = Environ$("COMPUTERNAME")
@@ -2837,6 +2905,9 @@ Private Sub BridgeAppendExecEventV1(ByVal dateTag As String, ByVal cmdSeq As Lon
 
     Dim line As String
     line = BRIDGE_EE_SCHEMA & "," & gBridgeRunId & "," & eventTs & "," & CStr(gBridgeEventSeq) & "," & CStr(cmdSeq) & "," & clientOrderId & ",," & execEvent & "," & ticker & "," & side & "," & CStr(qty) & "," & CStr(limitPrice) & ",,," & errCode & "," & BridgeCsvEscapeV1(errMsg) & vbCrLf
+    ' Step0.5: protect against accidental BOM/whitespace prefix so "EE.v1" is always at start.
+    line = Replace(line, ChrW(&HFEFF), "")
+    line = LTrim$(line)
 
     BridgeAppendCsvUtf8SigV1 path, header, line
     Exit Sub

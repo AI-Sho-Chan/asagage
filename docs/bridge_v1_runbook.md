@@ -61,17 +61,26 @@ PowerShell（`C:\AI\asagake`）で:
 - `cmd_seq` が前回より大きいか（Excelは `last_cmd_seq` 以下を無視します）
 
 ### 4.3 Excel再起動後に同じcmdが再実行される（cmd_seq巻き戻り）
-- 現在は **WorkbookのName（非表示）** に `last_cmd_seq` を保存します
-- Healthcheck の `ack_like_duplicate_cmd_seq` が増える場合は巻き戻り疑い
+- **二重ACK（同じ cmd_seq がACKされる）** が出た場合は、原則「巻き戻り＝再処理」が起きています。
+- 現在の対策（Bridge v1）:
+  - 起動時に `execution_events_YYYYMMDD.csv` を読んで **max(cmd_seq), max(event_seq), run_id** を復元します（ブック保存に依存しない）
+  - その上で、補助として **WorkbookのName（非表示）** にも `last_cmd_seq/event_seq/run_id` を保存します
+- Healthcheck の `ack_like_duplicate_cmd_seq` が増える場合は **Step0（状態復元）が壊れている** 可能性が高いです
 
 Nameの保存場所:
 - `BridgeLastCmdSeqV1_YYYYMMDD`（非表示 / ブック内）
 - `BridgeEventSeqV1_YYYYMMDD`（非表示 / ブック内）
 - `BridgeRunIdV1_YYYYMMDD`（非表示 / ブック内）
 
+### 4.4 PowerShellでのCSV読み取り時の注意（BOM）
+- PowerShell の `Import-Csv` は、環境によっては **BOM付きUTF-8** の先頭列名が `ï»¿schema_version` のように見えることがあります。
+- その場合は `Import-Csv -Encoding UTF8` を試すか、Python 側は必ず `encoding="utf-8-sig"` を使ってください。
+
+### 4.5 照合のJOINキー（推奨）
+- `orders_cmd` と `execution_events` の突合は、基本は **`cmd_seq + client_order_id`** を優先します（cmd_seq単体より安全）。
+
 ## 5. 1日1回の運用（推奨）
 
 1) 取引時間中（DEMO）: Excelで outbox が生成される
 2) 夕方: `bridge_healthcheck` を実行して異常がないか確認
 3) 異常があれば `analysis/bridge_health_YYYYMMDD.txt` を見て原因を切り分ける
-

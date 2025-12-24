@@ -35,7 +35,7 @@ def _safe_int_series(series: pd.Series) -> pd.Series:
 
 
 def _load_csv(path: Path) -> pd.DataFrame:
-    return pd.read_csv(path, dtype=str, keep_default_na=False)
+    return pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8-sig")
 
 
 def _metrics_to_df(date_tag: str, metrics: List[Dict[str, object]]) -> pd.DataFrame:
@@ -166,20 +166,48 @@ def run_healthcheck(*, date_tag: str, base_dir: Path) -> Tuple[HealthResult, Lis
                         "Excel may have reprocessed commands after restart if this is >0.",
                     )
 
-    if oc_df is not None and ee_df is not None and "cmd_seq" in oc_df.columns and "cmd_seq" in ee_df.columns:
-        oc_seq = _safe_int_series(oc_df["cmd_seq"]).drop_duplicates()
-        ee_seq = _safe_int_series(ee_df["cmd_seq"]).drop_duplicates()
-        oc_set = set(int(x) for x in oc_seq.tolist() if x >= 0)
-        ee_set = set(int(x) for x in ee_seq.tolist() if x >= 0)
-        pending = sorted(oc_set - ee_set)
+    if (
+        oc_df is not None
+        and ee_df is not None
+        and "cmd_seq" in oc_df.columns
+        and "cmd_seq" in ee_df.columns
+        and "client_order_id" in oc_df.columns
+        and "client_order_id" in ee_df.columns
+    ):
+        oc_pairs = set(
+            zip(
+                _safe_int_series(oc_df["cmd_seq"]).tolist(),
+                oc_df["client_order_id"].astype(str).tolist(),
+            )
+        )
+        ee_pairs = set(
+            zip(
+                _safe_int_series(ee_df["cmd_seq"]).tolist(),
+                ee_df["client_order_id"].astype(str).tolist(),
+            )
+        )
+        oc_pairs = {(s, o) for (s, o) in oc_pairs if s >= 0 and o.strip()}
+        ee_pairs = {(s, o) for (s, o) in ee_pairs if s >= 0 and o.strip()}
+
+        pending = sorted(oc_pairs - ee_pairs)
         add("reconcile", "orders_without_events", len(pending), "WARN" if pending else "INFO")
         if pending:
-            add("reconcile", "orders_without_events_sample", ",".join(str(x) for x in pending[:10]), "INFO")
+            add(
+                "reconcile",
+                "orders_without_events_sample",
+                ";".join(f"{s}:{o}" for s, o in pending[:10]),
+                "INFO",
+            )
 
-        unknown = sorted(ee_set - oc_set)
+        unknown = sorted(ee_pairs - oc_pairs)
         add("reconcile", "events_without_orders", len(unknown), "WARN" if unknown else "INFO")
         if unknown:
-            add("reconcile", "events_without_orders_sample", ",".join(str(x) for x in unknown[:10]), "INFO")
+            add(
+                "reconcile",
+                "events_without_orders_sample",
+                ";".join(f"{s}:{o}" for s, o in unknown[:10]),
+                "INFO",
+            )
 
         if "exec_event" in ee_df.columns:
             ev = ee_df["exec_event"].astype(str).str.upper()
@@ -227,4 +255,3 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
