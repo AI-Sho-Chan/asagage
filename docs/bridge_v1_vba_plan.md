@@ -1,4 +1,4 @@
-# Bridge.v1（Excel/VBAを薄くするための入出力CSV）実装計画（VBA側は次工程）
+﻿# Bridge.v1（Excel/VBAを薄くするための入出力CSV）実装計画（VBA側は次工程）
 
 この文書は「今動いているASAGAKE.xlsm（Import Candidates / Ordersシート）」を壊さずに、あとから **ファイルI/Oの形だけ** 追加するための計画です。
 （今回は “仕様固定＋Python側の準備” まで。VBAへはまだ実装しません）
@@ -71,4 +71,3 @@
 - どの列（ticker/価格/VWAP等）をMarketSnapshotに出すか（RSSで取得可能な範囲）
 - 注文の責務分割（ExcelがTP/SL/Trailまで持つのか、Pythonが持つのか）
 - `run_id` の採番規則（PC名・LIVE/DEMO・連番）
-
