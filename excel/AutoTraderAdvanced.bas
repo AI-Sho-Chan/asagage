@@ -2985,17 +2985,23 @@ Private Function BridgeConcatBomAndBytesV1(ByVal bytes As Variant) As Variant
 End Function
 
 Private Sub BridgeAppendBytesV1(ByVal path As String, ByVal bytes As Variant)
+    ' IMPORTANT: Put must receive a Byte() variable.
+    ' Passing Variant(Byte()) directly to Put can prepend a Variant header and corrupt the CSV (BOM not at start).
+    Dim b() As Byte: b = bytes
     Dim f As Integer: f = FreeFile
     Open path For Binary Access Write As #f
     Seek #f, LOF(f) + 1
-    Put #f, , bytes
+    Put #f, , b
     Close #f
 End Sub
 
 Private Sub BridgeWriteBytesV1(ByVal path As String, ByVal bytes As Variant)
+    ' IMPORTANT: Put must receive a Byte() variable.
+    ' Passing Variant(Byte()) directly to Put can prepend a Variant header and corrupt the CSV (BOM not at start).
+    Dim b() As Byte: b = bytes
     Dim f As Integer: f = FreeFile
     Open path For Binary Access Write As #f
-    Put #f, , bytes
+    Put #f, , b
     Close #f
 End Sub
 

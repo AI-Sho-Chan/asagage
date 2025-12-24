@@ -4,6 +4,7 @@ import argparse
 import sys
 from dataclasses import dataclass
 from datetime import datetime
+from io import StringIO
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -34,8 +35,55 @@ def _safe_int_series(series: pd.Series) -> pd.Series:
     return pd.to_numeric(series, errors="coerce").fillna(-1).astype("int64")
 
 
-def _load_csv(path: Path) -> pd.DataFrame:
-    return pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8-sig")
+def _decode_csv_bytes_with_recovery(raw: bytes) -> Tuple[str, List[str]]:
+    """
+    Decode CSV bytes robustly for Excel/VBA-produced files.
+
+    Historical VBA code sometimes wrote Variant(Byte()) directly to Put #,
+    which prepends a Variant header and moves the UTF-8 BOM away from byte 0.
+    This helper trims such prefixes (BOM/header not at start) so the CSV remains readable.
+    """
+
+    warnings: List[str] = []
+    bom = b"\xEF\xBB\xBF"
+
+    bom_idx = raw.find(bom)
+    if bom_idx > 0:
+        warnings.append(f"prefix_bom_trimmed_at={bom_idx}")
+        raw = raw[bom_idx:]
+    elif bom_idx == -1:
+        header_idx = raw.find(b"schema_version,")
+        if header_idx > 0:
+            warnings.append(f"prefix_header_trimmed_at={header_idx}")
+            raw = raw[header_idx:]
+
+    try:
+        return raw.decode("utf-8-sig"), warnings
+    except UnicodeDecodeError as exc:
+        warnings.append(f"encoding_error={exc!r}")
+        return "", warnings
+
+
+def _load_csv(path: Path) -> Tuple[Optional[pd.DataFrame], List[str]]:
+    """
+    Load a UTF-8-sig CSV with recovery.
+
+    Returns (df, warnings). df=None means "could not be parsed" and callers must not crash.
+    """
+
+    try:
+        return pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8-sig"), []
+    except UnicodeDecodeError:
+        text, warnings = _decode_csv_bytes_with_recovery(path.read_bytes())
+        if not text:
+            return None, warnings
+        try:
+            return pd.read_csv(StringIO(text), dtype=str, keep_default_na=False), warnings
+        except Exception as exc:  # pragma: no cover - defensive
+            warnings.append(f"parse_error={exc!r}")
+            return None, warnings
+    except Exception as exc:  # pragma: no cover - defensive
+        return None, [f"parse_error={exc!r}"]
 
 
 def _metrics_to_df(date_tag: str, metrics: List[Dict[str, object]]) -> pd.DataFrame:
@@ -87,84 +135,113 @@ def run_healthcheck(*, date_tag: str, base_dir: Path) -> Tuple[HealthResult, Lis
         ms_df = None
     else:
         add("files", "market_snapshots_exists", True)
-        ms_df = _load_csv(ms_path)
-        add("market_snapshots", "rows", len(ms_df))
-        if "snap_ts" in ms_df.columns:
-            last_ts = _parse_iso8601_maybe(ms_df["snap_ts"].iloc[-1]) if len(ms_df) else None
-            add("market_snapshots", "last_snap_ts", last_ts.isoformat() if last_ts else "")
+        ms_df, ms_warn = _load_csv(ms_path)
+        if ms_df is None:
+            add("market_snapshots", "encoding_error", True, "CRITICAL", "failed to parse market_snapshots")
+            add("market_snapshots", "read_warnings", "|".join(ms_warn), "CRITICAL")
+            msgs.append("[CRITICAL] market_snapshots could not be parsed (encoding/csv error)")
         else:
-            add("market_snapshots", "missing_column_snap_ts", True, "CRITICAL")
-            msgs.append("[CRITICAL] market_snapshots missing required column snap_ts")
+            if ms_warn:
+                add("market_snapshots", "read_warnings", "|".join(ms_warn), "WARN")
+                msgs.append(f"[WARN] market_snapshots recovered with warnings: {' | '.join(ms_warn)}")
 
-        for col in ["schema_version", "run_id", "snap_ts", "ticker"]:
-            if col not in ms_df.columns:
-                add("market_snapshots", f"missing_required_{col}", True, "CRITICAL")
+            add("market_snapshots", "rows", len(ms_df))
+            if "snap_ts" in ms_df.columns:
+                last_ts = _parse_iso8601_maybe(ms_df["snap_ts"].iloc[-1]) if len(ms_df) else None
+                add("market_snapshots", "last_snap_ts", last_ts.isoformat() if last_ts else "")
+            else:
+                add("market_snapshots", "missing_column_snap_ts", True, "CRITICAL")
+                msgs.append("[CRITICAL] market_snapshots missing required column snap_ts")
 
-        if all(c in ms_df.columns for c in ["run_id", "snap_ts", "ticker"]):
-            dup = ms_df.duplicated(subset=["run_id", "snap_ts", "ticker"]).sum()
-            add("market_snapshots", "duplicate_rows", int(dup), "WARN" if dup else "INFO")
+            for col in ["schema_version", "run_id", "snap_ts", "ticker"]:
+                if col not in ms_df.columns:
+                    add("market_snapshots", f"missing_required_{col}", True, "CRITICAL")
 
-        if "data_quality" in ms_df.columns:
-            bad = (ms_df["data_quality"].astype(str).str.upper() != "OK").sum()
-            add(
-                "market_snapshots",
-                "non_ok_quality_rows",
-                int(bad),
-                "WARN" if bad else "INFO",
-            )
+            if all(c in ms_df.columns for c in ["run_id", "snap_ts", "ticker"]):
+                dup = ms_df.duplicated(subset=["run_id", "snap_ts", "ticker"]).sum()
+                add("market_snapshots", "duplicate_rows", int(dup), "WARN" if dup else "INFO")
+
+            if "data_quality" in ms_df.columns:
+                bad = (ms_df["data_quality"].astype(str).str.upper() != "OK").sum()
+                add(
+                    "market_snapshots",
+                    "non_ok_quality_rows",
+                    int(bad),
+                    "WARN" if bad else "INFO",
+                )
 
     if not oc_path.exists():
         missing_file(oc_path, "orders_cmd")
         oc_df = None
     else:
         add("files", "orders_cmd_exists", True)
-        oc_df = _load_csv(oc_path)
-        add("orders_cmd", "rows", len(oc_df))
-        if "cmd_seq" not in oc_df.columns:
-            add("orders_cmd", "missing_column_cmd_seq", True, "CRITICAL")
-            msgs.append("[CRITICAL] orders_cmd missing required column cmd_seq")
+        oc_df, oc_warn = _load_csv(oc_path)
+        if oc_df is None:
+            add("orders_cmd", "encoding_error", True, "CRITICAL", "failed to parse orders_cmd")
+            add("orders_cmd", "read_warnings", "|".join(oc_warn), "CRITICAL")
+            msgs.append("[CRITICAL] orders_cmd could not be parsed (encoding/csv error)")
         else:
-            seq = _safe_int_series(oc_df["cmd_seq"])
-            dup = seq.duplicated().sum()
-            add("orders_cmd", "duplicate_cmd_seq", int(dup), "CRITICAL" if dup else "INFO")
-            uniq = seq.drop_duplicates().sort_values()
-            gaps = int((uniq.diff() > 1).sum()) if len(uniq) else 0
-            add("orders_cmd", "cmd_seq_gap_count", gaps, "WARN" if gaps else "INFO")
-            if len(uniq):
-                add("orders_cmd", "cmd_seq_min", int(uniq.iloc[0]))
-                add("orders_cmd", "cmd_seq_max", int(uniq.iloc[-1]))
+            if oc_warn:
+                add("orders_cmd", "read_warnings", "|".join(oc_warn), "WARN")
+
+            add("orders_cmd", "rows", len(oc_df))
+            if "cmd_seq" not in oc_df.columns:
+                add("orders_cmd", "missing_column_cmd_seq", True, "CRITICAL")
+                msgs.append("[CRITICAL] orders_cmd missing required column cmd_seq")
+            else:
+                seq = _safe_int_series(oc_df["cmd_seq"])
+                dup = seq.duplicated().sum()
+                add("orders_cmd", "duplicate_cmd_seq", int(dup), "CRITICAL" if dup else "INFO")
+                uniq = seq.drop_duplicates().sort_values()
+                gaps = int((uniq.diff() > 1).sum()) if len(uniq) else 0
+                add("orders_cmd", "cmd_seq_gap_count", gaps, "WARN" if gaps else "INFO")
+                if len(uniq):
+                    add("orders_cmd", "cmd_seq_min", int(uniq.iloc[0]))
+                    add("orders_cmd", "cmd_seq_max", int(uniq.iloc[-1]))
 
     if not ee_path.exists():
         missing_file(ee_path, "execution_events")
         ee_df = None
     else:
         add("files", "execution_events_exists", True)
-        ee_df = _load_csv(ee_path)
-        add("execution_events", "rows", len(ee_df))
-        for col in ["event_seq", "cmd_seq", "exec_event"]:
-            if col not in ee_df.columns:
-                add("execution_events", f"missing_required_{col}", True, "CRITICAL")
+        ee_df, ee_warn = _load_csv(ee_path)
+        if ee_df is None:
+            add("execution_events", "encoding_error", True, "CRITICAL", "failed to parse execution_events")
+            add("execution_events", "read_warnings", "|".join(ee_warn), "CRITICAL")
+            msgs.append("[CRITICAL] execution_events could not be parsed (encoding/csv error)")
+        else:
+            if ee_warn:
+                add("execution_events", "read_warnings", "|".join(ee_warn), "WARN")
 
-        if "cmd_seq" in ee_df.columns:
-            ee_seq = _safe_int_series(ee_df["cmd_seq"])
-            dup = ee_df.duplicated(subset=["cmd_seq", "exec_event", "client_order_id"]).sum() if "client_order_id" in ee_df.columns else 0
-            add(
-                "execution_events",
-                "duplicate_cmd_seq_events",
-                int(dup),
-                "WARN" if dup else "INFO",
-            )
-            if "exec_event" in ee_df.columns:
-                ack_like = ee_df["exec_event"].astype(str).str.upper().isin(["ACK", "REJECT"])
-                if ack_like.any():
-                    ack_dups = ee_df[ack_like].duplicated(subset=["cmd_seq"]).sum()
-                    add(
-                        "execution_events",
-                        "ack_like_duplicate_cmd_seq",
-                        int(ack_dups),
-                        "CRITICAL" if ack_dups else "INFO",
-                        "Excel may have reprocessed commands after restart if this is >0.",
-                    )
+            add("execution_events", "rows", len(ee_df))
+            for col in ["event_seq", "cmd_seq", "exec_event"]:
+                if col not in ee_df.columns:
+                    add("execution_events", f"missing_required_{col}", True, "CRITICAL")
+
+            if "cmd_seq" in ee_df.columns:
+                ee_seq = _safe_int_series(ee_df["cmd_seq"])
+                dup = (
+                    ee_df.duplicated(subset=["cmd_seq", "exec_event", "client_order_id"]).sum()
+                    if "client_order_id" in ee_df.columns
+                    else 0
+                )
+                add(
+                    "execution_events",
+                    "duplicate_cmd_seq_events",
+                    int(dup),
+                    "WARN" if dup else "INFO",
+                )
+                if "exec_event" in ee_df.columns:
+                    ack_like = ee_df["exec_event"].astype(str).str.upper().isin(["ACK", "REJECT"])
+                    if ack_like.any():
+                        ack_dups = ee_df[ack_like].duplicated(subset=["cmd_seq"]).sum()
+                        add(
+                            "execution_events",
+                            "ack_like_duplicate_cmd_seq",
+                            int(ack_dups),
+                            "CRITICAL" if ack_dups else "INFO",
+                            "Excel may have reprocessed commands after restart if this is >0.",
+                        )
 
     if (
         oc_df is not None
