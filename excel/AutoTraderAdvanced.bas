@@ -55,6 +55,25 @@ Private Const BRIDGE_MS_SCHEMA As String = "MS.v1"
 Private Const BRIDGE_OC_SCHEMA As String = "OC.v1"
 Private Const BRIDGE_EE_SCHEMA As String = "EE.v1"
 
+' Bridge MS.v1: column indices (ticker-unique market snapshot)
+Private Const MSV1_SCHEMA As String = "MS.v1"
+
+Private Const MSV1_I_SCHEMA_VERSION As Long = 0
+Private Const MSV1_I_RUN_ID As Long = 1
+Private Const MSV1_I_SNAP_TS As Long = 2
+Private Const MSV1_I_TICKER As Long = 3
+Private Const MSV1_I_LAST As Long = 4
+Private Const MSV1_I_BID As Long = 5
+Private Const MSV1_I_ASK As Long = 6
+Private Const MSV1_I_VWAP As Long = 7
+Private Const MSV1_I_CUM_VOLUME As Long = 8
+Private Const MSV1_I_PREV_CLOSE As Long = 9
+Private Const MSV1_I_BID_SIZE As Long = 10
+Private Const MSV1_I_ASK_SIZE As Long = 11
+Private Const MSV1_I_NKY_LAST As Long = 12
+Private Const MSV1_I_TOPIX_LAST As Long = 13
+Private Const MSV1_I_DATA_QUALITY As Long = 14
+
 Private gBridgeRunId As String
 Private gBridgeLastCmdSeq As Long
 Private gBridgeEventSeq As Long
@@ -2834,24 +2853,6 @@ End Sub
 ' ===== Bridge MS.v1 helpers (ticker-unique snapshot aggregation) =====
 ' MS.v1 columns order:
 ' schema_version,run_id,snap_ts,ticker,last,bid,ask,vwap,cum_volume,prev_close,bid_size,ask_size,nky_last,topix_last,data_quality
-
-Private Const MSV1_SCHEMA As String = "MS.v1"
-
-Private Const MSV1_I_SCHEMA_VERSION As Long = 0
-Private Const MSV1_I_RUN_ID As Long = 1
-Private Const MSV1_I_SNAP_TS As Long = 2
-Private Const MSV1_I_TICKER As Long = 3
-Private Const MSV1_I_LAST As Long = 4
-Private Const MSV1_I_BID As Long = 5
-Private Const MSV1_I_ASK As Long = 6
-Private Const MSV1_I_VWAP As Long = 7
-Private Const MSV1_I_CUM_VOLUME As Long = 8
-Private Const MSV1_I_PREV_CLOSE As Long = 9
-Private Const MSV1_I_BID_SIZE As Long = 10
-Private Const MSV1_I_ASK_SIZE As Long = 11
-Private Const MSV1_I_NKY_LAST As Long = 12
-Private Const MSV1_I_TOPIX_LAST As Long = 13
-Private Const MSV1_I_DATA_QUALITY As Long = 14
 
 Private Function BridgeMsV1_NewRec( _
     ByVal runId As String, ByVal snapTs As String, ByVal ticker As String, _
