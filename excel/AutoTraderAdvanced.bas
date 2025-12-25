@@ -2749,6 +2749,10 @@ Private Sub BridgeAppendMarketSnapshotsV1()
     Dim askCol As Long: askCol = FindColumn(ws, DASH2_HEADER_ROW, "BestAsk")
     Dim vwapCol As Long: vwapCol = FindColumn(ws, DASH2_HEADER_ROW, "VWAP")
     Dim prevCol As Long: prevCol = FindColumn(ws, DASH2_HEADER_ROW, "PrevClose")
+    Dim bidSizeCol As Long: bidSizeCol = FindColumn(ws, DASH2_HEADER_ROW, "BestBidSize")
+    Dim askSizeCol As Long: askSizeCol = FindColumn(ws, DASH2_HEADER_ROW, "BestAskSize")
+    Dim cumVolCol As Long: cumVolCol = FindColumn(ws, DASH2_HEADER_ROW, "CumVolume")
+    If cumVolCol = 0 Then cumVolCol = FindColumn(ws, DASH2_HEADER_ROW, "CumVol")
 
     If tickerCol = 0 Then Exit Sub
 
@@ -2757,11 +2761,20 @@ Private Sub BridgeAppendMarketSnapshotsV1()
     BridgeEnsureDirTreeV1 BridgeBasePathV1() & "\output\excel\outbox"
 
     Dim header As String
-    header = "schema_version,run_id,snap_ts,ticker,last,bid,ask,vwap,cum_volume,prev_close,nky_last,topix_last,data_quality" & vbCrLf
+    header = "schema_version,run_id,snap_ts,ticker,last,bid,ask,vwap,cum_volume,prev_close,bid_size,ask_size,nky_last,topix_last,data_quality" & vbCrLf
 
     Dim snapTs As String: snapTs = BridgeIsoNowJstV1()
     Dim r As Long
     Dim count As Long: count = 0
+
+    ' Normalize: one MS row per (run_id, snap_ts, ticker).
+    ' The dashboard may contain multiple rows for the same ticker (different plans). We merge:
+    ' - fill empty -> non-empty only
+    ' - improve data_quality: OK > STALE > MISSING
+    ' - detect conflicts (both non-empty but different) and warn; keep first value.
+    Dim msByTicker As Object
+    Set msByTicker = CreateObject("Scripting.Dictionary")
+    msByTicker.CompareMode = 1 ' vbTextCompare
 
     For r = DASH2_DATA_START To DASH2_DATA_START + 200
         Dim tkr As String: tkr = Trim$(CStr(ws.Cells(r, tickerCol).Value))
@@ -2772,24 +2785,222 @@ Private Sub BridgeAppendMarketSnapshotsV1()
         Dim askV As Variant: If askCol > 0 Then askV = ws.Cells(r, askCol).Value Else askV = ""
         Dim vwapV As Variant: If vwapCol > 0 Then vwapV = ws.Cells(r, vwapCol).Value Else vwapV = ""
         Dim prevV As Variant: If prevCol > 0 Then prevV = ws.Cells(r, prevCol).Value Else prevV = ""
+        Dim bidSizeV As Variant: If bidSizeCol > 0 Then bidSizeV = ws.Cells(r, bidSizeCol).Value Else bidSizeV = ""
+        Dim askSizeV As Variant: If askSizeCol > 0 Then askSizeV = ws.Cells(r, askSizeCol).Value Else askSizeV = ""
+        Dim cumVolV As Variant: If cumVolCol > 0 Then cumVolV = ws.Cells(r, cumVolCol).Value Else cumVolV = ""
 
         Dim dqStatus As String: dqStatus = "OK"
-        If IsError(lastV) Or IsError(bidV) Or IsError(askV) Then dqStatus = "MISSING"
+        If IsError(lastV) Or IsError(bidV) Or IsError(askV) Or IsError(vwapV) Then dqStatus = "MISSING"
+        If Len(Trim$(CStr(lastV))) = 0 Or Len(Trim$(CStr(bidV))) = 0 Or Len(Trim$(CStr(askV))) = 0 Then dqStatus = "MISSING"
 
-        Dim line As String
-        line = BRIDGE_MS_SCHEMA & "," & gBridgeRunId & "," & snapTs & "," & tkr & "," & CStr(lastV) & "," & CStr(bidV) & "," & CStr(askV) & "," & CStr(vwapV) & ",," & CStr(prevV) & ",,," & dqStatus & vbCrLf
+        Dim newRec As Variant
+        newRec = BridgeMsV1_NewRec( _
+            gBridgeRunId, snapTs, tkr, _
+            lastV, bidV, askV, vwapV, _
+            cumVolV, prevV, _
+            bidSizeV, askSizeV, _
+            "", "", _
+            dqStatus _
+        )
 
-        BridgeAppendCsvUtf8SigV1 path, header, line
+        If Not msByTicker.Exists(tkr) Then
+            msByTicker.Add tkr, newRec
+        Else
+            Dim baseRec As Variant: baseRec = msByTicker(tkr)
+            BridgeMsV1_MergeInPlace baseRec, newRec, tkr, snapTs, r
+            msByTicker(tkr) = baseRec
+        End If
 
         count = count + 1
         If count >= BRIDGE_MS_MAX_ROWS Then Exit For
     Next r
+
+    Dim dataLines As String: dataLines = ""
+    Dim key As Variant
+    For Each key In msByTicker.Keys
+        Dim rec As Variant: rec = msByTicker(key)
+        dataLines = dataLines & BridgeMsV1_ToCsvLine(rec)
+    Next key
+    If Len(dataLines) > 0 Then
+        BridgeAppendCsvUtf8SigV1 path, header, dataLines
+    End If
 
     Exit Sub
 
 Fail:
     LogVbaEvent "BridgeMarketSnapshotV1", "Err " & Err.Number & ": " & Err.Description
 End Sub
+
+' ===== Bridge MS.v1 helpers (ticker-unique snapshot aggregation) =====
+' MS.v1 columns order:
+' schema_version,run_id,snap_ts,ticker,last,bid,ask,vwap,cum_volume,prev_close,bid_size,ask_size,nky_last,topix_last,data_quality
+
+Private Const MSV1_SCHEMA As String = "MS.v1"
+
+Private Const MSV1_I_SCHEMA_VERSION As Long = 0
+Private Const MSV1_I_RUN_ID As Long = 1
+Private Const MSV1_I_SNAP_TS As Long = 2
+Private Const MSV1_I_TICKER As Long = 3
+Private Const MSV1_I_LAST As Long = 4
+Private Const MSV1_I_BID As Long = 5
+Private Const MSV1_I_ASK As Long = 6
+Private Const MSV1_I_VWAP As Long = 7
+Private Const MSV1_I_CUM_VOLUME As Long = 8
+Private Const MSV1_I_PREV_CLOSE As Long = 9
+Private Const MSV1_I_BID_SIZE As Long = 10
+Private Const MSV1_I_ASK_SIZE As Long = 11
+Private Const MSV1_I_NKY_LAST As Long = 12
+Private Const MSV1_I_TOPIX_LAST As Long = 13
+Private Const MSV1_I_DATA_QUALITY As Long = 14
+
+Private Function BridgeMsV1_NewRec( _
+    ByVal runId As String, ByVal snapTs As String, ByVal ticker As String, _
+    ByVal lastV As Variant, ByVal bidV As Variant, ByVal askV As Variant, ByVal vwapV As Variant, _
+    ByVal cumVolV As Variant, ByVal prevCloseV As Variant, _
+    ByVal bidSizeV As Variant, ByVal askSizeV As Variant, _
+    ByVal nkyLastV As Variant, ByVal topixLastV As Variant, _
+    ByVal dataQuality As String _
+) As Variant
+    Dim rec(0 To 14) As Variant
+    rec(MSV1_I_SCHEMA_VERSION) = MSV1_SCHEMA
+    rec(MSV1_I_RUN_ID) = runId
+    rec(MSV1_I_SNAP_TS) = snapTs
+    rec(MSV1_I_TICKER) = ticker
+
+    rec(MSV1_I_LAST) = BridgeMsV1_NumNorm(lastV)
+    rec(MSV1_I_BID) = BridgeMsV1_NumNorm(bidV)
+    rec(MSV1_I_ASK) = BridgeMsV1_NumNorm(askV)
+    rec(MSV1_I_VWAP) = BridgeMsV1_NumNorm(vwapV)
+    rec(MSV1_I_CUM_VOLUME) = BridgeMsV1_NumNorm(cumVolV)
+    rec(MSV1_I_PREV_CLOSE) = BridgeMsV1_NumNorm(prevCloseV)
+    rec(MSV1_I_BID_SIZE) = BridgeMsV1_NumNorm(bidSizeV)
+    rec(MSV1_I_ASK_SIZE) = BridgeMsV1_NumNorm(askSizeV)
+    rec(MSV1_I_NKY_LAST) = BridgeMsV1_NumNorm(nkyLastV)
+    rec(MSV1_I_TOPIX_LAST) = BridgeMsV1_NumNorm(topixLastV)
+
+    Dim q As String: q = UCase$(Trim$(dataQuality))
+    If (q <> "OK" And q <> "STALE" And q <> "MISSING") Then q = "MISSING"
+    rec(MSV1_I_DATA_QUALITY) = q
+
+    BridgeMsV1_NewRec = rec
+End Function
+
+' baseRec を newRec でマージ（in-place）
+Private Sub BridgeMsV1_MergeInPlace( _
+    ByRef baseRec As Variant, ByRef newRec As Variant, _
+    ByVal ticker As String, ByVal snapTs As String, ByVal rowIndex As Long _
+)
+    ' 1) 空→非空のみ補完（全数値列）
+    BridgeMsV1_FillIfEmpty baseRec, newRec, MSV1_I_LAST
+    BridgeMsV1_FillIfEmpty baseRec, newRec, MSV1_I_BID
+    BridgeMsV1_FillIfEmpty baseRec, newRec, MSV1_I_ASK
+    BridgeMsV1_FillIfEmpty baseRec, newRec, MSV1_I_VWAP
+    BridgeMsV1_FillIfEmpty baseRec, newRec, MSV1_I_CUM_VOLUME
+    BridgeMsV1_FillIfEmpty baseRec, newRec, MSV1_I_PREV_CLOSE
+    BridgeMsV1_FillIfEmpty baseRec, newRec, MSV1_I_BID_SIZE
+    BridgeMsV1_FillIfEmpty baseRec, newRec, MSV1_I_ASK_SIZE
+    BridgeMsV1_FillIfEmpty baseRec, newRec, MSV1_I_NKY_LAST
+    BridgeMsV1_FillIfEmpty baseRec, newRec, MSV1_I_TOPIX_LAST
+
+    ' 2) data_quality はより良い方へ（OK > STALE > MISSING）
+    baseRec(MSV1_I_DATA_QUALITY) = BridgeMsV1_BetterQuality( _
+        CStr(baseRec(MSV1_I_DATA_QUALITY)), CStr(newRec(MSV1_I_DATA_QUALITY)) _
+    )
+
+    ' 3) 重要列の矛盾検知（両方非空で不一致なら WARN。採用は base のまま）
+    BridgeMsV1_WarnIfConflict baseRec, newRec, MSV1_I_LAST, ticker, snapTs, rowIndex, "last"
+    BridgeMsV1_WarnIfConflict baseRec, newRec, MSV1_I_BID, ticker, snapTs, rowIndex, "bid"
+    BridgeMsV1_WarnIfConflict baseRec, newRec, MSV1_I_ASK, ticker, snapTs, rowIndex, "ask"
+    BridgeMsV1_WarnIfConflict baseRec, newRec, MSV1_I_VWAP, ticker, snapTs, rowIndex, "vwap"
+    BridgeMsV1_WarnIfConflict baseRec, newRec, MSV1_I_CUM_VOLUME, ticker, snapTs, rowIndex, "cum_volume"
+End Sub
+
+Private Sub BridgeMsV1_FillIfEmpty(ByRef baseRec As Variant, ByRef newRec As Variant, ByVal idx As Long)
+    If BridgeMsV1_IsBlank(baseRec(idx)) And Not BridgeMsV1_IsBlank(newRec(idx)) Then
+        baseRec(idx) = newRec(idx)
+    End If
+End Sub
+
+Private Sub BridgeMsV1_WarnIfConflict( _
+    ByRef baseRec As Variant, ByRef newRec As Variant, _
+    ByVal idx As Long, ByVal ticker As String, ByVal snapTs As String, ByVal rowIndex As Long, ByVal colName As String _
+)
+    If BridgeMsV1_IsBlank(baseRec(idx)) Or BridgeMsV1_IsBlank(newRec(idx)) Then Exit Sub
+    If BridgeMsV1_NumDifferent(CStr(baseRec(idx)), CStr(newRec(idx)), 0.0000001) Then
+        BridgeMsV1_LogWarn "MS conflict ticker=" & ticker & _
+            " snap_ts=" & snapTs & " col=" & colName & _
+            " base=" & CStr(baseRec(idx)) & " new=" & CStr(newRec(idx)) & _
+            " row=" & CStr(rowIndex)
+    End If
+End Sub
+
+Private Function BridgeMsV1_NumDifferent(ByVal a As String, ByVal b As String, ByVal eps As Double) As Boolean
+    On Error GoTo FallbackStr
+    If IsNumeric(a) And IsNumeric(b) Then
+        BridgeMsV1_NumDifferent = (Abs(CDbl(a) - CDbl(b)) > eps)
+        Exit Function
+    End If
+FallbackStr:
+    BridgeMsV1_NumDifferent = (Trim$(a) <> Trim$(b))
+End Function
+
+Private Function BridgeMsV1_BetterQuality(ByVal q1 As String, ByVal q2 As String) As String
+    If BridgeMsV1_QualityScore(q2) > BridgeMsV1_QualityScore(q1) Then
+        BridgeMsV1_BetterQuality = UCase$(Trim$(q2))
+    Else
+        BridgeMsV1_BetterQuality = UCase$(Trim$(q1))
+    End If
+    If BridgeMsV1_BetterQuality <> "OK" And BridgeMsV1_BetterQuality <> "STALE" And BridgeMsV1_BetterQuality <> "MISSING" Then
+        BridgeMsV1_BetterQuality = "MISSING"
+    End If
+End Function
+
+Private Function BridgeMsV1_QualityScore(ByVal q As String) As Long
+    Select Case UCase$(Trim$(q))
+        Case "OK": BridgeMsV1_QualityScore = 3
+        Case "STALE": BridgeMsV1_QualityScore = 2
+        Case "MISSING": BridgeMsV1_QualityScore = 1
+        Case Else: BridgeMsV1_QualityScore = 0
+    End Select
+End Function
+
+Private Function BridgeMsV1_IsBlank(ByVal v As Variant) As Boolean
+    BridgeMsV1_IsBlank = (Len(Trim$(CStr(v))) = 0)
+End Function
+
+' 数値をログ向けに正規化（空は空、数値は "1000" / "1000.5" 形式へ）
+Private Function BridgeMsV1_NumNorm(ByVal v As Variant) As String
+    If IsError(v) Then
+        BridgeMsV1_NumNorm = ""
+    ElseIf IsNumeric(v) Then
+        BridgeMsV1_NumNorm = LTrim$(Str$(CDbl(v)))
+    Else
+        BridgeMsV1_NumNorm = Trim$(CStr(v))
+    End If
+End Function
+
+Private Function BridgeMsV1_ToCsvLine(ByRef rec As Variant) As String
+    Dim i As Long
+    Dim out As String: out = ""
+    For i = 0 To 14
+        If i > 0 Then out = out & ","
+        out = out & CStr(rec(i))
+    Next i
+    BridgeMsV1_ToCsvLine = out & vbCrLf
+End Function
+
+Private Sub BridgeMsV1_LogWarn(ByVal msg As String)
+    On Error Resume Next
+    Dim logPath As String
+    logPath = ThisWorkbook.Path & "\logs\vba_events.log"
+
+    Dim f As Integer: f = FreeFile
+    Open logPath For Append As #f
+    Print #f, Format$(Now, "yyyy-mm-dd hh:nn:ss") & " [BridgeMsV1] " & msg
+    Close #f
+End Sub
+
+' ===== /Bridge MS.v1 helpers =====
 
 Private Sub BridgePollOrdersCmdV1()
     On Error GoTo Fail

@@ -5,7 +5,7 @@ import csv
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional, Tuple
 
 SRC = (Path(__file__).resolve().parents[1] / "src").resolve()
 if SRC.exists():
@@ -53,6 +53,51 @@ def _read_existing_max_cmd_seq(path: Path) -> int:
         return 0
 
 
+def _load_existing_orders_cmd(path: Path) -> Tuple[list[str], list[dict[str, str]]]:
+    if not path.exists():
+        return [], []
+    with open(path, "r", encoding="utf-8-sig", newline="") as f:
+        r = csv.DictReader(f)
+        columns = list(r.fieldnames or [])
+        rows: list[dict[str, str]] = []
+        for row in r:
+            if not row:
+                continue
+            rows.append({k: (v if v is not None else "") for k, v in row.items()})
+        return columns, rows
+
+
+def _ensure_columns(existing: list[str], required: list[str]) -> list[str]:
+    out = list(existing)
+    seen = {c: True for c in out}
+    for col in required:
+        if col not in seen:
+            out.append(col)
+            seen[col] = True
+    return out
+
+
+def _next_unused_cmd_seq(existing_rows: Iterable[dict[str, str]], start: int) -> int:
+    used: set[int] = set()
+    max_seq = 0
+    for row in existing_rows:
+        raw = (row.get("cmd_seq") or "").strip()
+        if not raw:
+            continue
+        try:
+            seq = int(float(raw))
+        except ValueError:
+            continue
+        used.add(seq)
+        if seq > max_seq:
+            max_seq = seq
+
+    seq = max(max_seq + 1, start) if start > 0 else (max_seq + 1)
+    while seq in used:
+        seq += 1
+    return seq
+
+
 def main() -> None:
     args = parse_args()
 
@@ -60,10 +105,12 @@ def main() -> None:
     inbox = Path("output/excel/inbox")
     out = inbox / f"orders_cmd_{date_tag}.csv"
 
-    cols = schema_columns(OC_V1)
-    existing_max = _read_existing_max_cmd_seq(out)
+    schema_cols = schema_columns(OC_V1)
+    existing_cols, existing_rows = _load_existing_orders_cmd(out)
+    cols = _ensure_columns(existing_cols if existing_cols else schema_cols, schema_cols)
+
     start = args.cmd_seq_start or 0
-    cmd_seq = max(existing_max + 1, start) if start > 0 else (existing_max + 1)
+    cmd_seq = _next_unused_cmd_seq(existing_rows, start)
 
     now = datetime.now().astimezone().isoformat(timespec="seconds")
     client_order_id = f"O_{args.date}_{cmd_seq:06d}"
@@ -86,7 +133,19 @@ def main() -> None:
         "reason": "BRIDGE_SMOKETEST",
     }
 
-    atomic_write_csv(out, columns=cols, rows=[row])
+    all_rows: list[dict[str, object]] = []
+    for existing in existing_rows:
+        out_row: dict[str, object] = {}
+        for col in cols:
+            out_row[col] = existing.get(col, "")
+        all_rows.append(out_row)
+
+    new_row: dict[str, object] = {}
+    for col in cols:
+        new_row[col] = row.get(col, "")
+    all_rows.append(new_row)
+
+    atomic_write_csv(out, columns=cols, rows=all_rows)
     print(
         {
             "written": str(out),
