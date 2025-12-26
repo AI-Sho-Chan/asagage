@@ -1949,6 +1949,9 @@ def _main_impl() -> None:
         except SystemExit:
             pass
 
+    summary_message = summary.pop("message", None)
+    if summary_message:
+        summary["summary_message"] = summary_message
     write_status(
         state="success",
         step="completed",
