@@ -32,6 +32,17 @@ def recent_trading_days(count: int, end_date: Optional[dt.date] = None) -> List[
     return list(reversed(days))
 
 
+def parse_date(value: Optional[str]) -> Optional[dt.date]:
+    if not value:
+        return None
+    for fmt in ("%Y%m%d", "%Y-%m-%d"):
+        try:
+            return dt.datetime.strptime(value, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError(f"invalid date: {value}")
+
+
 def load_ticker_minutes(ticker: str, days: Iterable[dt.date], root: Path) -> pd.DataFrame:
     frames: List[pd.DataFrame] = []
     for day in days:
@@ -154,8 +165,14 @@ def corrcoef(x: np.ndarray, y: np.ndarray) -> float:
         return 0.0
 
 
-def compute_coefficients(tickers: List[str], root: Path, history_days: int, nky_symbol: str) -> pd.DataFrame:
-    days = recent_trading_days(history_days)
+def compute_coefficients(
+    tickers: List[str],
+    root: Path,
+    history_days: int,
+    nky_symbol: str,
+    end_date: Optional[dt.date] = None,
+) -> pd.DataFrame:
+    days = recent_trading_days(history_days, end_date=end_date)
     start = days[0]
     end = days[-1]
     nky_df = fetch_index_minutes(nky_symbol, start, end)
@@ -223,6 +240,7 @@ def main() -> None:
     ap.add_argument("--history-days", type=int, default=60)
     ap.add_argument("--raw-root", default="data/raw/yahoo_1m")
     ap.add_argument("--nky-symbol", default="^N225")
+    ap.add_argument("--end-date", default=None, help="Anchor date YYYYMMDD or YYYY-MM-DD")
     ap.add_argument("--output", type=Path, default=Path("output/excel/dashboard_coeffs_latest.csv"))
     ap.add_argument("--save-dated", action="store_true", help="Also save with timestamp suffix")
     args = ap.parse_args()
@@ -231,7 +249,14 @@ def main() -> None:
     if not tickers:
         raise SystemExit("compute_dashboard_coeffs: no tickers found")
 
-    df = compute_coefficients(tickers, Path(args.raw_root), args.history_days, args.nky_symbol)
+    end_date = parse_date(args.end_date)
+    df = compute_coefficients(
+        tickers,
+        Path(args.raw_root),
+        args.history_days,
+        args.nky_symbol,
+        end_date=end_date,
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(args.output, index=False, encoding="utf-8-sig")
     if args.save_dated:

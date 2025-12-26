@@ -221,19 +221,36 @@ def chunked(seq: List[str], size: int) -> Iterable[List[str]]:
         yield seq[idx : idx + size]
 
 
-def download_daily_returns(symbols: List[str], period: str = "3mo") -> Dict[str, pd.Series]:
+def download_daily_returns(
+    symbols: List[str],
+    period: str = "3mo",
+    start_date: Optional[dt.date] = None,
+    end_date: Optional[dt.date] = None,
+) -> Dict[str, pd.Series]:
     returns: Dict[str, pd.Series] = {}
     if not symbols:
         return returns
     for batch in chunked(symbols, 30):
-        data = yf.download(
-            batch,
-            period=period,
-            interval="1d",
-            auto_adjust=False,
-            progress=False,
-            group_by="ticker",
-        )
+        if start_date or end_date:
+            end = end_date + dt.timedelta(days=1) if end_date else None
+            data = yf.download(
+                batch,
+                start=start_date,
+                end=end,
+                interval="1d",
+                auto_adjust=False,
+                progress=False,
+                group_by="ticker",
+            )
+        else:
+            data = yf.download(
+                batch,
+                period=period,
+                interval="1d",
+                auto_adjust=False,
+                progress=False,
+                group_by="ticker",
+            )
         if data is None or data.empty:
             continue
         if isinstance(data.columns, pd.MultiIndex):
@@ -260,7 +277,12 @@ def download_daily_returns(symbols: List[str], period: str = "3mo") -> Dict[str,
     return returns
 
 
-def compute_corr_map(tickers: List[str], period: str = "6mo") -> Dict[str, Dict[str, float]]:
+def compute_corr_map(
+    tickers: List[str],
+    period: str = "6mo",
+    end_date: Optional[dt.date] = None,
+    lookback_days: int = 180,
+) -> Dict[str, Dict[str, float]]:
     uniq = [t.strip().upper() for t in tickers if isinstance(t, str) and t.strip()]
     uniq = sorted(dict.fromkeys(uniq))
     if not uniq:
@@ -268,7 +290,11 @@ def compute_corr_map(tickers: List[str], period: str = "6mo") -> Dict[str, Dict[
     nky_symbol = "^N225"
     topix_candidates = ["^TOPX", "^TPX", "1306.T"]
     symbols = uniq + [nky_symbol] + topix_candidates
-    returns = download_daily_returns(symbols, period=period)
+    if end_date:
+        start_date = end_date - dt.timedelta(days=lookback_days)
+        returns = download_daily_returns(symbols, start_date=start_date, end_date=end_date)
+    else:
+        returns = download_daily_returns(symbols, period=period)
     corr_map: Dict[str, Dict[str, float]] = {}
 
     topix_symbol = None
@@ -389,7 +415,11 @@ def compute_vwap_revert_stats(
     return stats
 
 
-def enrich_dashboard_columns(csv_path: Path, coeff_path: Path) -> None:
+def enrich_dashboard_columns(
+    csv_path: Path,
+    coeff_path: Path,
+    corr_map: Optional[Dict[str, Dict[str, float]]] = None,
+) -> None:
     try:
         df = pd.read_csv(csv_path)
     except Exception:
@@ -451,7 +481,8 @@ def enrich_dashboard_columns(csv_path: Path, coeff_path: Path) -> None:
 
     ticker_list = df.get("Ticker")
     if ticker_list is not None:
-        corr_map = compute_corr_map(ticker_list.dropna().astype(str).tolist())
+        if not corr_map:
+            corr_map = compute_corr_map(ticker_list.dropna().astype(str).tolist())
         upper_series = ticker_list.astype(str).str.upper()
         df["CorrNKY"] = upper_series.map(lambda t: corr_map.get(t, {}).get("CorrNKY", np.nan))
         df["CorrTOPIX"] = upper_series.map(lambda t: corr_map.get(t, {}).get("CorrTOPIX", np.nan))
@@ -740,6 +771,12 @@ def _main_impl() -> None:
         default="",
     )
     ap.add_argument("--min-index-corr", type=float, default=0.2, help="Minimum CorrTOPIX to keep a candidate (default 0.2)")
+    ap.add_argument(
+        "--corr-history-days",
+        type=int,
+        default=180,
+        help="Calendar days for CorrNKY/CorrTOPIX history when anchoring to target date (default 180)",
+    )
     ap.add_argument(
         "--min-vwap-revert",
         type=float,
@@ -1799,7 +1836,15 @@ def _main_impl() -> None:
     for frame in candidate_frames:
         if "Ticker" in frame.columns:
             ticker_union.update(frame["Ticker"].dropna().astype(str).str.upper().tolist())
-    corr_map = compute_corr_map(sorted(ticker_union)) if ticker_union else {}
+    corr_map = (
+        compute_corr_map(
+            sorted(ticker_union),
+            end_date=target_date,
+            lookback_days=int(getattr(args, "corr_history_days", 180)),
+        )
+        if ticker_union
+        else {}
+    )
     vwap_stats = (
         compute_vwap_revert_stats(
             sorted(ticker_union),
@@ -1869,12 +1914,14 @@ def _main_impl() -> None:
                     str(args.coeff_history_days),
                     "--output",
                     str(coeff_latest),
+                    "--end-date",
+                    target_date.strftime("%Y%m%d"),
                 ],
                 cwd=repo_root,
             )
         except SystemExit:
             pass
-    enrich_dashboard_columns(out_all, coeff_latest)
+    enrich_dashboard_columns(out_all, coeff_latest, corr_map=corr_map)
     apply_trend_preferences(out_all, (repo_root / args.trend_pref).resolve(), args.trend_bp_th)
 
     # Keep a dated snapshot of the FINAL candidates file for DailyReplay / weekend reuse.
