@@ -123,7 +123,7 @@ def main() -> None:
             if "Ticker" in src_df.columns and "Ticker" in df.columns:
                 src_df["Ticker"] = src_df["Ticker"].astype(str).str.upper()
                 df["Ticker"] = df["Ticker"].astype(str).str.upper()
-                src_df = src_df.set_index("Ticker")
+                src_df = src_df.groupby("Ticker", as_index=True).first()
                 for col in ("BiasSlope_row", "GapSlope_row", "CorrSlope_row"):
                     if col in src_df.columns:
                         mapped = df["Ticker"].map(src_df[col])
