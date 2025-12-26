@@ -105,7 +105,8 @@ trap cleanup_and_shutdown EXIT
   WEEKEND_INCREMENTAL="${WEEKEND_INCREMENTAL:-1}"
   WEEKEND_FORCE_FULL_RESET="${WEEKEND_FORCE_FULL_RESET:-0}"
   # A/B test knobs for Walk-Forward slice count (0 keeps bt_opt30_forward default).
-  COARSE_FORWARD_SLICES="${COARSE_FORWARD_SLICES:-0}"
+  # B mode: reduce coarse forward slices to 3 (refine unchanged).
+  COARSE_FORWARD_SLICES="${COARSE_FORWARD_SLICES:-3}"
   REFINE_FORWARD_SLICES="${REFINE_FORWARD_SLICES:-0}"
   EXTRA_WEEKEND_FLAGS=()
   if [ "$WEEKEND_INCREMENTAL" = "1" ]; then
