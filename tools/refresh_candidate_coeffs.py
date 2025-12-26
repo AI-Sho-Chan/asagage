@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import importlib.util
 import shutil
 import subprocess
 import sys
@@ -15,8 +16,16 @@ from pathlib import Path
 
 import pandas as pd
 
-# Reuse helper from nightly_build_candidates (safe import; no side effects)
-from scripts.nightly_build_candidates import compute_corr_map, enrich_dashboard_columns
+def load_nightly_helpers(repo_root: Path):
+    module_path = repo_root / "scripts" / "nightly_build_candidates.py"
+    if not module_path.exists():
+        raise SystemExit(f"missing nightly_build_candidates.py at {module_path}")
+    spec = importlib.util.spec_from_file_location("nightly_build_candidates", module_path)
+    if spec is None or spec.loader is None:
+        raise SystemExit("failed to load nightly_build_candidates module")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.compute_corr_map, module.enrich_dashboard_columns
 
 
 def parse_date(value: str | None) -> dt.date:
@@ -63,6 +72,7 @@ def main() -> None:
     args = ap.parse_args()
 
     repo_root = Path(".").resolve()
+    compute_corr_map, enrich_dashboard_columns = load_nightly_helpers(repo_root)
     input_path = Path(args.candidates)
     if not input_path.exists():
         raise SystemExit(f"missing candidates file: {input_path}")
