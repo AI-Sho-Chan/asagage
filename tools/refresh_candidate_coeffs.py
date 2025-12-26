@@ -69,6 +69,11 @@ def main() -> None:
     ap.add_argument("--coeff-history-days", type=int, default=60)
     ap.add_argument("--corr-history-days", type=int, default=180)
     ap.add_argument("--coeff-file", default="", help="Optional precomputed coeffs CSV")
+    ap.add_argument(
+        "--sync-slopes-from",
+        default="",
+        help="Optional candidates CSV to copy Bias/Gap/Corr slope columns from (per ticker)",
+    )
     args = ap.parse_args()
 
     repo_root = Path(".").resolve()
@@ -110,6 +115,20 @@ def main() -> None:
     ) if tickers else {}
 
     enrich_dashboard_columns(output_path, coeff_path, corr_map=corr_map)
+
+    if args.sync_slopes_from:
+        src_path = Path(args.sync_slopes_from)
+        if src_path.exists():
+            src_df = pd.read_csv(src_path)
+            if "Ticker" in src_df.columns and "Ticker" in df.columns:
+                src_df["Ticker"] = src_df["Ticker"].astype(str).str.upper()
+                df["Ticker"] = df["Ticker"].astype(str).str.upper()
+                src_df = src_df.set_index("Ticker")
+                for col in ("BiasSlope_row", "GapSlope_row", "CorrSlope_row"):
+                    if col in src_df.columns:
+                        mapped = df["Ticker"].map(src_df[col])
+                        df[col] = mapped.where(~mapped.isna(), df.get(col))
+                df.to_csv(output_path, index=False, encoding="utf-8-sig")
     print(f"updated={output_path} coeffs={coeff_path} tickers={len(tickers)}")
 
 
