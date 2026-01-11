@@ -18,7 +18,10 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import email.message
 import hashlib
+import json
+import smtplib
 import subprocess
 import sys
 from pathlib import Path
@@ -50,6 +53,38 @@ DEFAULT_COOLDOWN_MINUTES = 5
 DEFAULT_MAX_TRADES_PER_TICKER = 2
 
 JST = dt.timezone(dt.timedelta(hours=9))
+
+
+def _load_smtp_config(path: Path) -> dict | None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _send_mail_via_smtp(smtp_cfg: dict, recipient: str, subject: str, body: str) -> None:
+    user = smtp_cfg.get("user")
+    password = smtp_cfg.get("pass")
+    host = smtp_cfg.get("host")
+    port = int(smtp_cfg.get("port", 587))
+    if not (user and password and host and recipient):
+        raise RuntimeError("smtp.json must contain host/port/user/pass and recipient must be set")
+
+    msg = email.message.EmailMessage()
+    msg["From"] = user
+    msg["To"] = recipient
+    msg["Subject"] = subject
+    msg.set_content(body)
+
+    with smtplib.SMTP(host, port, timeout=30) as smtp:
+        smtp.ehlo()
+        smtp.starttls()
+        smtp.ehlo()
+        smtp.login(user, password)
+        smtp.send_message(msg)
 
 
 def _iso_ts_jst(ts: dt.datetime | pd.Timestamp) -> str:
@@ -1093,6 +1128,21 @@ def parse_args() -> argparse.Namespace:
         default="",
         help="Optional engine_version for DecisionTrace (default: git short sha if available).",
     )
+    ap.add_argument(
+        "--email",
+        action="store_true",
+        help="Send the report via SMTP using state/smtp.json.",
+    )
+    ap.add_argument(
+        "--recipient",
+        default="",
+        help="Recipient email address (required when --email).",
+    )
+    ap.add_argument(
+        "--smtp",
+        default="state/smtp.json",
+        help="SMTP config JSON path (default: state/smtp.json).",
+    )
     return ap.parse_args()
 
 
@@ -1192,7 +1242,6 @@ def main() -> None:
 
     summary_json = OUT_DIR / f"daily_replay_{args.date}{suffix}.json"
     with open(summary_json, "w", encoding="utf-8") as f:
-        import json
         json.dump(summary, f, ensure_ascii=False, indent=2)
     print(f"summary written to {summary_json}")
 
@@ -1206,6 +1255,22 @@ def main() -> None:
     )
     report_txt.write_text(report, encoding="utf-8-sig")
     print(f"mail report written to {report_txt}")
+
+    if bool(getattr(args, "email", False)):
+        recipient = str(getattr(args, "recipient", "") or "").strip()
+        smtp_cfg_path = Path(str(getattr(args, "smtp", "state/smtp.json")))
+        smtp_cfg = _load_smtp_config(smtp_cfg_path)
+        if not smtp_cfg:
+            print(f"[warn] smtp config not found at {smtp_cfg_path}; skip email")
+        elif not recipient:
+            print("[warn] --recipient is required when --email; skip email")
+        else:
+            try:
+                subject = f"ASAGAKE DailyReplay {args.date}{suffix}"
+                _send_mail_via_smtp(smtp_cfg, recipient, subject, report)
+                print(f"Mail sent to {recipient}")
+            except Exception as exc:
+                print(f"[warn] email send failed: {exc!r}")
 
 
 if __name__ == "__main__":

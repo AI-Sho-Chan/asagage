@@ -1,7 +1,8 @@
 param(
   [string]$BaseDir = "C:\AI\asagake",
   [string]$PythonExe = "C:\Python313\python.exe",
-  [string]$DateTag = ""
+  [string]$DateTag = "",
+  [string]$Recipient = "shouichi.ikeda@gmail.com"
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,14 +22,13 @@ if ([string]::IsNullOrWhiteSpace($DateTag)) {
 
 $logPath = Join-Path $BaseDir ("logs\daily_replay_task_{0}.log" -f $DateTag)
 $ts = (Get-Date).ToString("s")
-Add-Content -Path $logPath -Value ("[{0}] === DailyReplay start (date={1}) ===" -f $ts, $DateTag)
+Add-Content -Path $logPath -Value ("[{0}] === DailyReplay start (date={1}) ===" -f $ts, $DateTag) -Encoding utf8
 
 try {
-  & $PythonExe tools\simulate_daily_replay.py --date-tag $DateTag 2>&1 | Tee-Object -FilePath $logPath -Append | Out-Null
-  Add-Content -Path $logPath -Value ("[{0}] === DailyReplay end ===" -f (Get-Date).ToString("s"))
+  & $PythonExe tools\simulate_daily_replay.py --date $DateTag --email --recipient $Recipient 2>&1 | Out-File -FilePath $logPath -Append -Encoding utf8
+  Add-Content -Path $logPath -Value ("[{0}] === DailyReplay end ===" -f (Get-Date).ToString("s")) -Encoding utf8
   exit 0
 } catch {
-  Add-Content -Path $logPath -Value ("[{0}] [error] {1}" -f (Get-Date).ToString("s"), $_.Exception.Message)
+  Add-Content -Path $logPath -Value ("[{0}] [error] {1}" -f (Get-Date).ToString("s"), $_.Exception.Message) -Encoding utf8
   exit 1
 }
-
