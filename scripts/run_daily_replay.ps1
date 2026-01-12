@@ -1,6 +1,6 @@
 param(
   [string]$BaseDir = "C:\AI\asagake",
-  [string]$PythonExe = "C:\Python313\python.exe",
+  [string]$PythonExe = "",
   [string]$DateTag = "",
   [string]$Recipient = "shouichi.ikeda@gmail.com"
 )
@@ -9,8 +9,17 @@ $ErrorActionPreference = "Stop"
 
 Set-Location $BaseDir
 
+if ([string]::IsNullOrWhiteSpace($PythonExe)) {
+  $candidateVenv = Join-Path $BaseDir ".venv\Scripts\python.exe"
+  if (Test-Path $candidateVenv) {
+    $PythonExe = $candidateVenv
+  } else {
+    $PythonExe = "C:\Python313\python.exe"
+  }
+}
+
 if (-not (Test-Path $PythonExe)) {
-  throw "Python not found: $PythonExe"
+  throw "Python not found: $PythonExe (set -PythonExe or create .venv)"
 }
 
 New-Item -ItemType Directory -Force -Path (Join-Path $BaseDir "logs") | Out-Null
