@@ -3362,6 +3362,21 @@ Public Sub ImportCandidatesV2()
     raw = Replace$(raw, vbCr, vbLf)
     lines = Split(raw, vbLf)
 
+    ' Guardrail: avoid wiping the dashboard when candidates file is unexpectedly tiny
+    ' (e.g. upstream overwrite / partial write). Keep the existing rows in that case.
+    Dim nonEmptyLines As Long: nonEmptyLines = 0
+    Dim li As Long
+    For li = LBound(lines) To UBound(lines)
+        If Len(Trim$(CStr(lines(li)))) > 0 Then nonEmptyLines = nonEmptyLines + 1
+    Next li
+
+    Dim approxRecords As Long: approxRecords = nonEmptyLines - 1 ' header line
+    If approxRecords < 5 Then
+        LogVbaEvent "ImportCandidatesV2", "candidate_csv_too_small records=" & CStr(approxRecords) & " nonEmptyLines=" & CStr(nonEmptyLines) & " path=" & path & " (skip import to avoid wiping dashboard)"
+        If wasProtected Then ProtectDashboardV2 ws
+        Exit Sub
+    End If
+
     Dim selCol As Long: selCol = FindColumn(ws, DASH2_HEADER_ROW, "Selected")
 
     Dim jtbCol As Long: jtbCol = FindColumn(ws, DASH2_HEADER_ROW, "J_th_base")

@@ -21,6 +21,7 @@
 - [x] Bridge.v1 のVBA側実装計画（まだ未実装）を `docs/bridge_v1_vba_plan.md` に固定し、スキーマ一致テスト（`tests/test_bridge_v1_schemas.py`）を追加。
 - [ ] 次の金曜に週末バッチが自動起動・完走したかを確認（`~/cloud_logs/weekend_*.log` と `output/bt30/NIGHTLY_YYYYMMDD` で確認）
 - [ ] `abnormal_codes_latest.csv` のアップロードが失敗していないか、DailyReplayログで確認（失敗時はVMの異常時フル探索が効かない）
+- [ ] 朝 08:50 の旧タスク `ASAGAKEデモ自動実行` を無効化/削除し、`Asagake-MorningDemo`（InteractiveToken）だけにする（Session 0 の見えないExcel起動でASAGAKE.xlsmがロックされる事故の再発防止）
 
 ## Later（改善）
 - [ ] `scripts/run_update_regulars_1m.ps1`（Top200常連の1分足更新）を再開する場合は、タスクの実行時刻/負荷/アップロード先を再点検してから有効化する
