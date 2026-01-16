@@ -20,6 +20,7 @@ from asagake_core.candidates import append_candidate_metadata, make_candidate_me
 
 ROOT = Path("output/excel")
 LOG_DIR = Path("logs")
+FALLBACK_MIN_ROWS_DEFAULT = 3
 
 
 @dataclass
@@ -161,6 +162,61 @@ def _resolve_latest_root_candidate_file() -> Optional[Path]:
             if date and date > best_date:
                 best = p
                 best_date = date
+    return best
+
+
+def _resolve_latest_b_candidate_file() -> Optional[Path]:
+    """Pick the newest B-type candidates_nextday CSV in output/excel/.
+
+    These files are excluded from normal aggregation (to avoid feeding the
+    aggregated output back into the input), but they are useful as a safe
+    fallback when nightly aggregation yields too few rows.
+
+    Preference order:
+      1) candidates_nextday_B_coarse3.csv (fixed name)
+      2) candidates_nextday_B_from_vm_YYYYMMDD.csv (dated snapshots)
+      3) candidates_nextday_B_*.csv (other variants)
+    """
+
+    coarse3 = ROOT / "candidates_nextday_B_coarse3.csv"
+    if coarse3.is_file():
+        return coarse3
+
+    best: Optional[Path] = None
+    best_date: str = ""
+
+    for p in sorted(ROOT.glob("candidates_nextday_B_from_vm_*.csv")):
+        if not p.is_file():
+            continue
+        date = _date_from_name(p) or ""
+        if date and date > best_date:
+            best = p
+            best_date = date
+
+    if best is not None:
+        return best
+
+    # Last resort: other B variants. Prefer date when present; otherwise newest mtime.
+    best_mtime: float = 0.0
+    for p in sorted(ROOT.glob("candidates_nextday_B_*.csv")):
+        if not p.is_file():
+            continue
+        date = _date_from_name(p) or ""
+        try:
+            mtime = p.stat().st_mtime
+        except OSError:
+            mtime = 0.0
+
+        if date:
+            if date > best_date:
+                best = p
+                best_date = date
+                best_mtime = mtime
+        else:
+            if not best_date and mtime >= best_mtime:
+                best = p
+                best_mtime = mtime
+
     return best
 
 
@@ -380,6 +436,16 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--default-gapban-pct", type=float, default=3.0)
     ap.add_argument("--default-no-trade-min", type=int, default=5)
     ap.add_argument(
+        "--fallback-min-rows",
+        type=int,
+        default=FALLBACK_MIN_ROWS_DEFAULT,
+        help=(
+            "When the aggregated candidates_nextday.csv would contain too few rows, "
+            "prefer a B-type candidates file (e.g. candidates_nextday_B_coarse3.csv) "
+            "if it exists and contains at least this many rows."
+        ),
+    )
+    ap.add_argument(
         "--allow-empty-overwrite",
         action="store_true",
         help=(
@@ -476,6 +542,9 @@ def main() -> None:
     nightly_date_tag = resolve_latest_date_tag()
     latest_root = _resolve_latest_root_candidate_file()
     latest_root_date = _date_from_name(latest_root) if latest_root else None
+    latest_b = _resolve_latest_b_candidate_file()
+    fallback_min_rows = max(int(getattr(args, "fallback_min_rows", FALLBACK_MIN_ROWS_DEFAULT)), 1)
+    latest_b_rows = _read_nonempty_row_count(latest_b) if latest_b else 0
 
     # Default behaviour: pick the newest run we have. When nightly folders are stale
     # (e.g. nightly is disabled but weekend candidates_for_YYYYMMDD.csv is new),
@@ -508,6 +577,11 @@ def main() -> None:
             frames, used_paths = _read_nonempty_csvs([fallback])
             source_label = fallback.name
 
+    if not frames and latest_b is not None and latest_b_rows >= fallback_min_rows:
+        frames, used_paths = _read_nonempty_csvs([latest_b])
+        if frames:
+            source_label = latest_b.name
+
     out = args.output
 
     diag: Dict[str, object] = {
@@ -519,6 +593,9 @@ def main() -> None:
         "requested_date_tag": requested_date_tag or None,
         "latest_nightly_date_tag": nightly_date_tag or None,
         "latest_root_candidate": str(latest_root) if latest_root else None,
+        "latest_b_candidate": str(latest_b) if latest_b else None,
+        "latest_b_rows": latest_b_rows,
+        "fallback_min_rows": fallback_min_rows,
         "thresholds": {
             "min_j": thresholds.min_j,
             "min_win_ci": thresholds.min_win_ci,
@@ -578,6 +655,26 @@ def main() -> None:
                     used_paths = alt_paths
                     combined = alt_combined
                     source_label = fallback.name
+
+    # If the aggregation results in too few rows, prefer the latest B-type candidate set.
+    if (
+        combined is not None
+        and not combined.empty
+        and len(combined) < fallback_min_rows
+        and latest_b is not None
+        and latest_b_rows >= fallback_min_rows
+    ):
+        try:
+            b_df = pd.read_csv(latest_b)
+        except Exception:
+            b_df = pd.DataFrame()
+        if not b_df.empty and len(b_df) >= fallback_min_rows:
+            frames = [b_df]
+            used_paths = [latest_b]
+            combined = b_df
+            source_label = latest_b.name
+            diag["fallback_b_used"] = True
+            diag["fallback_b_reason"] = "aggregated_rows_below_threshold"
 
     if combined is None or combined.empty:
         existing_rows = _read_nonempty_row_count(out)
