@@ -3388,6 +3388,10 @@ Public Sub ImportCandidatesV2()
 
     LogVbaEvent "ImportCandidatesV2", "start workbook_path=" & ThisWorkbook.path & " dash=" & DASH2_SHEET & " protected=" & CStr(wasProtected)
 
+    ' If a filter/hidden rows remain on the sheet, the import can look like "only 1 ticker"
+    ' even when many rows were written. Ensure the candidate area is visible before writing.
+    BridgeResetCandidateAreaV2 ws
+
     path = ThisWorkbook.path & "\output\excel\candidates_nextday.csv"
 
     On Error Resume Next
@@ -3817,6 +3821,23 @@ ImportErr:
     LogVbaEvent "ImportCandidatesV2", "Err " & Err.Number & ": " & Err.Description & " path=" & path
     Resume ImportFinalize
 
+End Sub
+
+' Ensure candidate rows are visible (filters/hidden rows can make the import appear truncated).
+Private Sub BridgeResetCandidateAreaV2(ByVal ws As Worksheet)
+    On Error Resume Next
+
+    ' Clear any active AutoFilter so newly written rows are not hidden.
+    If ws.FilterMode Then ws.ShowAllData
+    If ws.AutoFilterMode Then ws.AutoFilterMode = False
+
+    ' Unhide a reasonable candidate row window (avoid un-hiding the entire sheet).
+    Dim unhideLast As Long
+    unhideLast = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    If unhideLast < (DASH2_DATA_START + 2000) Then unhideLast = DASH2_DATA_START + 2000
+    ws.Rows(CStr(DASH2_DATA_START) & ":" & CStr(unhideLast)).EntireRow.Hidden = False
+
+    On Error GoTo 0
 End Sub
 
 Private Sub ProtectDashboardV2(ByVal ws As Worksheet)
