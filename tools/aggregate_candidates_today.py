@@ -517,6 +517,65 @@ def _backup_existing(out: Path, keep: int = 10) -> Optional[Path]:
     return backup
 
 
+def _restore_from_backups(out: Path, min_rows: int) -> Optional[Path]:
+    """Restore candidates_nextday.csv from a newer snapshot that has enough rows.
+
+    We support both the current backup naming (`candidates_nextday.csv.backup_...`)
+    and the legacy naming (`candidates_nextday_backup_...csv`).
+    """
+    if min_rows <= 0:
+        return None
+    if not out.exists() or not out.is_file():
+        return None
+
+    last_good = out.with_name(f"{out.stem}_last_good{out.suffix}")
+    candidates: List[Path] = []
+    if last_good.is_file():
+        candidates.append(last_good)
+
+    # Current scheme: "candidates_nextday.csv.backup_YYYYMMDD_HHMMSS"
+    candidates.extend(out.parent.glob(f"{out.name}.backup_*"))
+
+    # Legacy scheme: "candidates_nextday_backup_YYYYMMDD_HHMMSS.csv"
+    candidates.extend(out.parent.glob(f"{out.stem}_backup_*{out.suffix}"))
+
+    # Sort newest-first using (date tag if present, mtime, name).
+    def sort_key(path: Path) -> Tuple[str, float, str]:
+        date = _date_from_name(path) or ""
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            mtime = 0.0
+        return (date, mtime, path.name)
+
+    backups = sorted({p.resolve() for p in candidates if p.is_file()}, key=sort_key, reverse=True)
+    for backup in backups:
+        if _read_nonempty_row_count(backup) < min_rows:
+            continue
+        try:
+            tmp = out.with_name(f".{out.name}.restore.{os.getpid()}.{_timestamp()}.tmp")
+            tmp.write_bytes(backup.read_bytes())
+            os.replace(tmp, out)
+            return backup
+        except OSError:
+            continue
+    return None
+
+
+def _write_last_good_snapshot(out: Path) -> Optional[Path]:
+    """Keep a stable copy that we can restore from when sources go missing."""
+    if not out.exists() or not out.is_file():
+        return None
+    last_good = out.with_name(f"{out.stem}_last_good{out.suffix}")
+    try:
+        tmp = last_good.with_name(f".{last_good.name}.{os.getpid()}.{_timestamp()}.tmp")
+        tmp.write_bytes(out.read_bytes())
+        os.replace(tmp, last_good)
+        return last_good
+    except OSError:
+        return None
+
+
 def _write_diag(path: Path, payload: Dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -613,26 +672,46 @@ def main() -> None:
     diag_path = args.diag_json or (LOG_DIR / f"aggregate_candidates_{_timestamp()}.json")
 
     if not frames:
-        existing_rows = _read_nonempty_row_count(out)
-        diag["result"] = {
-            "reason": "no_source_candidates",
-            "existing_rows": existing_rows,
-            "action": "overwrite_empty" if args.allow_empty_overwrite else "keep_previous",
-        }
-        _write_diag(diag_path, diag)
-
         if args.allow_empty_overwrite:
+            existing_rows = _read_nonempty_row_count(out)
+            diag["result"] = {
+                "reason": "no_source_candidates",
+                "existing_rows": existing_rows,
+                "action": "overwrite_empty",
+            }
+            _write_diag(diag_path, diag)
             _backup_existing(out)
             _atomic_write_csv(pd.DataFrame(), out)
             print(json.dumps({"written": str(out), "rows": 0, "kept_previous": False}, ensure_ascii=False))
         else:
+            existing_rows = _read_nonempty_row_count(out)
+            diag["result"] = {
+                "reason": "no_source_candidates",
+                "existing_rows": existing_rows,
+                "action": "keep_previous",
+            }
+
+            restored_from: Optional[Path] = None
+            if existing_rows < fallback_min_rows:
+                restored_from = _restore_from_backups(out, fallback_min_rows)
+                if restored_from is not None:
+                    existing_rows = _read_nonempty_row_count(out)
+                    diag["result"]["action"] = "restore_backup"
+                    diag["result"]["restored_from"] = str(restored_from)
+
+            _write_diag(diag_path, diag)
             print(
                 json.dumps(
                     {
                         "written": str(out),
                         "rows": existing_rows,
-                        "kept_previous": True,
-                        "message": "No candidates found; keeping previous candidates_nextday.csv",
+                        "kept_previous": restored_from is None,
+                        "restored_from": str(restored_from) if restored_from is not None else None,
+                        "message": (
+                            "No candidates found; restored candidates_nextday.csv from backup"
+                            if restored_from is not None
+                            else "No candidates found; keeping previous candidates_nextday.csv"
+                        ),
                     },
                     ensure_ascii=False,
                 )
@@ -724,6 +803,8 @@ def main() -> None:
     combined = append_candidate_metadata(combined, defaults=defaults)
     _backup_existing(out)
     _atomic_write_csv(combined, out)
+    if len(combined) >= fallback_min_rows:
+        _write_last_good_snapshot(out)
 
     payload = {"written": str(out), "rows": int(len(combined))}
     payload.update(summary.to_json())
