@@ -20,7 +20,7 @@ from asagake_core.candidates import append_candidate_metadata, make_candidate_me
 
 ROOT = Path("output/excel")
 LOG_DIR = Path("logs")
-FALLBACK_MIN_ROWS_DEFAULT = 3
+FALLBACK_MIN_ROWS_DEFAULT = 5
 
 
 @dataclass
@@ -754,6 +754,37 @@ def main() -> None:
             source_label = latest_b.name
             diag["fallback_b_used"] = True
             diag["fallback_b_reason"] = "aggregated_rows_below_threshold"
+
+    # Guardrail: if we would shrink candidates_nextday.csv to an unusually small set,
+    # keep the previous file (and/or restore from backups) instead of overwriting.
+    # This prevents "Import Candidates shows only 1 ticker" incidents when a transient
+    # filter/parse issue yields too few rows.
+    if combined is not None and not combined.empty and len(combined) < fallback_min_rows:
+        existing_rows = _read_nonempty_row_count(out)
+        if existing_rows >= fallback_min_rows:
+            diag["result"] = {
+                "reason": "aggregated_rows_below_threshold",
+                "aggregated_rows": int(len(combined)),
+                "existing_rows": existing_rows,
+                "action": "keep_previous",
+            }
+            diag["source_after_fallback"] = source_label
+            diag["source_files_after_fallback"] = [str(p) for p in used_paths]
+            _write_diag(diag_path, diag)
+            print(
+                json.dumps(
+                    {
+                        "written": str(out),
+                        "rows": existing_rows,
+                        "kept_previous": True,
+                        "message": f"Aggregated rows below threshold ({len(combined)}<{fallback_min_rows}); keeping previous candidates_nextday.csv",
+                        "source": source_label,
+                        "source_files": [str(p) for p in used_paths],
+                    },
+                    ensure_ascii=False,
+                )
+            )
+            return
 
     if combined is None or combined.empty:
         existing_rows = _read_nonempty_row_count(out)

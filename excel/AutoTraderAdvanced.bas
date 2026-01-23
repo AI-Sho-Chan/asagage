@@ -28,6 +28,8 @@ Private Const DEFAULT_NKY_STEADY_BP As Double = 15#
 Private Const DEFAULT_ALERT_COOLDOWN_MIN As Double = 10#
 Private Const SPIKE_RATIO_THRESHOLD As Double = 3#
 
+Private Const IMPORT_CANDIDATES_MIN_ROWS As Long = 5
+
 Private gDashboardWatcher As cDashboardWatcher
 Private gThresholdState As Object
 Private gAlertCooldown As Object
@@ -1254,6 +1256,68 @@ Private Function ParseCsvLine(ByVal line As String) As Variant
 
     ParseCsvLine = arr
 
+End Function
+
+
+Private Function SplitCsvRowsRespectQuotesV1(ByVal raw As String) As Variant
+    Dim rows As Collection
+    Set rows = New Collection
+
+    Dim current As String
+    Dim inQuotes As Boolean
+    Dim i As Long
+
+    For i = 1 To Len(raw)
+        Dim ch As String
+        ch = Mid$(raw, i, 1)
+
+        If ch = """" Then
+            If inQuotes And i < Len(raw) And Mid$(raw, i + 1, 1) = """" Then
+                current = current & """"   ' escaped quote
+                i = i + 1
+            Else
+                inQuotes = Not inQuotes
+                current = current & ch
+            End If
+        ElseIf ch = vbLf And Not inQuotes Then
+            rows.Add current
+            current = vbNullString
+        Else
+            current = current & ch
+        End If
+    Next i
+
+    rows.Add current
+
+    Dim out() As String
+    ReDim out(0 To rows.Count - 1)
+    For i = 1 To rows.Count
+        out(i - 1) = rows(i)
+    Next i
+
+    SplitCsvRowsRespectQuotesV1 = out
+End Function
+
+
+Private Function NormalizeCsvHeaderKeyV1(ByVal value As String) As String
+    Dim h As String
+    h = LCase$(Trim$(value))
+    h = Application.WorksheetFunction.Clean(h)
+
+    Do While Len(h) > 0
+        Dim chCode As Long
+        chCode = AscW(Left$(h, 1))
+        If chCode >= 48 And chCode <= 122 Then Exit Do
+        h = Mid$(h, 2)
+    Loop
+
+    If Len(h) > 0 Then
+        If AscW(Left$(h, 1)) = &HFEFF Then
+            h = Mid$(h, 2)
+        End If
+    End If
+
+    NormalizeCsvHeaderKeyV1 = h
 End Function
 
 
@@ -3351,16 +3415,11 @@ Public Sub ImportCandidatesV2()
 
     ' Read full file and split by LF/CRLF. pandas emits LF-only by default,
     ' which can make Line Input treat the file as a single "line".
-    f = FreeFile
-    Open path For Binary As #f
-    raw = String$(LOF(f), vbNullChar)
-    If LOF(f) > 0 Then Get #f, , raw
-    Close #f
-    f = 0
+    raw = BridgeReadAllTextUtf8V1(path)
 
     raw = Replace$(raw, vbCrLf, vbLf)
     raw = Replace$(raw, vbCr, vbLf)
-    lines = Split(raw, vbLf)
+    lines = SplitCsvRowsRespectQuotesV1(raw)
 
     ' Guardrail: avoid wiping the dashboard when candidates file is unexpectedly tiny
     ' (e.g. upstream overwrite / partial write). Keep the existing rows in that case.
@@ -3371,8 +3430,49 @@ Public Sub ImportCandidatesV2()
     Next li
 
     Dim approxRecords As Long: approxRecords = nonEmptyLines - 1 ' header line
-    If approxRecords < 5 Then
+    If approxRecords < IMPORT_CANDIDATES_MIN_ROWS Then
         LogVbaEvent "ImportCandidatesV2", "candidate_csv_too_small records=" & CStr(approxRecords) & " nonEmptyLines=" & CStr(nonEmptyLines) & " path=" & path & " (skip import to avoid wiping dashboard)"
+        If wasProtected Then ProtectDashboardV2 ws
+        Exit Sub
+    End If
+
+    ' Second guardrail: ensure we can parse enough tickers before touching the sheet.
+    Dim checkFirst As Boolean: checkFirst = True
+    Dim checkIdxTicker As Long: checkIdxTicker = -1
+    Dim parsedRecords As Long: parsedRecords = 0
+    Dim checkLine As Variant
+    Dim checkHdr As Variant
+
+    For Each checkLine In lines
+        Dim checkText As String
+        checkText = Trim$(CStr(checkLine))
+        If Len(checkText) = 0 Then GoTo NextCheckLine
+
+        If checkFirst Then
+            checkHdr = ParseCsvLine(checkText)
+            Dim hi As Long
+            For hi = LBound(checkHdr) To UBound(checkHdr)
+                Dim hk As String: hk = NormalizeCsvHeaderKeyV1(CStr(checkHdr(hi)))
+                If hk = "ticker" Then checkIdxTicker = hi
+                If hk = "code" And checkIdxTicker = -1 Then checkIdxTicker = hi
+            Next hi
+            checkFirst = False
+        Else
+            Dim checkParts As Variant: checkParts = ParseCsvLine(checkText)
+            If checkIdxTicker >= 0 And checkIdxTicker <= UBound(checkParts) Then
+                Dim checkTkr As String: checkTkr = Trim$(checkParts(checkIdxTicker))
+                If Len(checkTkr) > 1 And Left$(checkTkr, 1) = """" And Right$(checkTkr, 1) = """" Then
+                    checkTkr = Mid$(checkTkr, 2, Len(checkTkr) - 2)
+                End If
+                checkTkr = Replace$(checkTkr, """", "")
+                If Len(checkTkr) > 0 Then parsedRecords = parsedRecords + 1
+            End If
+        End If
+NextCheckLine:
+    Next checkLine
+
+    If parsedRecords < IMPORT_CANDIDATES_MIN_ROWS Then
+        LogVbaEvent "ImportCandidatesV2", "candidate_csv_parse_too_small approx=" & CStr(approxRecords) & " parsed=" & CStr(parsedRecords) & " path=" & path & " (skip import to avoid wiping dashboard)"
         If wasProtected Then ProtectDashboardV2 ws
         Exit Sub
     End If
@@ -3448,18 +3548,7 @@ Public Sub ImportCandidatesV2()
 
             For i = LBound(hdr) To UBound(hdr)
 
-                Dim h As String: h = LCase$(Trim$(hdr(i)))
-                h = Application.WorksheetFunction.Clean(h)
-                Do While Len(h) > 0
-                    Dim chCode As Long: chCode = AscW(Left$(h, 1))
-                    If chCode >= 48 And chCode <= 122 Then Exit Do
-                    h = Mid$(h, 2)
-                Loop
-                If Len(h) > 0 Then
-                    If AscW(Left$(h, 1)) = &HFEFF Then
-                        h = Mid$(h, 2)
-                    End If
-                End If
+                Dim h As String: h = NormalizeCsvHeaderKeyV1(CStr(hdr(i)))
                 If h = "ticker" Then idxTicker = i
                 If h = "code" And idxTicker = -1 Then idxTicker = i
 
@@ -3635,7 +3724,18 @@ ImportFinalize:
     If f <> 0 Then Close #f
     On Error GoTo 0
 
-    LogVbaEvent "ImportCandidatesV2", "done imported=" & CStr(importedCount) & " path=" & path
+    Dim candSize As String: candSize = ""
+    Dim candMtime As String: candMtime = ""
+    On Error Resume Next
+    candSize = CStr(FileLen(path))
+    candMtime = CStr(FileDateTime(path))
+    On Error GoTo 0
+
+    LogVbaEvent "ImportCandidatesV2", "done imported=" & CStr(importedCount) & " approxRecords=" & CStr(approxRecords) & " parsedRecords=" & CStr(parsedRecords) & " nonEmptyLines=" & CStr(nonEmptyLines) & " size=" & candSize & " mtime=" & candMtime & " path=" & path
+
+    If importedCount > 0 And importedCount < IMPORT_CANDIDATES_MIN_ROWS Then
+        LogVbaEvent "ImportCandidatesV2", "warn partial_import imported=" & CStr(importedCount) & " approxRecords=" & CStr(approxRecords) & " parsedRecords=" & CStr(parsedRecords) & " nonEmptyLines=" & CStr(nonEmptyLines) & " path=" & path
+    End If
 
     Dim clearRow As Long
 
@@ -3643,8 +3743,10 @@ ImportFinalize:
     ApplyDynamicSignalsV2
     On Error GoTo 0
 
-    ' If we imported nothing, do not clear the sheet (keeps last known candidates visible).
-    If importedCount > 0 And maxExisting >= DASH2_DATA_START And r <= maxExisting Then
+    ' Clear the remaining old rows only when the import looks healthy.
+    ' If we imported nothing (or only a tiny number of rows due to partial parse), do not clear the sheet
+    ' so the last known candidates remain visible.
+    If importedCount >= IMPORT_CANDIDATES_MIN_ROWS And maxExisting >= DASH2_DATA_START And r <= maxExisting Then
 
         For clearRow = r To maxExisting
 
