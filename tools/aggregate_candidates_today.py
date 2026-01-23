@@ -802,6 +802,40 @@ def main() -> None:
                 )
                 return
 
+            # If we couldn't restore a safe snapshot, do NOT overwrite the output with a tiny set.
+            # Keeping the current file (even if small) is safer than writing an unreliable partial
+            # result that can confuse Excel Import and make recovery harder.
+            diag["result"] = {
+                "reason": "aggregated_rows_below_threshold",
+                "aggregated_rows": int(len(combined)),
+                "existing_rows": existing_rows,
+                "action": "keep_previous_no_backup",
+                "restored_from": None,
+            }
+            diag["warning"] = (
+                "restore_from_backups_failed; keeping existing candidates_nextday.csv to avoid overwriting with a tiny set"
+            )
+            diag["source_after_fallback"] = source_label
+            diag["source_files_after_fallback"] = [str(p) for p in used_paths]
+            _write_diag(diag_path, diag)
+            print(
+                json.dumps(
+                    {
+                        "written": str(out),
+                        "rows": existing_rows,
+                        "kept_previous": True,
+                        "message": (
+                            f"Aggregated rows below threshold ({len(combined)}<{fallback_min_rows}); "
+                            "no last_good/backup snapshot could be restored, so keeping existing candidates_nextday.csv"
+                        ),
+                        "source": source_label,
+                        "source_files": [str(p) for p in used_paths],
+                    },
+                    ensure_ascii=False,
+                )
+            )
+            return
+
         if existing_rows >= fallback_min_rows:
             diag["result"] = {
                 "reason": "aggregated_rows_below_threshold",
