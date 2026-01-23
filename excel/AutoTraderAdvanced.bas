@@ -3425,6 +3425,15 @@ Public Sub ImportCandidatesV2()
     raw = Replace$(raw, vbCr, vbLf)
     lines = SplitCsvRowsRespectQuotesV1(raw)
 
+    ' If the primary candidates file looks broken (too few rows), try the last-good snapshot.
+    ' This avoids the "only 1 ticker imported" incident when the CSV is transiently incomplete.
+    Dim lastGoodPath As String
+    lastGoodPath = Replace$(path, ".csv", "_last_good.csv")
+    If Len(Dir$(lastGoodPath)) = 0 Then
+        lastGoodPath = ThisWorkbook.path & "\output\excel\candidates_nextday_last_good.csv"
+    End If
+    Dim usedLastGood As Boolean: usedLastGood = False
+
     ' Guardrail: avoid wiping the dashboard when candidates file is unexpectedly tiny
     ' (e.g. upstream overwrite / partial write). Keep the existing rows in that case.
     Dim nonEmptyLines As Long: nonEmptyLines = 0
@@ -3435,9 +3444,34 @@ Public Sub ImportCandidatesV2()
 
     Dim approxRecords As Long: approxRecords = nonEmptyLines - 1 ' header line
     If approxRecords < IMPORT_CANDIDATES_MIN_ROWS Then
-        LogVbaEvent "ImportCandidatesV2", "candidate_csv_too_small records=" & CStr(approxRecords) & " nonEmptyLines=" & CStr(nonEmptyLines) & " path=" & path & " (skip import to avoid wiping dashboard)"
-        If wasProtected Then ProtectDashboardV2 ws
-        Exit Sub
+        Dim tryRaw As String: tryRaw = ""
+        If Len(Dir$(lastGoodPath)) > 0 Then
+            tryRaw = BridgeReadAllTextUtf8V1(lastGoodPath)
+            tryRaw = Replace$(tryRaw, vbCrLf, vbLf)
+            tryRaw = Replace$(tryRaw, vbCr, vbLf)
+            Dim tryLines As Variant: tryLines = SplitCsvRowsRespectQuotesV1(tryRaw)
+            Dim tryNonEmpty As Long: tryNonEmpty = 0
+            Dim tli As Long
+            For tli = LBound(tryLines) To UBound(tryLines)
+                If Len(Trim$(CStr(tryLines(tli)))) > 0 Then tryNonEmpty = tryNonEmpty + 1
+            Next tli
+            Dim tryApprox As Long: tryApprox = tryNonEmpty - 1
+            If tryApprox >= IMPORT_CANDIDATES_MIN_ROWS Then
+                raw = tryRaw
+                lines = tryLines
+                nonEmptyLines = tryNonEmpty
+                approxRecords = tryApprox
+                path = lastGoodPath
+                usedLastGood = True
+                LogVbaEvent "ImportCandidatesV2", "fallback_last_good_used approxRecords=" & CStr(approxRecords) & " path=" & path
+            End If
+        End If
+
+        If approxRecords < IMPORT_CANDIDATES_MIN_ROWS Then
+            LogVbaEvent "ImportCandidatesV2", "candidate_csv_too_small records=" & CStr(approxRecords) & " nonEmptyLines=" & CStr(nonEmptyLines) & " path=" & path & " (skip import to avoid wiping dashboard)"
+            If wasProtected Then ProtectDashboardV2 ws
+            Exit Sub
+        End If
     End If
 
     ' Second guardrail: ensure we can parse enough tickers before touching the sheet.
@@ -3476,9 +3510,68 @@ NextCheckLine:
     Next checkLine
 
     If parsedRecords < IMPORT_CANDIDATES_MIN_ROWS Then
-        LogVbaEvent "ImportCandidatesV2", "candidate_csv_parse_too_small approx=" & CStr(approxRecords) & " parsed=" & CStr(parsedRecords) & " path=" & path & " (skip import to avoid wiping dashboard)"
-        If wasProtected Then ProtectDashboardV2 ws
-        Exit Sub
+        ' If the parse unexpectedly yields too few tickers, try last_good once.
+        If (Not usedLastGood) And Len(Dir$(lastGoodPath)) > 0 Then
+            Dim tryRaw2 As String: tryRaw2 = BridgeReadAllTextUtf8V1(lastGoodPath)
+            tryRaw2 = Replace$(tryRaw2, vbCrLf, vbLf)
+            tryRaw2 = Replace$(tryRaw2, vbCr, vbLf)
+            Dim tryLines2 As Variant: tryLines2 = SplitCsvRowsRespectQuotesV1(tryRaw2)
+
+            Dim tryNonEmpty2 As Long: tryNonEmpty2 = 0
+            Dim tli2 As Long
+            For tli2 = LBound(tryLines2) To UBound(tryLines2)
+                If Len(Trim$(CStr(tryLines2(tli2)))) > 0 Then tryNonEmpty2 = tryNonEmpty2 + 1
+            Next tli2
+            Dim tryApprox2 As Long: tryApprox2 = tryNonEmpty2 - 1
+
+            If tryApprox2 >= IMPORT_CANDIDATES_MIN_ROWS Then
+                raw = tryRaw2
+                lines = tryLines2
+                nonEmptyLines = tryNonEmpty2
+                approxRecords = tryApprox2
+                path = lastGoodPath
+                usedLastGood = True
+
+                checkFirst = True
+                checkIdxTicker = -1
+                parsedRecords = 0
+                For Each checkLine In lines
+                    Dim checkText2 As String
+                    checkText2 = Trim$(CStr(checkLine))
+                    If Len(checkText2) = 0 Then GoTo NextCheckLine2
+
+                    If checkFirst Then
+                        checkHdr = ParseCsvLine(checkText2)
+                        Dim hi2 As Long
+                        For hi2 = LBound(checkHdr) To UBound(checkHdr)
+                            Dim hk2 As String: hk2 = NormalizeCsvHeaderKeyV1(CStr(checkHdr(hi2)))
+                            If hk2 = "ticker" Then checkIdxTicker = hi2
+                            If hk2 = "code" And checkIdxTicker = -1 Then checkIdxTicker = hi2
+                        Next hi2
+                        checkFirst = False
+                    Else
+                        Dim checkParts2 As Variant: checkParts2 = ParseCsvLine(checkText2)
+                        If checkIdxTicker >= 0 And checkIdxTicker <= UBound(checkParts2) Then
+                            Dim checkTkr2 As String: checkTkr2 = Trim$(checkParts2(checkIdxTicker))
+                            If Len(checkTkr2) > 1 And Left$(checkTkr2, 1) = """" And Right$(checkTkr2, 1) = """" Then
+                                checkTkr2 = Mid$(checkTkr2, 2, Len(checkTkr2) - 2)
+                            End If
+                            checkTkr2 = Replace$(checkTkr2, """", "")
+                            If Len(checkTkr2) > 0 Then parsedRecords = parsedRecords + 1
+                        End If
+                    End If
+NextCheckLine2:
+                Next checkLine
+
+                LogVbaEvent "ImportCandidatesV2", "fallback_last_good_used_after_parse approx=" & CStr(approxRecords) & " parsed=" & CStr(parsedRecords) & " path=" & path
+            End If
+        End If
+
+        If parsedRecords < IMPORT_CANDIDATES_MIN_ROWS Then
+            LogVbaEvent "ImportCandidatesV2", "candidate_csv_parse_too_small approx=" & CStr(approxRecords) & " parsed=" & CStr(parsedRecords) & " path=" & path & " (skip import to avoid wiping dashboard)"
+            If wasProtected Then ProtectDashboardV2 ws
+            Exit Sub
+        End If
     End If
 
     Dim selCol As Long: selCol = FindColumn(ws, DASH2_HEADER_ROW, "Selected")

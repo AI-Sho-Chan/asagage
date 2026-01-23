@@ -5,12 +5,21 @@
 
 $ErrorActionPreference = 'Stop'
 $repo = 'C:/AI/asagake'
-$python = 'C:/Python313/python.exe'
+$python = ''
 $logPath = Join-Path $repo 'logs/run_nightly_candidates.log'
+
+$candidateVenv = Join-Path $repo ".venv\\Scripts\\python.exe"
+if (Test-Path $candidateVenv) {
+    $python = $candidateVenv
+} else {
+    $python = 'C:/Python313/python.exe'
+}
+
+$now = Get-Date
+"[$($now.ToString('s'))] nightly_env whoami=$([System.Security.Principal.WindowsIdentity]::GetCurrent().Name) python=$python repo=$repo" | Out-File -FilePath $logPath -Append -Encoding utf8
 
 $DisableLocalWeekend = (Test-Path (Join-Path $repo "state\disable_local_weekend.txt"))
 
-$now = Get-Date
 $isFriday = ($now.DayOfWeek -eq 'Friday')
 
 if (-not $Smoke -and -not $DisableLocalWeekend -and $isFriday) {
@@ -98,7 +107,9 @@ try {
     try {
         $aggScript = Join-Path $repo 'tools/aggregate_candidates_today.py'
         $aggOut = Join-Path $repo 'output/excel/candidates_nextday.csv'
-        $aggPayload = & $python $aggScript --output $aggOut 2>&1
+        # Avoid overwriting candidates_nextday.csv with a tiny/partial set.
+        # Keep previous "last_good" unless we can produce a reasonable number of rows.
+        $aggPayload = & $python $aggScript --output $aggOut --fallback-min-rows 10 2>&1
         "[$([DateTime]::Now.ToString('s'))] aggregate_candidates_today exit 0" | Out-File -FilePath $logPath -Append -Encoding utf8
         if ($aggPayload) {
             "[$([DateTime]::Now.ToString('s'))] aggregate_candidates_today payload $aggPayload" | Out-File -FilePath $logPath -Append -Encoding utf8

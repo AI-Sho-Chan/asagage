@@ -17,7 +17,7 @@ Const BASE_DIR = "C:\AI\asagake"
 Const LOG_DIR = "C:\AI\asagake\logs"
 Const WORKBOOK_PATH = "C:\AI\asagake\ASAGAKE.xlsm"
 Const LOCK_PATH = "C:\AI\asagake\logs\morning_task.lock"
-Const MIN_CANDIDATE_ROWS = 5
+Const MIN_CANDIDATE_ROWS = 10
 
 Dim fso: Set fso = CreateObject("Scripting.FileSystemObject")
 If Not fso.FolderExists(LOG_DIR) Then
@@ -39,6 +39,20 @@ On Error Resume Next
 
 LogLine logPath, logLatest, "start: workbook=" & WORKBOOK_PATH
 
+' Safety guard:
+' This script MUST NOT run under SYSTEM/NT AUTHORITY.
+' If it does, Excel may launch in a non-interactive session and lock ASAGAKE.xlsm without showing a window.
+Dim guardShell: Set guardShell = CreateObject("WScript.Shell")
+Dim envUser: envUser = UCase$(Trim$(guardShell.ExpandEnvironmentStrings("%USERNAME%")))
+Dim envDomain: envDomain = UCase$(Trim$(guardShell.ExpandEnvironmentStrings("%USERDOMAIN%")))
+Dim envSession: envSession = UCase$(Trim$(guardShell.ExpandEnvironmentStrings("%SESSIONNAME%")))
+If envDomain = "NT AUTHORITY" Or envUser = "SYSTEM" Or envSession = "SERVICES" Then
+    LogLine logPath, logLatest, "fatal: refuse to run in non-interactive context (USERDOMAIN=" & envDomain & " USERNAME=" & envUser & " SESSIONNAME=" & envSession & ")"
+    LogLine logPath, logLatest, "action: fix Task Scheduler to run as logged-in user (InteractiveToken) only."
+    ReleaseLock LOCK_PATH
+    WScript.Quit 4
+End If
+
 If Not fso.FileExists(WORKBOOK_PATH) Then
     LogLine logPath, logLatest, "error: workbook not found"
     ReleaseLock LOCK_PATH
@@ -52,8 +66,16 @@ If Err.Number <> 0 Then
     Err.Clear
 End If
 Dim candApprox: candApprox = CandidateApproxRecords(BASE_DIR & "\output\excel\candidates_nextday.csv")
+Dim candPath: candPath = BASE_DIR & "\output\excel\candidates_nextday.csv"
+Dim candLastGoodPath: candLastGoodPath = BASE_DIR & "\output\excel\candidates_nextday_last_good.csv"
 If candApprox < MIN_CANDIDATE_ROWS Then
-    LogLine logPath, logLatest, "warn: candidates_nextday too small (records~=" & CStr(candApprox) & "); skip ImportCandidatesV2 and StartDemoV2"
+    LogLine logPath, logLatest, "warn: candidates_nextday too small (records~=" & CStr(candApprox) & "); attempt restore from last_good"
+    If RestoreFileIfExists(candLastGoodPath, candPath, logPath, logLatest) Then
+        candApprox = CandidateApproxRecords(candPath)
+        LogLine logPath, logLatest, "info: restored candidates_nextday from last_good; records~=" & CStr(candApprox)
+    Else
+        LogLine logPath, logLatest, "warn: restore candidates_nextday failed; skip ImportCandidatesV2 and StartDemoV2"
+    End If
 End If
 
 Dim shell: Set shell = CreateObject("WScript.Shell")
@@ -159,6 +181,29 @@ WScript.Quit 0
 
 ' ===== helpers =====
 
+Function RestoreFileIfExists(ByVal srcPath, ByVal dstPath, ByVal logPath, ByVal logLatest)
+    RestoreFileIfExists = False
+    On Error Resume Next
+    If Not fso.FileExists(srcPath) Then Exit Function
+
+    ' Create destination folder if needed (should already exist).
+    Dim parentDir
+    parentDir = fso.GetParentFolderName(dstPath)
+    If Len(parentDir) > 0 And Not fso.FolderExists(parentDir) Then
+        fso.CreateFolder parentDir
+    End If
+
+    ' Copy overwrite.
+    fso.CopyFile srcPath, dstPath, True
+    If Err.Number <> 0 Then
+        LogLine logPath, logLatest, "warn: RestoreFileIfExists copy failed: " & CStr(Err.Number) & " " & Err.Description
+        Err.Clear
+        Exit Function
+    End If
+
+    RestoreFileIfExists = True
+End Function
+
 Function NowStamp()
     Dim d: d = Now
     NowStamp = Year(d) & Right("0" & Month(d), 2) & Right("0" & Day(d), 2) & "_" & _
@@ -238,19 +283,23 @@ Sub LogCandidateSummary(ByVal pathA, ByVal pathB, ByVal csvPath)
 
     Dim raw: raw = ReadAllTextUtf8BestEffort(csvPath)
 
-    raw = Replace(raw, vbCrLf, vbLf)
-    raw = Replace(raw, vbCr, vbLf)
-    Dim lines: lines = Split(raw, vbLf)
-    Dim n: n = UBound(lines) + 1
-    Dim records: records = n - 1
-    If records < 0 Then records = 0
-
     Dim sizeBytes: sizeBytes = 0
     Dim mtime: mtime = ""
     On Error Resume Next
     sizeBytes = fso.GetFile(csvPath).Size
     mtime = CStr(fso.GetFile(csvPath).DateLastModified)
     On Error GoTo 0
+
+    If Len(raw) = 0 And sizeBytes > 0 Then
+        LogLine pathA, pathB, "warn: candidates_nextday read returned empty (transient lock?) size=" & CStr(sizeBytes) & " mtime=" & mtime
+    End If
+
+    raw = Replace(raw, vbCrLf, vbLf)
+    raw = Replace(raw, vbCr, vbLf)
+    Dim lines: lines = Split(raw, vbLf)
+    Dim n: n = UBound(lines) + 1
+    Dim records: records = n - 1
+    If records < 0 Then records = 0
 
     LogLine pathA, pathB, "candidates_nextday: lines=" & CStr(n) & " records~=" & CStr(records) & " size=" & CStr(sizeBytes) & " mtime=" & mtime & " (" & csvPath & ")"
 End Sub
@@ -261,6 +310,17 @@ Function CandidateApproxRecords(ByVal csvPath)
     If Not fso.FileExists(csvPath) Then Exit Function
 
     Dim raw: raw = ReadAllTextUtf8BestEffort(csvPath)
+    If Len(raw) = 0 Then
+        ' If the read fails transiently but the file is clearly non-empty, do not treat it as 0 records.
+        Dim sizeBytes: sizeBytes = 0
+        On Error Resume Next
+        sizeBytes = fso.GetFile(csvPath).Size
+        On Error GoTo 0
+        If sizeBytes > 1024 Then
+            CandidateApproxRecords = MIN_CANDIDATE_ROWS
+            Exit Function
+        End If
+    End If
     raw = Replace(raw, vbCrLf, vbLf)
     raw = Replace(raw, vbCr, vbLf)
     Dim lines: lines = Split(raw, vbLf)
@@ -276,18 +336,36 @@ Function ReadAllTextUtf8BestEffort(ByVal path)
     ' Prefer ADODB.Stream (proper UTF-8 + BOM handling).
     Dim stm: Set stm = CreateObject("ADODB.Stream")
     If Err.Number = 0 And Not stm Is Nothing Then
+        Err.Clear
         stm.Type = 2 ' text
         stm.Charset = "utf-8"
         stm.Open
-        stm.LoadFromFile path
-        ReadAllTextUtf8BestEffort = stm.ReadText(-1)
+        Dim i
+        For i = 1 To 3
+            Err.Clear
+            stm.LoadFromFile path
+            If Err.Number = 0 Then Exit For
+            WScript.Sleep 150
+        Next
+        If Err.Number = 0 Then
+            ReadAllTextUtf8BestEffort = stm.ReadText(-1)
+            stm.Close
+            Exit Function
+        End If
+        ' If LoadFromFile failed (e.g. transient lock), fall back instead of returning empty.
+        Err.Clear
         stm.Close
-        Exit Function
     End If
     Err.Clear
 
     ' Fallback: FSO read (may mis-detect encoding; still better than failing).
     Dim f: Set f = fso.OpenTextFile(path, 1, False, 0) ' ForReading, ANSI
+    If Err.Number <> 0 Then
+        Err.Clear
+        ReadAllTextUtf8BestEffort = ""
+        Exit Function
+    End If
+
     If Not f.AtEndOfStream Then
         ReadAllTextUtf8BestEffort = f.ReadAll
     Else

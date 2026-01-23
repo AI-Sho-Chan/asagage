@@ -20,7 +20,11 @@ from asagake_core.candidates import append_candidate_metadata, make_candidate_me
 
 ROOT = Path("output/excel")
 LOG_DIR = Path("logs")
-FALLBACK_MIN_ROWS_DEFAULT = 5
+# Guardrail for production stability:
+# When aggregation would shrink the dashboard input to a tiny set, keep the previous
+# "last good" set instead. This avoids accidental wipes when upstream outputs are
+# missing/partial (e.g., task failures, transient file locks).
+FALLBACK_MIN_ROWS_DEFAULT = 10
 
 
 @dataclass
