@@ -756,11 +756,48 @@ def main() -> None:
             diag["fallback_b_reason"] = "aggregated_rows_below_threshold"
 
     # Guardrail: if we would shrink candidates_nextday.csv to an unusually small set,
-    # keep the previous file (and/or restore from backups) instead of overwriting.
-    # This prevents "Import Candidates shows only 1 ticker" incidents when a transient
-    # filter/parse issue yields too few rows.
+    # keep the previous file and/or restore from a last-good snapshot instead of overwriting.
+    #
+    # Why: when combined candidates briefly drop to 0-1 rows (e.g. transient filter/parse issue),
+    # Excel's "Import Candidates" appears to load only 1 ticker/plan (or none). Worse, once the
+    # output file shrinks below the threshold, subsequent runs may keep overwriting the tiny file,
+    # because the "keep previous" condition no longer applies. This block prevents that.
     if combined is not None and not combined.empty and len(combined) < fallback_min_rows:
         existing_rows = _read_nonempty_row_count(out)
+        restored_from: Optional[Path] = None
+
+        if existing_rows < fallback_min_rows:
+            restored_from = _restore_from_backups(out, fallback_min_rows)
+            if restored_from is not None:
+                existing_rows = _read_nonempty_row_count(out)
+                diag["result"] = {
+                    "reason": "aggregated_rows_below_threshold",
+                    "aggregated_rows": int(len(combined)),
+                    "existing_rows": existing_rows,
+                    "action": "restore_backup",
+                    "restored_from": str(restored_from),
+                }
+                diag["source_after_fallback"] = source_label
+                diag["source_files_after_fallback"] = [str(p) for p in used_paths]
+                _write_diag(diag_path, diag)
+                print(
+                    json.dumps(
+                        {
+                            "written": str(out),
+                            "rows": existing_rows,
+                            "kept_previous": False,
+                            "restored_from": str(restored_from),
+                            "message": (
+                                f"Aggregated rows below threshold ({len(combined)}<{fallback_min_rows}); restored candidates_nextday.csv from backup"
+                            ),
+                            "source": source_label,
+                            "source_files": [str(p) for p in used_paths],
+                        },
+                        ensure_ascii=False,
+                    )
+                )
+                return
+
         if existing_rows >= fallback_min_rows:
             diag["result"] = {
                 "reason": "aggregated_rows_below_threshold",
