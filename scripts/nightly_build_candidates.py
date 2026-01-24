@@ -176,20 +176,40 @@ def aggregate_candidates(
         try:
             weekly_df = pd.read_csv(weekly_base)
             if "Ticker" in weekly_df.columns:
-                before = len(df)
-                df = weekly_df.merge(df, on="Ticker", how="left", suffixes=("_weekly", ""))
-                for col in list(df.columns):
-                    if col.endswith("_weekly"):
-                        base_col = col[:-7]
-                        if base_col in df.columns:
-                            df[base_col] = df[base_col].where(df[base_col].notna(), df[col])
-                            df.drop(columns=[col], inplace=True)
-                df = df[df["Ticker"].notna()]
-                summary["message"] = f"weekly base {len(df)}/{before}"
+                weekly_df = weekly_df[weekly_df["Ticker"].notna()].copy()
+                weekly_df["Ticker"] = weekly_df["Ticker"].astype(str).str.strip()
+                weekly_df = weekly_df[weekly_df["Ticker"] != ""]
+                weekly_tickers = int(weekly_df["Ticker"].nunique())
+
+                # Safety: avoid collapsing daily candidates to 0/1 ticker when the weekly file
+                # is empty (header-only) or too small due to strict filters.
+                weekly_min_tickers = 10
+                if weekly_tickers >= weekly_min_tickers:
+                    before = len(df)
+                    df = weekly_df.merge(df, on="Ticker", how="left", suffixes=("_weekly", ""))
+                    for col in list(df.columns):
+                        if col.endswith("_weekly"):
+                            base_col = col[:-7]
+                            if base_col in df.columns:
+                                df[base_col] = df[base_col].where(df[base_col].notna(), df[col])
+                                df.drop(columns=[col], inplace=True)
+                    df = df[df["Ticker"].notna()]
+                    summary["message"] = f"weekly base applied {len(df)}/{before} (weekly={weekly_tickers})"
+                else:
+                    summary["message"] = f"weekly base skipped (weekly={weekly_tickers} < {weekly_min_tickers})"
         except Exception as exc:  # pragma: no cover
             summary["message"] = f"weekly merge failed: {exc}"
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    if df.empty:
+        # Do not overwrite candidates_nextday.csv with an empty file.
+        # The caller will run a fallback aggregator if needed.
+        summary["total_candidates"] = "0"
+        summary["unique_tickers"] = "0"
+        summary.setdefault("message", "no candidates after filters")
+        summary["weekly_synced"] = "0"
+        return summary
+
     if "_score" in df.columns:
         df = df.drop(columns=["_score"])
     # Defensive: we've seen rare runs where `run_type` was missing at runtime,

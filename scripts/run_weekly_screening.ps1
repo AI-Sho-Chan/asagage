@@ -1,4 +1,4 @@
-param(
+ï»¿param(
   [string]$DateTag = (Get-Date -Format 'yyyyMMdd'),
   [int]$TopUniverse = 200,
   [int]$TargetTop = 50
@@ -73,10 +73,15 @@ $args = @(
   if ($aggJson -and $aggJson.written) {
     $written = [System.IO.Path]::GetFullPath($aggJson.written)
     $latest = Join-Path $Repo 'output/excel/weekly_candidates_latest.csv'
-    Copy-Item $written $latest -Force
-    # é€±æœ«çµæœã‚’ç›´ã¡ã«ç¿Œå–¶æ¥­æ—¥å€™è£œã«åæ˜ 
-    Copy-Item $written (Join-Path $Repo 'output/excel/candidates_nextday.csv') -Force
-    Write-Status 'aggregate' "weekly candidates: $($aggJson.rows) rows -> $written"
+    $rows = 0
+    try { $rows = [int]$aggJson.rows } catch { $rows = 0 }
+
+    if ($rows -gt 0) {
+      Copy-Item $written $latest -Force
+      Write-Status 'aggregate' "weekly candidates: $rows rows -> $written"
+    } else {
+      Write-Status 'aggregate' "weekly candidates: 0 rows (skip overwrite) -> $written"
+    }
   }
 
   # Pre-fetch minute cache for listed tickers to ensure 'ts' exists
@@ -98,7 +103,7 @@ $args = @(
   & $Python $coeffArgs
   if ($LASTEXITCODE -ne 0) { throw "dashboard coeff calc failed ($LASTEXITCODE)" }
 
-  # ¬‰Ê‚ÉŠî‚Ã‚­ƒ‹[ƒ‹©“®XViAM1000 SELL ‚Ì©“®Šg’£‰Â”Ûj
+  # æˆæœã«åŸºã¥ããƒ«ãƒ¼ãƒ«è‡ªå‹•æ›´æ–°ï¼ˆAM1000 SELL ã®è‡ªå‹•æ‹¡å¼µå¯å¦ï¼‰
   try {
     & $Python @('tools/auto_rules_from_results.py','--summary','analysis/session_mode_summary.csv','--rules','state/strategy_rules.ini') | Out-Null
     Write-Status 'rules' 'auto_rules_from_results completed'
@@ -132,7 +137,8 @@ catch {
 try {
   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\register_boardlogger_task.ps1 | Out-Null
   Write-Status 'boardlogger' 'registered'
-} catch { Write-Status 'boardlogger_error' .Exception.Message }
+} catch { Write-Status 'boardlogger_error' $_.Exception.Message }
+
 
 
 
