@@ -21,9 +21,13 @@ if [ "${NOW_DOW}" != "5" ]; then
   exit 0
 fi
 
-# Only trigger in the "right after market close" window.
+# Only trigger after the normal 16:30 JST cron window.
 # If the VM starts too early, let the normal 16:30 cron handle it.
-if [ "${NOW_HHMM}" -lt "1630" ] || [ "${NOW_HHMM}" -gt "2000" ]; then
+#
+# We allow the late-start window to extend through the end of Friday.
+# This covers cases where the zone is temporarily resource-exhausted and
+# the VM can only start later in the evening.
+if [ "${NOW_HHMM}" -lt "1630" ] || [ "${NOW_HHMM}" -gt "2359" ]; then
   exit 0
 fi
 

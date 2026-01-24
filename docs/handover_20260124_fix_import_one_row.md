@@ -1,33 +1,28 @@
-# Handover 2026-01-24 (fix: Import Candidates が1件になる)
+# Handover 2026-01-24（修正：Import Candidates が 1 件になる）
 
-## 背景
-- ASAGAKE の `Import Candidates` 実行で「1銘柄/1プランしか取り込まれない」事象が散発。
-- `logs/vba_events.log` には `ImportCandidatesV2 done imported=1` が記録されていた。
-- `output/excel/candidates_nextday.csv.backup_*` を確認すると、実際に **rows=1** や **ヘッダのみ（rows=0相当）** のバックアップが存在。
+## 何が起きていたか
+- ASAGAKE の `Import Candidates` を押すと、候補が 1 銘柄/1プランしか入らないことがあった。
+- `logs/vba_events.log` に `ImportCandidatesV2 done imported=1` が残っていた。
 
-結論として、Import 側の不具合というより **Import 元の `candidates_nextday.csv` が極端に小さい内容で上書きされる日がある** のが主因。
+## 原因の候補（複数パターン）
+1) `output/excel/candidates_nextday.csv` が **小さすぎる**（生成途中/上書き途中/0行に近い）
+2) Import 処理が **途中で止まっている**（エラーが握りつぶされている）
+3) 朝の自動処理（タスクスケジューラ）で Excel を見えない形で起動していて、ファイル更新やロックが絡んでいる
 
-## 対応（再発防止）
-### 1) nightly 側の上書きガード強化
-- `scripts/run_nightly_candidates.ps1` で `tools/aggregate_candidates_today.py` 呼び出し時に `--fallback-min-rows 10` を付与。
-- `tools/aggregate_candidates_today.py` のデフォルト `FALLBACK_MIN_ROWS_DEFAULT` を **5 → 10** に引き上げ。
-  - 上流の出力欠損/部分書き込み等で候補が「小さすぎる」場合に、`candidates_nextday_last_good.csv` を維持して事故を避ける目的。
+## 対応（VBA側）
+- `ImportCandidatesV2` に「小さすぎるCSVを読み込んだ時に、ダッシュボードを空にしない」保護を入れる。
+- CSVが小さい場合は、最後に成功した候補（`candidates_nextday_last_good.csv`）へフォールバックして Import を続行する。
+- Import 終了時に `approxRecords / parsedRecords / nonEmptyLines / size / mtime` を `vba_events.log` に必ず出す（切り分け用）。
 
-### 2) Excel Import 側の last_good フォールバック追加
-- `excel/AutoTraderAdvanced.bas` の `ImportCandidatesV2` にて、
-  - `candidates_nextday.csv` が小さすぎる場合、`candidates_nextday_last_good.csv` を読み直して Import を継続。
-  - last_good でも不足なら Import を中断（既存のダッシュボードを消さない）。
+## 対応（運用側：切り分け手順）
+1) Import 直後に `logs/vba_events.log` を開く
+2) `ImportCandidatesV2 done ...` の行を確認し、
+   - imported が 1 なのか
+   - parsedRecords が 1 なのか（CSVが小さい/壊れている）
+   - parsedRecords は多いのに imported が 1 なのか（途中終了の疑い）
+   を判断する
 
-### 3) 朝8:50タスク側の安全策
-- `Step1_Morning.vbs` の最小行数を **5 → 10** に引き上げ。
-- `candidates_nextday.csv` が小さすぎる場合、`candidates_nextday_last_good.csv` から復元してから Import を試みる。
-- さらに重要な安全策として、**SYSTEM/非対話セッションでは実行を拒否**（見えないExcelが起動してファイルをロックする事故を防ぐ）。
-
-## 期待する効果
-- 「nightly が失敗/部分出力 → candidates_nextday が 0〜1行に縮む → 翌朝 Import が 1件」事故の頻度を大きく減らす。
-- 朝タスクでExcelが見えないのにASAGAKEだけロックする事故（他ユーザー使用中）を減らす。
-
-## 次の確認（運用）
-- `output/excel/candidates_nextday.csv` の行数・更新時刻を daily で確認。
-- `logs/vba_events.log` の `ImportCandidatesV2` が `fallback_last_good_used` を出していないかを確認（出ていれば “元CSVが小さかった日” のサイン）。
+## 再発防止
+- `tools/aggregate_candidates_today.py` が `candidates_nextday.csv` を生成する際、生成失敗で 0〜1行になりそうなら「前回のlast_goodを残す」運用にする。
+- 朝の自動起動（タスクスケジューラ）が SYSTEM でExcelを立ち上げている場合、ユーザーからは見えず、かつファイルロックになるので要注意（ユーザー実行に寄せる）。
 
