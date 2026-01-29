@@ -2570,6 +2570,8 @@ End Sub
 Private Sub BridgeTickV1()
     On Error GoTo Fail
     If Not IsDemoMode() Then Exit Sub
+    ' Prevent DEMO bridge from emitting snapshots / consuming commands outside JP cash session.
+    If Not IsJpxCashSessionNowV2(Now) Then Exit Sub
 
     ' Re-initialize per trading day so cmd_seq/event_seq do not get stuck from previous days.
     If gBridgeInitialized Then
@@ -3956,15 +3958,40 @@ Public Sub RefreshTrendsV2()
     Dim prevStatus As Variant
     prevStatus = Application.StatusBar
 
+    Dim nowTime As Date
+    nowTime = Now
+
+    ' DEMO: Stop auto-tick shortly after the cash session ends so we do not
+    ' keep generating synthetic demo logs overnight (DEMO_EOD_FLAT spam).
+    If IsDemoMode() Then
+        Dim stopTimeRaw As String
+        stopTimeRaw = GetStrategyRule("demo_stop_time", "15:35")
+        Dim stopTime As Date
+        stopTime = Date + ToTimeOfDaySafe(stopTimeRaw, TimeSerial(15, 35, 0))
+        If nowTime >= stopTime Then
+            StopAutoTickV2
+            UpdateStatusV2 "IDLE"
+            LogVbaEvent "RefreshTrendsV2", "DEMO stopped at demo_stop_time=" & stopTimeRaw
+            Application.StatusBar = prevStatus
+            Exit Sub
+        End If
+    End If
+
     Application.StatusBar = "方向フィルタを再計算しています..."
 
     On Error Resume Next
     UpdateAllDriverTrends ws
     ws.Calculate
     ApplyDynamicSignalsV2
-    PreplaceOrdersV2
-    If IsDemoMode() Then MarkPendingPreplaceAsOrderedDemo
-    If IsDemoMode() Then ProcessDemoOrdersV2 ws
+    ' DEMO: Only place/update/execute demo orders during the JPX cash session.
+    ' (Lunch break and after-hours are excluded to avoid stale-quote artifacts.)
+    Dim inCashSession As Boolean
+    inCashSession = IsJpxCashSessionNowV2(Now)
+    If (Not IsDemoMode()) Or inCashSession Then
+        PreplaceOrdersV2
+        If IsDemoMode() Then MarkPendingPreplaceAsOrderedDemo
+        If IsDemoMode() Then ProcessDemoOrdersV2 ws
+    End If
     UpdateTrendIndicators ws
     On Error GoTo 0
 
@@ -3985,6 +4012,34 @@ Private Function IsDemoMode() As Boolean
         IsDemoMode = False
     End If
     On Error GoTo 0
+End Function
+
+' JPX cash session (JST):
+' - Morning: 09:00–11:30
+' - Afternoon: 12:30–15:30
+Private Function IsJpxCashSessionNowV2(ByVal t As Date) As Boolean
+    On Error GoTo Fail
+
+    Dim wd As Long
+    wd = Weekday(t, vbMonday) ' Mon=1 ... Sun=7
+    If wd > 5 Then
+        IsJpxCashSessionNowV2 = False
+        Exit Function
+    End If
+
+    Dim tod As Date
+    tod = TimeValue(t)
+
+    Dim amStart As Date: amStart = TimeSerial(9, 0, 0)
+    Dim amEnd As Date: amEnd = TimeSerial(11, 30, 0)
+    Dim pmStart As Date: pmStart = TimeSerial(12, 30, 0)
+    Dim pmEnd As Date: pmEnd = TimeSerial(15, 30, 0)
+
+    IsJpxCashSessionNowV2 = ((tod >= amStart And tod <= amEnd) Or (tod >= pmStart And tod <= pmEnd))
+    Exit Function
+
+Fail:
+    IsJpxCashSessionNowV2 = False
 End Function
 
 Private Sub MarkPendingPreplaceAsOrderedDemo()
