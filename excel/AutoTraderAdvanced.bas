@@ -935,10 +935,16 @@ Private Function CanFireAlert(ByVal key As String) As Boolean
     CanFireAlert = True
 End Function
 
+Private Sub SafeSetStatusBarV2(ByVal v As Variant)
+    On Error Resume Next
+    Application.StatusBar = v
+    On Error GoTo 0
+End Sub
+
 Private Sub RaiseThresholdAlert(ByVal ws As Worksheet, ByVal rowIndex As Long, ByVal ticker As String, ByVal side As String, ByVal ratio As Double)
     Dim message As String
     message = "THRESHOLD " & ticker & " " & side & " ratio " & Format$(ratio, "0.00")
-    Application.StatusBar = message
+    SafeSetStatusBarV2 message
     Dim entryStatusCol As Long
     entryStatusCol = FindColumn(ws, DASH2_HEADER_ROW, "EntryStatus")
     If entryStatusCol > 0 Then
@@ -2684,6 +2690,22 @@ End Sub
 
 
 Public Sub StartDemoV2()
+    ' Prevent collateral "Excel busy" when the user is working on other files in the same Excel process.
+    ' If you need ASAGAKE to run while using other Excel workbooks, open ASAGAKE in a dedicated Excel process
+    ' (e.g. via: excel.exe /x "C:\AI\asagake\ASAGAKE.xlsm").
+    On Error Resume Next
+    Dim wbCount As Long: wbCount = Application.Workbooks.Count
+    On Error GoTo 0
+    If wbCount > 1 Then
+        LogVbaEvent "StartDemoV2", "blocked: other workbooks detected (count=" & CStr(wbCount) & "); ask user to open ASAGAKE in a dedicated Excel instance"
+        MsgBox "Cannot start ASAGAKE DEMO." & vbCrLf & vbCrLf & _
+               "Reason: Other Excel workbooks are open in the same Excel instance." & vbCrLf & _
+               "ASAGAKE's periodic macro can make other workbooks 'busy'." & vbCrLf & vbCrLf & _
+               "Fix: Open ASAGAKE in a dedicated Excel instance (separate process), then press Demo Start again." & vbCrLf & _
+               "Example: excel.exe /x ""C:\\AI\\asagake\\ASAGAKE.xlsm""", vbExclamation
+        Exit Sub
+    End If
+
     UpdateStatusV2 "DEMO_RUNNING"
     SetExcelIsolationV2 True
     StartAutoTickV2
@@ -2696,6 +2718,20 @@ Public Sub StopDemoV2()
 End Sub
 
 Public Sub StartLiveV2()
+    ' Same guard as DEMO: do not start LIVE when other workbooks exist in the same Excel process.
+    On Error Resume Next
+    Dim wbCount As Long: wbCount = Application.Workbooks.Count
+    On Error GoTo 0
+    If wbCount > 1 Then
+        LogVbaEvent "StartLiveV2", "blocked: other workbooks detected (count=" & CStr(wbCount) & "); ask user to open ASAGAKE in a dedicated Excel instance"
+        MsgBox "Cannot start ASAGAKE LIVE." & vbCrLf & vbCrLf & _
+               "Reason: Other Excel workbooks are open in the same Excel instance." & vbCrLf & _
+               "ASAGAKE's periodic macro can make other workbooks 'busy'." & vbCrLf & vbCrLf & _
+               "Fix: Open ASAGAKE in a dedicated Excel instance (separate process), then press Live Start again." & vbCrLf & _
+               "Example: excel.exe /x ""C:\\AI\\asagake\\ASAGAKE.xlsm""", vbExclamation
+        Exit Sub
+    End If
+
     UpdateStatusV2 "LIVE_RUNNING"
     SetExcelIsolationV2 True
     StartAutoTickV2
@@ -4238,12 +4274,13 @@ Public Sub RefreshTrendsV2()
             StopAutoTickV2
             UpdateStatusV2 "IDLE"
             LogVbaEvent "RefreshTrendsV2", "DEMO stopped at demo_stop_time=" & stopTimeRaw
-            Application.StatusBar = prevStatus
+            SafeSetStatusBarV2 prevStatus
             Exit Sub
         End If
     End If
 
-    Application.StatusBar = "方向フィルタを再計算しています..."
+    ' Avoid StatusBar failures that can spam errors and slow down Excel.
+    SafeSetStatusBarV2 "Recalculating direction filter..."
 
     ' IMPORTANT (performance):
     ' RefreshTrendsV2 runs periodically via AutoTick (Application.OnTime).
@@ -4300,7 +4337,7 @@ Public Sub RefreshTrendsV2()
     If doDriver Then UpdateTrendIndicators ws
     On Error GoTo 0
 
-    Application.StatusBar = prevStatus
+    SafeSetStatusBarV2 prevStatus
 
 End Sub
 
