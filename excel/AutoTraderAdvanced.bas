@@ -1647,7 +1647,7 @@ Private Function GetSlippageKey(ByVal sessionVal As String, ByVal modeVal As Str
     End If
 End Function
 
-Public Sub ApplyDynamicSignalsV2()
+Public Sub ApplyDynamicSignalsV2(Optional ByVal skipDriverUpdate As Boolean = False)
 
     Dim ws As Worksheet
     On Error Resume Next
@@ -1657,7 +1657,7 @@ Public Sub ApplyDynamicSignalsV2()
 
     EnsureParamFormulas ws
     EnsureDashboardWatcher
-    UpdateAllDriverTrends ws
+    If Not skipDriverUpdate Then UpdateAllDriverTrends ws
     Set gJStats = Nothing
     EnsureJStatsLoaded
 
@@ -4336,8 +4336,13 @@ Public Sub RefreshTrendsV2()
     If doDriver Then UpdateAllDriverTrends ws
 
     If doCalc Then
-        ws.Calculate
-        ApplyDynamicSignalsV2
+        Dim doWsCalc As Boolean: doWsCalc = True
+        If isDemo Then doWsCalc = DemoForceWsCalculateV2()
+        On Error Resume Next
+        If (Not isDemo) Or (Application.Calculation <> xlCalculationAutomatic) Then doWsCalc = True
+        On Error GoTo 0
+        If doWsCalc Then ws.Calculate
+        ApplyDynamicSignalsV2 skipDriverUpdate:=True
 
         ' DEMO: Only place/update orders during the JPX cash session.
         ' (Lunch break and after-hours are excluded to avoid stale-quote artifacts.)
@@ -4357,6 +4362,15 @@ Public Sub RefreshTrendsV2()
     SafeSetStatusBarV2 prevStatus
 
 End Sub
+
+Private Function DemoForceWsCalculateV2() As Boolean
+    On Error GoTo Fallback
+    Dim raw As String: raw = GetStrategyRule("demo_force_ws_calculate", "0")
+    DemoForceWsCalculateV2 = (CLng(Val(raw)) <> 0)
+    Exit Function
+Fallback:
+    DemoForceWsCalculateV2 = False
+End Function
 
 Private Function IsDemoMode() As Boolean
     On Error Resume Next
