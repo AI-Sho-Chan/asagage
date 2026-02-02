@@ -46,15 +46,15 @@ Private Const BB_DEFAULT_BLOCK_MINUTES As Double = 3#
 ' Auto tick (V2): keep RefreshTrends/Preplace/Demo processing running without manual button clicks.
 Private Const AUTO_TICK_V2_INTERVAL_SEC As Long = 5
 Private Const AUTO_TICK_V2_DEMO_INTERVAL_SEC_DEFAULT As Long = 15
-Private Const AUTO_TICK_V2_DEMO_CALC_INTERVAL_SEC_DEFAULT As Long = 10
-Private Const AUTO_TICK_V2_DEMO_DRIVER_TREND_INTERVAL_SEC_DEFAULT As Long = 30
+Private Const AUTO_TICK_V2_DEMO_CALC_INTERVAL_SEC_DEFAULT As Long = 30
+Private Const AUTO_TICK_V2_DEMO_DRIVER_TREND_INTERVAL_SEC_DEFAULT As Long = 60
 Private gAutoTickV2Next As Date
 Private gAutoTickV2Scheduled As Boolean
 Private gAutoTickV2InProgress As Boolean
 
 ' Bridge v1 (DEMO): file IO inbox/outbox (ASCII-only, append-only where applicable)
 Private Const BRIDGE_MS_INTERVAL_SEC As Long = 5
-Private Const BRIDGE_MS_INTERVAL_DEMO_SEC_DEFAULT As Long = 15
+Private Const BRIDGE_MS_INTERVAL_DEMO_SEC_DEFAULT As Long = 60
 Private Const BRIDGE_MS_MAX_ROWS As Long = 5
 
 Private Const BRIDGE_MS_SCHEMA As String = "MS.v1"
@@ -2804,6 +2804,9 @@ End Sub
 Private Sub BridgeTickV1()
     On Error GoTo Fail
     If Not IsDemoMode() Then Exit Sub
+    ' DEMO performance safety: allow turning off Bridge I/O to avoid making Excel "busy"
+    ' while the user is working in other workbooks.
+    If Not DemoBridgeEnabledV1() Then Exit Sub
     ' Prevent DEMO bridge from emitting snapshots / consuming commands outside JP cash session.
     If Not IsJpxCashSessionNowV2(Now) Then Exit Sub
 
@@ -3601,6 +3604,17 @@ Fallback:
     BridgeMarketSnapshotIntervalSecV1 = BRIDGE_MS_INTERVAL_SEC
 End Function
 
+Private Function DemoBridgeEnabledV1() As Boolean
+    ' 1 = enable Bridge I/O in DEMO (market_snapshots outbox + orders_cmd inbox)
+    ' 0 = disable Bridge I/O in DEMO to reduce Excel load
+    On Error GoTo Fallback
+    Dim raw As String: raw = GetStrategyRule("demo_bridge_enabled", "0")
+    DemoBridgeEnabledV1 = (CLng(Val(raw)) <> 0)
+    Exit Function
+Fallback:
+    DemoBridgeEnabledV1 = False
+End Function
+
 Private Sub StartAutoTickV2()
     StopAutoTickV2
     ScheduleAutoTickV2
@@ -4258,7 +4272,10 @@ Public Sub RefreshTrendsV2()
     If ws Is Nothing Then Exit Sub
 
     Dim prevStatus As Variant
+    ' Reading StatusBar can fail on some Excel states; never let this block the whole tick.
+    On Error Resume Next
     prevStatus = Application.StatusBar
+    On Error GoTo 0
 
     Dim nowTime As Date
     nowTime = Now
