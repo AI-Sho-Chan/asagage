@@ -82,21 +82,19 @@ Dim shell: Set shell = CreateObject("WScript.Shell")
 Dim excelApp: Set excelApp = Nothing
 Dim createdExcel: createdExcel = False
 
-' Try attach (same desktop/session) first
-Set excelApp = GetObject(, "Excel.Application")
+' Always create a dedicated Excel instance for ASAGAKE.
+' Rationale:
+' - If we attach to an existing Excel instance, ASAGAKE's AutoTickV2 (timer VBA)
+'   will periodically block *all* workbooks inside that same Excel process.
+' - A dedicated instance isolates ASAGAKE so other Excel work is not "busy".
+Set excelApp = CreateObject("Excel.Application")
 If Err.Number <> 0 Then
+    LogLine logPath, logLatest, "fatal: CreateObject(Excel.Application) failed: " & CStr(Err.Number) & " " & Err.Description
     Err.Clear
+    ReleaseLock LOCK_PATH
+    WScript.Quit 1
 End If
-If excelApp Is Nothing Then
-    Set excelApp = CreateObject("Excel.Application")
-    If Err.Number <> 0 Then
-        LogLine logPath, logLatest, "fatal: CreateObject(Excel.Application) failed: " & CStr(Err.Number) & " " & Err.Description
-        Err.Clear
-        ReleaseLock LOCK_PATH
-        WScript.Quit 1
-    End If
-    createdExcel = True
-End If
+createdExcel = True
 
 excelApp.Visible = True
 excelApp.DisplayAlerts = False

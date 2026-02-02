@@ -45,12 +45,16 @@ Private Const BB_DEFAULT_BLOCK_MINUTES As Double = 3#
 
 ' Auto tick (V2): keep RefreshTrends/Preplace/Demo processing running without manual button clicks.
 Private Const AUTO_TICK_V2_INTERVAL_SEC As Long = 5
+Private Const AUTO_TICK_V2_DEMO_INTERVAL_SEC_DEFAULT As Long = 15
+Private Const AUTO_TICK_V2_DEMO_CALC_INTERVAL_SEC_DEFAULT As Long = 10
+Private Const AUTO_TICK_V2_DEMO_DRIVER_TREND_INTERVAL_SEC_DEFAULT As Long = 30
 Private gAutoTickV2Next As Date
 Private gAutoTickV2Scheduled As Boolean
 Private gAutoTickV2InProgress As Boolean
 
 ' Bridge v1 (DEMO): file IO inbox/outbox (ASCII-only, append-only where applicable)
 Private Const BRIDGE_MS_INTERVAL_SEC As Long = 5
+Private Const BRIDGE_MS_INTERVAL_DEMO_SEC_DEFAULT As Long = 15
 Private Const BRIDGE_MS_MAX_ROWS As Long = 5
 
 Private Const BRIDGE_MS_SCHEMA As String = "MS.v1"
@@ -1995,27 +1999,23 @@ Public Sub PreplaceOrdersV2()
     Set slipDict = LoadSlippageOverrides()
 
     Dim isDemo As Boolean: isDemo = IsDemoMode()
-
-    Dim lastOrder As Long: lastOrder = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
-    Dim idx As Long
-    For idx = lastOrder To 2 Step -1
-        Dim modeExisting As String: modeExisting = LCase$(Trim$(CStr(sh.Cells(idx, 6).Value)))
-        Dim statusExisting As String: statusExisting = UCase$(Trim$(CStr(sh.Cells(idx, 7).Value)))
-
-        If modeExisting = "preplace" Then
-            sh.Rows(idx).Delete
-        ElseIf isDemo And modeExisting = "preplace_demo" Then
-            ' Keep RUNNING entries (active positions). Refresh only pending/ordered rows.
-            If statusExisting = "ORDERED" Or statusExisting = "CANCELLED_AUTO" Then
-                sh.Rows(idx).Delete
-            End If
-        End If
-    Next idx
-
-    If IsWithinNoTradeWindow(ws) Then Exit Sub
+    
+    ' PERFORMANCE NOTE:
+    ' Deleting many rows in Orders every tick freezes the entire Excel instance (including other workbooks).
+    ' We therefore keep Orders append-only as much as possible and only update/cancel rows in-place.
+    If IsWithinNoTradeWindow(ws) Then
+        CancelOutstandingPreplaceRowsV2 sh, "NO_TRADE_WINDOW"
+        Exit Sub
+    End If
 
     Dim r As Long, lastR As Long
     lastR = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    
+    Dim desiredKeys As Object
+    Set desiredKeys = CreateObject("Scripting.Dictionary") ' key: "<dashRow>|<side>"
+    
+    Dim activeRows As Object
+    Set activeRows = CreateObject("Scripting.Dictionary") ' row indexes we chose/updated (for duplicate cleanup)
 
     For r = DASH2_DATA_START To lastR
         If ws.Cells(r, selCol).Value = 1 Then
@@ -2054,11 +2054,180 @@ Public Sub PreplaceOrdersV2()
                         End If
                     End If
                 End If
-                LogPreOrder ws, sh, r, hasBuy, hasSell, eBuyCol, eSellCol, qtyCol, jCol, tpPerJCol, slPerJCol, modeCol, sessionCol, tickerCol, bufferFrac, noteExtra
+                
+                If hasBuy Then
+                    desiredKeys(CStr(r) & "|BUY") = True
+                    UpsertPreplaceRowV2 ws, sh, r, "BUY", isDemo, bufferFrac, noteExtra, eBuyCol, qtyCol, jCol, tpPerJCol, slPerJCol, modeCol, sessionCol, tickerCol, activeRows
+                End If
+                If hasSell Then
+                    desiredKeys(CStr(r) & "|SELL") = True
+                    UpsertPreplaceRowV2 ws, sh, r, "SELL", isDemo, bufferFrac, noteExtra, eSellCol, qtyCol, jCol, tpPerJCol, slPerJCol, modeCol, sessionCol, tickerCol, activeRows
+                End If
             End If
         End If
     Next r
+    
+    ' Cancel stale/duplicate preplace rows that are no longer desired.
+    CancelObsoletePreplaceRowsV2 sh, desiredKeys, activeRows, "OBSOLETE"
 
+End Sub
+
+Private Sub CancelOutstandingPreplaceRowsV2(ByVal sh As Worksheet, ByVal reason As String)
+    If sh Is Nothing Then Exit Sub
+    Dim lastRow As Long
+    lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
+    Dim r As Long
+    For r = 2 To lastRow
+        Dim modeVal As String: modeVal = LCase$(Trim$(CStr(sh.Cells(r, ORD_COL_MODE).Value)))
+        If modeVal <> "preplace" And modeVal <> "preplace_demo" Then GoTo NextRow
+        Dim statusVal As String: statusVal = UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_STATUS).Value)))
+        If statusVal = "RUNNING" Or statusVal = "FILLED" Or statusVal = "CLOSED" Then GoTo NextRow
+        If statusVal = "ORDERED" Or statusVal = "PENDING" Then
+            sh.Cells(r, ORD_COL_STATUS).Value = "CANCELLED_AUTO"
+            If Len(Trim$(CStr(sh.Cells(r, ORD_COL_NOTE).Value))) = 0 Then
+                sh.Cells(r, ORD_COL_NOTE).Value = "PREPLACE_CANCEL_" & reason
+            End If
+        End If
+NextRow:
+    Next r
+End Sub
+
+Private Sub CancelObsoletePreplaceRowsV2(ByVal sh As Worksheet, ByVal desiredKeys As Object, ByVal activeRows As Object, ByVal reason As String)
+    If sh Is Nothing Then Exit Sub
+    Dim lastRow As Long
+    lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
+    Dim r As Long
+    For r = 2 To lastRow
+        Dim modeVal As String: modeVal = LCase$(Trim$(CStr(sh.Cells(r, ORD_COL_MODE).Value)))
+        If modeVal <> "preplace" And modeVal <> "preplace_demo" Then GoTo NextRow
+        Dim statusVal As String: statusVal = UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_STATUS).Value)))
+        If statusVal = "RUNNING" Or statusVal = "FILLED" Or statusVal = "CLOSED" Then GoTo NextRow
+        
+        Dim dashRow As Long
+        dashRow = CLng(ToDouble(sh.Cells(r, ORD_COL_DASH_ROW).Value, 0#))
+        Dim side As String: side = UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_SIDE).Value)))
+        Dim key As String: key = CStr(dashRow) & "|" & side
+        
+        Dim isDesired As Boolean
+        isDesired = (dashRow > 0 And desiredKeys.Exists(key))
+        
+        Dim isActiveRow As Boolean
+        isActiveRow = activeRows.Exists(CStr(r))
+        
+        If (Not isDesired) Or (Not isActiveRow) Then
+            If statusVal = "ORDERED" Or statusVal = "PENDING" Then
+                sh.Cells(r, ORD_COL_STATUS).Value = "CANCELLED_AUTO"
+                If Len(Trim$(CStr(sh.Cells(r, ORD_COL_NOTE).Value))) = 0 Then
+                    sh.Cells(r, ORD_COL_NOTE).Value = "PREPLACE_CANCEL_" & reason
+                End If
+            End If
+        End If
+NextRow:
+    Next r
+End Sub
+
+Private Sub UpsertPreplaceRowV2( _
+    ByVal ws As Worksheet, ByVal sh As Worksheet, ByVal dashRow As Long, ByVal side As String, _
+    ByVal isDemo As Boolean, ByVal bufferFrac As Double, ByVal noteExtra As String, _
+    ByVal entryCol As Long, ByVal qtyCol As Long, ByVal jCol As Long, ByVal tpPerJCol As Long, ByVal slPerJCol As Long, _
+    ByVal modeCol As Long, ByVal sessionCol As Long, ByVal tickerCol As Long, ByVal activeRows As Object)
+    
+    If ws Is Nothing Or sh Is Nothing Then Exit Sub
+    If dashRow <= 0 Then Exit Sub
+    side = UCase$(Trim$(side))
+    If side <> "BUY" And side <> "SELL" Then Exit Sub
+    If entryCol = 0 Or qtyCol = 0 Or tickerCol = 0 Then Exit Sub
+    
+    Dim rowIdx As Long
+    rowIdx = FindPreplaceRowByDashRowSideV2(sh, dashRow, side)
+    If rowIdx = 0 Then
+        rowIdx = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row + 1
+    Else
+        Dim st As String: st = UCase$(Trim$(CStr(sh.Cells(rowIdx, ORD_COL_STATUS).Value)))
+        ' Do not touch active/historical rows.
+        If st = "RUNNING" Or st = "FILLED" Or st = "CLOSED" Then Exit Sub
+    End If
+    
+    activeRows(CStr(rowIdx)) = True
+    
+    Dim sheetToken As String
+    sheetToken = "'" & Replace(ws.Name, "'", "''") & "'!"
+    
+    Dim tickerRef As String
+    tickerRef = sheetToken & ws.Cells(dashRow, tickerCol).Address(True, True, xlA1)
+    
+    Dim qtyRef As String
+    qtyRef = sheetToken & ws.Cells(dashRow, qtyCol).Address(True, True, xlA1)
+    
+    Dim entryRef As String
+    entryRef = sheetToken & ws.Cells(dashRow, entryCol).Address(True, True, xlA1)
+    
+    Dim sessionRef As String
+    If sessionCol > 0 Then sessionRef = sheetToken & ws.Cells(dashRow, sessionCol).Address(True, True, xlA1) Else sessionRef = ""
+    Dim modeRef As String
+    If modeCol > 0 Then modeRef = sheetToken & ws.Cells(dashRow, modeCol).Address(True, True, xlA1) Else modeRef = ""
+    
+    Dim noteFormula As String
+    noteFormula = BuildNoteFormula(sessionRef, modeRef, noteExtra)
+    
+    sh.Cells(rowIdx, ORD_COL_TS).Value = Format$(Now, "yyyy-mm-dd hh:nn:ss")
+    sh.Cells(rowIdx, ORD_COL_SIDE).Value = side
+    sh.Cells(rowIdx, ORD_COL_MODE).Value = IIf(isDemo, "preplace_demo", "preplace")
+    sh.Cells(rowIdx, ORD_COL_STATUS).Value = IIf(isDemo, "ORDERED", "PENDING")
+    sh.Cells(rowIdx, ORD_COL_DASH_ROW).Value = dashRow
+    
+    SetCellFormulaIfDifferentV2 sh.Cells(rowIdx, ORD_COL_TICKER), "=" & tickerRef
+    SetCellFormulaIfDifferentV2 sh.Cells(rowIdx, ORD_COL_QTY), "=" & qtyRef
+    SetCellFormulaIfDifferentV2 sh.Cells(rowIdx, ORD_COL_PRICE), BuildAdjustedPriceFormula(entryRef, bufferFrac, (side = "BUY"))
+    If noteFormula <> "" Then
+        SetCellFormulaIfDifferentV2 sh.Cells(rowIdx, ORD_COL_NOTE), noteFormula
+    End If
+    
+    ' TP/SL (use formulas so they update automatically as J/coeffs update)
+    If jCol > 0 And tpPerJCol > 0 And slPerJCol > 0 Then
+        Dim q As String: q = Chr$(34)
+        Dim jRef As String: jRef = sheetToken & ws.Cells(dashRow, jCol).Address(True, True, xlA1)
+        Dim tpPerJRef As String: tpPerJRef = sheetToken & ws.Cells(dashRow, tpPerJCol).Address(True, True, xlA1)
+        Dim slPerJRef As String: slPerJRef = sheetToken & ws.Cells(dashRow, slPerJCol).Address(True, True, xlA1)
+        If side = "BUY" Then
+            SetCellFormulaIfDifferentV2 sh.Cells(rowIdx, ORD_COL_TP), "=IF(" & entryRef & "=" & q & q & "," & q & q & "," & entryRef & "*(1+N(" & tpPerJRef & ")*ABS(N(" & jRef & "))/100))"
+            SetCellFormulaIfDifferentV2 sh.Cells(rowIdx, ORD_COL_SL), "=IF(" & entryRef & "=" & q & q & "," & q & q & "," & entryRef & "*(1-N(" & slPerJRef & ")*ABS(N(" & jRef & "))/100))"
+        ElseIf side = "SELL" Then
+            SetCellFormulaIfDifferentV2 sh.Cells(rowIdx, ORD_COL_TP), "=IF(" & entryRef & "=" & q & q & "," & q & q & "," & entryRef & "*(1-N(" & tpPerJRef & ")*ABS(N(" & jRef & "))/100))"
+            SetCellFormulaIfDifferentV2 sh.Cells(rowIdx, ORD_COL_SL), "=IF(" & entryRef & "=" & q & q & "," & q & q & "," & entryRef & "*(1+N(" & slPerJRef & ")*ABS(N(" & jRef & "))/100))"
+        End If
+    End If
+End Sub
+
+Private Function FindPreplaceRowByDashRowSideV2(ByVal sh As Worksheet, ByVal dashRow As Long, ByVal side As String) As Long
+    If sh Is Nothing Then Exit Function
+    If dashRow <= 0 Then Exit Function
+    side = UCase$(Trim$(side))
+    
+    Dim lastRow As Long
+    lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
+    
+    Dim r As Long
+    For r = lastRow To 2 Step -1
+        If CLng(ToDouble(sh.Cells(r, ORD_COL_DASH_ROW).Value, 0#)) <> dashRow Then GoTo NextRow
+        If UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_SIDE).Value))) <> side Then GoTo NextRow
+        Dim modeVal As String: modeVal = LCase$(Trim$(CStr(sh.Cells(r, ORD_COL_MODE).Value)))
+        If modeVal <> "preplace" And modeVal <> "preplace_demo" Then GoTo NextRow
+        FindPreplaceRowByDashRowSideV2 = r
+        Exit Function
+NextRow:
+    Next r
+End Function
+
+Private Sub SetCellFormulaIfDifferentV2(ByVal cell As Range, ByVal formulaText As String)
+    If cell Is Nothing Then Exit Sub
+    If Len(formulaText) = 0 Then Exit Sub
+    On Error Resume Next
+    If cell.HasFormula Then
+        If CStr(cell.Formula) = formulaText Then Exit Sub
+    End If
+    cell.Formula = formulaText
+    On Error GoTo 0
 End Sub
 
 
@@ -2824,7 +2993,7 @@ Private Sub BridgeAppendMarketSnapshotsV1()
     On Error GoTo Fail
 
     If Now < gBridgeNextSnapshotAt Then Exit Sub
-    gBridgeNextSnapshotAt = Now + TimeSerial(0, 0, BRIDGE_MS_INTERVAL_SEC)
+    gBridgeNextSnapshotAt = Now + TimeSerial(0, 0, BridgeMarketSnapshotIntervalSecV1())
 
     Dim ws As Worksheet: Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
 
@@ -3299,10 +3468,73 @@ Fail:
     LogVbaEvent "BridgeAppendCsvUtf8SigV1", "Err " & Err.Number & ": " & Err.Description & " path=" & path
 End Sub
 
+Private Function ClampLongV2(ByVal v As Long, ByVal lo As Long, ByVal hi As Long) As Long
+    If v < lo Then v = lo
+    If v > hi Then v = hi
+    ClampLongV2 = v
+End Function
+
+Private Function AutoTickIntervalSecV2() As Long
+    On Error GoTo Fallback
+
+    Dim defVal As Long
+    Dim key As String
+    If IsDemoMode() Then
+        key = "demo_autotick_interval_sec"
+        defVal = AUTO_TICK_V2_DEMO_INTERVAL_SEC_DEFAULT
+    Else
+        key = "live_autotick_interval_sec"
+        defVal = AUTO_TICK_V2_INTERVAL_SEC
+    End If
+
+    Dim raw As String: raw = GetStrategyRule(key, CStr(defVal))
+    AutoTickIntervalSecV2 = ClampLongV2(CLng(Val(raw)), 1, 300)
+    Exit Function
+
+Fallback:
+    AutoTickIntervalSecV2 = AUTO_TICK_V2_INTERVAL_SEC
+End Function
+
+Private Function DemoCalcIntervalSecV2() As Long
+    On Error GoTo Fallback
+    Dim raw As String: raw = GetStrategyRule("demo_calc_interval_sec", CStr(AUTO_TICK_V2_DEMO_CALC_INTERVAL_SEC_DEFAULT))
+    DemoCalcIntervalSecV2 = ClampLongV2(CLng(Val(raw)), 1, 300)
+    Exit Function
+Fallback:
+    DemoCalcIntervalSecV2 = AUTO_TICK_V2_DEMO_CALC_INTERVAL_SEC_DEFAULT
+End Function
+
+Private Function DemoDriverTrendIntervalSecV2() As Long
+    On Error GoTo Fallback
+    Dim raw As String: raw = GetStrategyRule("demo_driver_trend_interval_sec", CStr(AUTO_TICK_V2_DEMO_DRIVER_TREND_INTERVAL_SEC_DEFAULT))
+    DemoDriverTrendIntervalSecV2 = ClampLongV2(CLng(Val(raw)), 1, 600)
+    Exit Function
+Fallback:
+    DemoDriverTrendIntervalSecV2 = AUTO_TICK_V2_DEMO_DRIVER_TREND_INTERVAL_SEC_DEFAULT
+End Function
+
+Private Function BridgeMarketSnapshotIntervalSecV1() As Long
+    On Error GoTo Fallback
+    Dim defVal As Long
+    Dim key As String
+    If IsDemoMode() Then
+        key = "demo_bridge_ms_interval_sec"
+        defVal = BRIDGE_MS_INTERVAL_DEMO_SEC_DEFAULT
+    Else
+        key = "live_bridge_ms_interval_sec"
+        defVal = BRIDGE_MS_INTERVAL_SEC
+    End If
+    Dim raw As String: raw = GetStrategyRule(key, CStr(defVal))
+    BridgeMarketSnapshotIntervalSecV1 = ClampLongV2(CLng(Val(raw)), 1, 300)
+    Exit Function
+Fallback:
+    BridgeMarketSnapshotIntervalSecV1 = BRIDGE_MS_INTERVAL_SEC
+End Function
+
 Private Sub StartAutoTickV2()
     StopAutoTickV2
     ScheduleAutoTickV2
-    LogVbaEvent "AutoTickV2", "scheduled interval_sec=" & CStr(AUTO_TICK_V2_INTERVAL_SEC)
+    LogVbaEvent "AutoTickV2", "scheduled interval_sec=" & CStr(AutoTickIntervalSecV2())
 End Sub
 
 Private Sub StopAutoTickV2()
@@ -3316,7 +3548,7 @@ End Sub
 
 Private Sub ScheduleAutoTickV2()
     On Error Resume Next
-    gAutoTickV2Next = Now + TimeSerial(0, 0, AUTO_TICK_V2_INTERVAL_SEC)
+    gAutoTickV2Next = Now + TimeSerial(0, 0, AutoTickIntervalSecV2())
     Application.OnTime gAutoTickV2Next, "AutoTraderAdvanced.AutoTickV2"
     gAutoTickV2Scheduled = True
     On Error GoTo 0
@@ -3979,20 +4211,59 @@ Public Sub RefreshTrendsV2()
 
     Application.StatusBar = "方向フィルタを再計算しています..."
 
-    On Error Resume Next
-    UpdateAllDriverTrends ws
-    ws.Calculate
-    ApplyDynamicSignalsV2
-    ' DEMO: Only place/update/execute demo orders during the JPX cash session.
-    ' (Lunch break and after-hours are excluded to avoid stale-quote artifacts.)
+    ' IMPORTANT (performance):
+    ' RefreshTrendsV2 runs periodically via AutoTick (Application.OnTime).
+    ' Calling ws.Calculate / UpdateAllDriverTrends too frequently can make Excel "busy"
+    ' and block other workbooks opened in the same Excel instance.
+    '
+    ' Strategy:
+    ' - LIVE: keep original behavior (run every tick)
+    ' - DEMO: throttle heavy operations (calculate / driver-trend refresh) while still
+    '         processing demo fills/exits during the JPX cash session.
+    Dim isDemo As Boolean: isDemo = IsDemoMode()
     Dim inCashSession As Boolean
     inCashSession = IsJpxCashSessionNowV2(Now)
-    If (Not IsDemoMode()) Or inCashSession Then
-        PreplaceOrdersV2
-        If IsDemoMode() Then MarkPendingPreplaceAsOrderedDemo
-        If IsDemoMode() Then ProcessDemoOrdersV2 ws
+
+    Dim doCalc As Boolean: doCalc = True
+    Dim doDriver As Boolean: doDriver = True
+
+    If isDemo Then
+        Static lastCalcAt As Date
+        Static lastDriverAt As Date
+
+        Dim calcInterval As Long: calcInterval = DemoCalcIntervalSecV2()
+        Dim driverInterval As Long: driverInterval = DemoDriverTrendIntervalSecV2()
+
+        If lastCalcAt = 0 Then lastCalcAt = nowTime - TimeSerial(0, 0, calcInterval)
+        If lastDriverAt = 0 Then lastDriverAt = nowTime - TimeSerial(0, 0, driverInterval)
+
+        doCalc = (DateDiff("s", lastCalcAt, nowTime) >= calcInterval)
+        doDriver = (DateDiff("s", lastDriverAt, nowTime) >= driverInterval)
+
+        If doCalc Then lastCalcAt = nowTime
+        If doDriver Then lastDriverAt = nowTime
     End If
-    UpdateTrendIndicators ws
+
+    On Error Resume Next
+    If doDriver Then UpdateAllDriverTrends ws
+
+    If doCalc Then
+        ws.Calculate
+        ApplyDynamicSignalsV2
+
+        ' DEMO: Only place/update orders during the JPX cash session.
+        ' (Lunch break and after-hours are excluded to avoid stale-quote artifacts.)
+        If (Not isDemo) Or inCashSession Then
+            PreplaceOrdersV2
+            If isDemo Then MarkPendingPreplaceAsOrderedDemo
+        End If
+    End If
+
+    If (Not isDemo) Or inCashSession Then
+        If isDemo Then ProcessDemoOrdersV2 ws
+    End If
+
+    If doDriver Then UpdateTrendIndicators ws
     On Error GoTo 0
 
     Application.StatusBar = prevStatus
