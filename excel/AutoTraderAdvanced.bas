@@ -2685,21 +2685,25 @@ End Sub
 
 Public Sub StartDemoV2()
     UpdateStatusV2 "DEMO_RUNNING"
+    SetExcelIsolationV2 True
     StartAutoTickV2
 End Sub
 
 Public Sub StopDemoV2()
     StopAutoTickV2
+    SetExcelIsolationV2 False
     UpdateStatusV2 "IDLE"
 End Sub
 
 Public Sub StartLiveV2()
     UpdateStatusV2 "LIVE_RUNNING"
+    SetExcelIsolationV2 True
     StartAutoTickV2
 End Sub
 
 Public Sub StopLiveV2()
     StopAutoTickV2
+    SetExcelIsolationV2 False
     UpdateStatusV2 "IDLE"
 End Sub
 
@@ -2725,12 +2729,22 @@ ScheduleNext:
 StopLoop:
     gAutoTickV2InProgress = False
     StopAutoTickV2
+    SetExcelIsolationV2 False
     Exit Sub
 
 Fail:
     gAutoTickV2InProgress = False
     LogVbaEvent "AutoTickV2", "Err " & Err.Number & ": " & Err.Description
     Resume ScheduleNext
+End Sub
+
+' Reduce collateral damage: while ASAGAKE is auto-ticking, prevent other workbooks
+' from being opened into the same Excel instance (which would become "busy" too).
+' This mainly prevents new workbooks from attaching to this running instance via shell/DDE.
+Private Sub SetExcelIsolationV2(ByVal enabled As Boolean)
+    On Error Resume Next
+    Application.IgnoreRemoteRequests = enabled
+    On Error GoTo 0
 End Sub
 
 
@@ -3475,24 +3489,29 @@ Private Function ClampLongV2(ByVal v As Long, ByVal lo As Long, ByVal hi As Long
 End Function
 
 Private Function AutoTickIntervalSecV2() As Long
-    On Error GoTo Fallback
+    ' DEMO should tick slower than LIVE to reduce UI freezes and collateral impact on other workbooks.
+    ' On any error, fall back to the mode-specific default (not always LIVE's default).
+    Dim defVal As Long: defVal = AUTO_TICK_V2_INTERVAL_SEC
+    Dim key As String: key = "live_autotick_interval_sec"
 
-    Dim defVal As Long
-    Dim key As String
+    ' IsDemoMode() can occasionally error early in startup (e.g., status cell not ready).
+    ' In that case, keep the safe LIVE default rather than returning 0 and scheduling too fast.
+    On Error Resume Next
     If IsDemoMode() Then
         key = "demo_autotick_interval_sec"
         defVal = AUTO_TICK_V2_DEMO_INTERVAL_SEC_DEFAULT
-    Else
-        key = "live_autotick_interval_sec"
-        defVal = AUTO_TICK_V2_INTERVAL_SEC
     End If
+    On Error GoTo Fallback
 
     Dim raw As String: raw = GetStrategyRule(key, CStr(defVal))
-    AutoTickIntervalSecV2 = ClampLongV2(CLng(Val(raw)), 1, 300)
+    Dim v As Long: v = CLng(Val(raw))
+    If v < 1 Then v = defVal
+    AutoTickIntervalSecV2 = ClampLongV2(v, 1, 300)
     Exit Function
 
 Fallback:
-    AutoTickIntervalSecV2 = AUTO_TICK_V2_INTERVAL_SEC
+    If defVal < 1 Then defVal = AUTO_TICK_V2_INTERVAL_SEC
+    AutoTickIntervalSecV2 = defVal
 End Function
 
 Private Function DemoCalcIntervalSecV2() As Long
@@ -3534,7 +3553,7 @@ End Function
 Private Sub StartAutoTickV2()
     StopAutoTickV2
     ScheduleAutoTickV2
-    LogVbaEvent "AutoTickV2", "scheduled interval_sec=" & CStr(AutoTickIntervalSecV2())
+    LogVbaEvent "AutoTickV2", "scheduled mode=" & IIf(IsDemoMode(), "DEMO", "LIVE") & " interval_sec=" & CStr(AutoTickIntervalSecV2())
 End Sub
 
 Private Sub StopAutoTickV2()
