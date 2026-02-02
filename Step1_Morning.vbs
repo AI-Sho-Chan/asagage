@@ -43,9 +43,9 @@ LogLine logPath, logLatest, "start: workbook=" & WORKBOOK_PATH
 ' This script MUST NOT run under SYSTEM/NT AUTHORITY.
 ' If it does, Excel may launch in a non-interactive session and lock ASAGAKE.xlsm without showing a window.
 Dim guardShell: Set guardShell = CreateObject("WScript.Shell")
-Dim envUser: envUser = UCase$(Trim$(guardShell.ExpandEnvironmentStrings("%USERNAME%")))
-Dim envDomain: envDomain = UCase$(Trim$(guardShell.ExpandEnvironmentStrings("%USERDOMAIN%")))
-Dim envSession: envSession = UCase$(Trim$(guardShell.ExpandEnvironmentStrings("%SESSIONNAME%")))
+Dim envUser: envUser = UCase(Trim(guardShell.ExpandEnvironmentStrings("%USERNAME%")))
+Dim envDomain: envDomain = UCase(Trim(guardShell.ExpandEnvironmentStrings("%USERDOMAIN%")))
+Dim envSession: envSession = UCase(Trim(guardShell.ExpandEnvironmentStrings("%SESSIONNAME%")))
 If envDomain = "NT AUTHORITY" Or envUser = "SYSTEM" Or envSession = "SERVICES" Then
     LogLine logPath, logLatest, "fatal: refuse to run in non-interactive context (USERDOMAIN=" & envDomain & " USERNAME=" & envUser & " SESSIONNAME=" & envSession & ")"
     LogLine logPath, logLatest, "action: fix Task Scheduler to run as logged-in user (InteractiveToken) only."
