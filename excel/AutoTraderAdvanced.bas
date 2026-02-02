@@ -2713,6 +2713,21 @@ Public Sub AutoTickV2()
     If gAutoTickV2InProgress Then GoTo ScheduleNext
     gAutoTickV2InProgress = True
 
+    ' Safety guard:
+    ' If other workbooks are open in the SAME Excel process, AutoTickV2 will make those workbooks "busy" too
+    ' (because VBA runs on the single Excel UI thread). To avoid collateral damage, stop the loop and return to IDLE.
+    On Error Resume Next
+    Dim wbCount As Long: wbCount = Application.Workbooks.Count
+    On Error GoTo Fail
+    If wbCount > 1 Then
+        LogVbaEvent "AutoTickV2", "warn: other workbooks detected (count=" & CStr(wbCount) & "); stop to avoid Excel busy"
+        gAutoTickV2InProgress = False
+        StopAutoTickV2
+        SetExcelIsolationV2 False
+        UpdateStatusV2 "IDLE"
+        Exit Sub
+    End If
+
     If Not IsRunningModeV2() Then GoTo StopLoop
     RefreshTrendsV2
     BridgeTickV1

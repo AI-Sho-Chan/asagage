@@ -96,6 +96,13 @@ If Err.Number <> 0 Then
 End If
 createdExcel = True
 
+On Error Resume Next
+' Isolation (important):
+' Prevent other Excel files (double-click etc.) from being opened into *this* Excel instance.
+' This avoids "other workbooks become busy" when ASAGAKE is auto-ticking every few seconds.
+excelApp.IgnoreRemoteRequests = True
+On Error GoTo 0
+
 excelApp.Visible = True
 excelApp.DisplayAlerts = False
 excelApp.AskToUpdateLinks = False
