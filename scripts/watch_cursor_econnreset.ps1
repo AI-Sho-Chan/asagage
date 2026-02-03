@@ -46,9 +46,25 @@ function Normalize-PositiveInt {
 
   try {
     if ($null -eq $Value) { return $DefaultValue }
-    $first = @($Value)[0]
-    if ($null -eq $first) { return $DefaultValue }
-    $n = [int]$first
+
+    # Task Scheduler / some callers can pass values in odd container shapes like:
+    # - 5
+    # - "5"
+    # - @("5")
+    # - @(@("5"))  (nested arrays)
+    # We unwrap until we get a scalar value and then TryParse.
+    $cur = $Value
+    while ($cur -is [System.Array]) {
+      if ($cur.Length -le 0) { return $DefaultValue }
+      $cur = $cur[0]
+    }
+
+    if ($null -eq $cur) { return $DefaultValue }
+    $s = [string]$cur
+    if (-not $s) { return $DefaultValue }
+
+    $n = 0
+    if (-not [int]::TryParse($s, [ref]$n)) { return $DefaultValue }
     if ($n -le 0) { return $DefaultValue }
     return $n
   } catch {
@@ -96,6 +112,14 @@ function Load-State {
     if (-not $raw) { return $default }
     $obj = $raw | ConvertFrom-Json -ErrorAction Stop
 
+    # If the state file somehow became a JSON array (e.g., due to an older bug or manual edit),
+    # pick the last element as the most recent state.
+    if ($obj -is [System.Array]) {
+      if ($obj.Length -le 0) { return $default }
+      $obj = $obj[$obj.Length - 1]
+      if ($null -eq $obj) { return $default }
+    }
+
     # NOTE: StrictMode=Latest makes "missing property" a hard error on PSCustomObject.
     # We intentionally treat missing fields as default values (backward-compatible).
     $props = @()
@@ -108,19 +132,55 @@ function Load-State {
         if ($k) {
           $kResolved = $k
           try { $kResolved = (Resolve-Path -LiteralPath $k -ErrorAction Stop).Path } catch { $kResolved = $k }
-          $offsets[$kResolved.ToLowerInvariant()] = [long]$_.Value
+
+          # Values must be numeric offsets. If not parseable, skip instead of failing hard.
+          $val = $_.Value
+          while ($val -is [System.Array]) {
+            if ($val.Length -le 0) { break }
+            $val = $val[0]
+          }
+          $valStr = ""
+          try { $valStr = [string]$val } catch { $valStr = "" }
+          $n = 0L
+          if ([long]::TryParse($valStr, [ref]$n) -and $n -ge 0) {
+            $offsets[$kResolved.ToLowerInvariant()] = $n
+          }
         }
       }
     }
 
     $version = 1
-    if (($props -contains "version") -and $obj.version) { $version = [int]$obj.version }
+    if (($props -contains "version") -and $obj.version) {
+      $v = $obj.version
+      while ($v -is [System.Array]) {
+        if ($v.Length -le 0) { break }
+        $v = $v[0]
+      }
+      $vStr = ""
+      try { $vStr = [string]$v } catch { $vStr = "" }
+      $vn = 0
+      if ([int]::TryParse($vStr, [ref]$vn) -and $vn -gt 0) { $version = $vn }
+    }
 
     $lastScan = ""
-    if (($props -contains "last_scan_utc") -and $obj.last_scan_utc) { $lastScan = [string]$obj.last_scan_utc }
+    if (($props -contains "last_scan_utc") -and $obj.last_scan_utc) {
+      $ls = $obj.last_scan_utc
+      while ($ls -is [System.Array]) {
+        if ($ls.Length -le 0) { break }
+        $ls = $ls[0]
+      }
+      try { $lastScan = [string]$ls } catch { $lastScan = "" }
+    }
 
     $lastDiag = ""
-    if (($props -contains "last_diag_utc") -and $obj.last_diag_utc) { $lastDiag = [string]$obj.last_diag_utc }
+    if (($props -contains "last_diag_utc") -and $obj.last_diag_utc) {
+      $ld = $obj.last_diag_utc
+      while ($ld -is [System.Array]) {
+        if ($ld.Length -le 0) { break }
+        $ld = $ld[0]
+      }
+      try { $lastDiag = [string]$ld } catch { $lastDiag = "" }
+    }
 
     return @{
       version = $version
@@ -197,7 +257,8 @@ function Save-State {
   $dir = Split-Path -Parent $Path
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
 
-  $tmp = "$Path.tmp"
+  # Use a per-process temp file to avoid collisions if Task Scheduler accidentally overlaps runs.
+  $tmp = "$Path.tmp.$PID"
   ($State | ConvertTo-Json -Depth 6) | Set-Content -LiteralPath $tmp -Encoding utf8
   Move-Item -LiteralPath $tmp -Destination $Path -Force
 }
@@ -207,11 +268,14 @@ function Read-NewText {
     [string]$Path,
     [long]$Offset
   )
-  if (-not (Test-Path -LiteralPath $Path)) { return @{ text = ""; offset = 0; exists = $false; len = 0 } }
+  if (-not (Test-Path -LiteralPath $Path)) { return @{ text = ""; offset = $Offset; exists = $false; len = 0 } }
 
   $fi = Get-Item -LiteralPath $Path -ErrorAction Stop
   $len = [long]$fi.Length
-  if ($Offset -gt $len) { $Offset = 0 } # truncated / rotated
+  if ($Offset -lt 0) { $Offset = 0 }
+  # If the file was truncated/rotated, jumping back to 0 causes re-reading historical ECONNRESET lines
+  # and looks like "the task restarted". Prefer tailing from EOF to avoid duplicate alarms.
+  if ($Offset -gt $len) { $Offset = $len }
 
   $fs = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
   try {
@@ -233,17 +297,19 @@ function Get-Latest-CursorLogFiles {
 
   $cursorLogRoot = ""
   if ($LogsRoot) {
-    $cursorLogRoot = $LogsRoot
+    $cursorLogRoot = [System.Environment]::ExpandEnvironmentVariables($LogsRoot)
   } else {
     $cursorLogRoot = Join-Path $env:APPDATA "Cursor\\logs"
     if (-not (Test-Path -LiteralPath $cursorLogRoot)) {
       # Fallback: try to find a plausible user profile Cursor logs folder (for SYSTEM runs).
       try {
-        $candidates = Get-ChildItem -LiteralPath "C:\\Users" -Directory -ErrorAction SilentlyContinue |
-          ForEach-Object { Join-Path $_.FullName "AppData\\Roaming\\Cursor\\logs" } |
-          Where-Object { Test-Path -LiteralPath $_ }
+        $candidates = @(
+          Get-ChildItem -LiteralPath "C:\\Users" -Directory -ErrorAction SilentlyContinue |
+            ForEach-Object { Join-Path $_.FullName "AppData\\Roaming\\Cursor\\logs" } |
+            Where-Object { Test-Path -LiteralPath $_ }
+        )
 
-        if ($candidates -and $candidates.Count -gt 0) {
+        if (@($candidates).Count -gt 0) {
           # Pick the one with the newest subdirectory name (Cursor log dirs are timestamp-like).
           $best = $null
           $bestScore = ""
@@ -294,13 +360,36 @@ $statePath = Join-Path $logDir "cursor_econnreset_watch_state.json"
 $exitCode = 0
 $state = Load-State -Path $statePath
 
+
+# Prevent duplicate concurrent runs (Task Scheduler can overlap when diag takes > 1 min).
+$lockStream = $null
+$lockPath = Join-Path $logDir "cursor_econnreset_watch.lock"
+try {
+  $lockStream = [System.IO.File]::Open(
+    $lockPath,
+    [System.IO.FileMode]::OpenOrCreate,
+    [System.IO.FileAccess]::ReadWrite,
+    [System.IO.FileShare]::None
+  )
+} catch {
+  try {
+    Write-LogLine -Path $logPath -Line "[warn] another watcher instance is running; exit"
+  } catch {}
+  exit 0
+}
+
+if ($state.ContainsKey("state_load_error") -and $state.state_load_error) {
+  Write-LogLine -Path $logPath -Line ("[warn] state_load_error={0}" -f $state.state_load_error)
+}
+
 try {
   $dirLimit = Normalize-PositiveInt -Value $MaxDirs -DefaultValue 5
   # IMPORTANT: Always treat as an array. When only 1 file is found, PowerShell would otherwise
   # return a scalar string and `$files.Count` would fail under StrictMode.
   $files = @(Get-Latest-CursorLogFiles -DirLimit $dirLimit -LogsRoot $CursorLogsRoot)
-  if (-not $files -or $files.Count -eq 0) {
+  if (@($files).Count -eq 0) {
     $rootShown = $CursorLogsRoot
+    if ($rootShown) { $rootShown = [System.Environment]::ExpandEnvironmentVariables($rootShown) }
     if (-not $rootShown) { $rootShown = (Join-Path $env:APPDATA "Cursor\\logs") }
     Write-LogLine -Path $logPath -Line "[warn] Cursor log files not found under $rootShown"
     $exitCode = 2
@@ -313,6 +402,19 @@ try {
       $offset = 0
       if ($state.file_offsets.ContainsKey($key)) {
         $offset = [long]$state.file_offsets[$key]
+
+        # Safety: if offset unexpectedly reset to 0 for a large file, treat it as a reset and
+        # baseline to EOF to avoid repeatedly re-reading historical ECONNRESET lines.
+        if ($offset -le 0) {
+          try {
+            $fi = Get-Item -LiteralPath $f -ErrorAction Stop
+            if ($fi.Length -gt 1048576) {
+              $state.file_offsets[$key] = [long]$fi.Length
+              Write-LogLine -Path $logPath -Line "[warn] offset_reset_detected baseline_to_eof len=$($fi.Length) file=$f"
+              continue
+            }
+          } catch {}
+        }
       } else {
         # First time seeing this file: baseline to EOF to avoid firing on historical errors.
         try {
@@ -320,11 +422,14 @@ try {
           $state.file_offsets[$key] = [long]$fi.Length
           Write-LogLine -Path $logPath -Line "[init] baseline offset=$($fi.Length) file=$f"
           continue
-        } catch {}
+        } catch {
+          Write-LogLine -Path $logPath -Line "[init][warn] failed to baseline file=${f}: $($_.Exception.Message)"
+          continue
+        }
       }
       $res = Read-NewText -Path $f -Offset $offset
-      $state.file_offsets[$key] = [long]$res.offset
       if (-not $res.exists) { continue }
+      $state.file_offsets[$key] = [long]$res.offset
 
       if ($res.text -and $res.text -match "ECONNRESET") {
         $found = $true
@@ -357,6 +462,9 @@ try {
 } finally {
   $state.last_scan_utc = (Get-Date).ToUniversalTime().ToString("o")
   Save-State -Path $statePath -State $state
+  if ($lockStream) {
+    try { $lockStream.Dispose() } catch {}
+  }
 }
 
 exit $exitCode
