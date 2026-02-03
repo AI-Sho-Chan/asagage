@@ -296,7 +296,9 @@ $state = Load-State -Path $statePath
 
 try {
   $dirLimit = Normalize-PositiveInt -Value $MaxDirs -DefaultValue 5
-  $files = Get-Latest-CursorLogFiles -DirLimit $dirLimit -LogsRoot $CursorLogsRoot
+  # IMPORTANT: Always treat as an array. When only 1 file is found, PowerShell would otherwise
+  # return a scalar string and `$files.Count` would fail under StrictMode.
+  $files = @(Get-Latest-CursorLogFiles -DirLimit $dirLimit -LogsRoot $CursorLogsRoot)
   if (-not $files -or $files.Count -eq 0) {
     $rootShown = $CursorLogsRoot
     if (-not $rootShown) { $rootShown = (Join-Path $env:APPDATA "Cursor\\logs") }
