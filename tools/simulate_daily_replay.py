@@ -1157,6 +1157,14 @@ def parse_args() -> argparse.Namespace:
         help="Send the report via SMTP using state/smtp.json.",
     )
     ap.add_argument(
+        "--force-email",
+        action="store_true",
+        help=(
+            "Send email even if the daily sent-flag exists. "
+            "By default, once-per-day is enforced."
+        ),
+    )
+    ap.add_argument(
         "--recipient",
         default="",
         help="Recipient email address (required when --email).",
@@ -1282,18 +1290,30 @@ def main() -> None:
     if bool(getattr(args, "email", False)):
         recipient = str(getattr(args, "recipient", "") or "").strip()
         smtp_cfg_path = Path(str(getattr(args, "smtp", "state/smtp.json")))
+        sent_flag_path = ROOT / "logs" / f"daily_replay_sent_{args.date}.flag"
+        if sent_flag_path.exists() and not bool(getattr(args, "force_email", False)):
+            print(f"[warn] already sent today; skip email (flag={sent_flag_path})")
+            return
         smtp_cfg = _load_smtp_config(smtp_cfg_path)
         if not smtp_cfg:
-            print(f"[warn] smtp config not found at {smtp_cfg_path}; skip email")
+            print(f"[warn] smtp config not found at {smtp_cfg_path}; email failed")
+            raise SystemExit(2)
         elif not recipient:
-            print("[warn] --recipient is required when --email; skip email")
+            print("[warn] --recipient is required when --email; email failed")
+            raise SystemExit(2)
         else:
             try:
                 subject = f"ASAGAKE DailyReplay {args.date}{suffix}"
                 _send_mail_via_smtp(smtp_cfg, recipient, subject, report)
                 print(f"Mail sent to {recipient}")
+                sent_flag_path.parent.mkdir(parents=True, exist_ok=True)
+                sent_flag_path.write_text(
+                    f"sent_at={dt.datetime.now(tz=JST).isoformat()} recipient={recipient}\n",
+                    encoding="utf-8",
+                )
             except Exception as exc:
                 print(f"[warn] email send failed: {exc!r}")
+                raise SystemExit(2)
 
 
 if __name__ == "__main__":

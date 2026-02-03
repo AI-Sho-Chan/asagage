@@ -70,18 +70,9 @@ try {
   $output = & $PythonExe $replayScript --date $DateTag --email --recipient $Recipient 2>&1
   $output | Out-File -FilePath $logPath -Append -Encoding utf8
   $exitCode = $LASTEXITCODE
-
-  if ($exitCode -eq 0) {
-    if ($output -match "Mail sent") {
-      "ok $(Get-Date -Format s)" | Set-Content -Path $sentFlagPath -Encoding ascii
-    } elseif ($output -match "email send failed") {
-      # Make the scheduler retry when email send fails.
-      $exitCode = 2
-    }
-  }
   Add-Content -Path $logPath -Value ("[{0}] exit_code={1}" -f (Get-Date).ToString("s"), $exitCode) -Encoding utf8
   Add-Content -Path $logPath -Value ("[{0}] === DailyReplay end ===" -f (Get-Date).ToString("s")) -Encoding utf8
-  if ($exitCode -eq 0) { exit 0 } else { exit 1 }
+  exit $exitCode
 } catch {
   $err = $_ | Out-String
   Add-Content -Path $logPath -Value ("[{0}] [error] {1}" -f (Get-Date).ToString("s"), $err.Trim()) -Encoding utf8
