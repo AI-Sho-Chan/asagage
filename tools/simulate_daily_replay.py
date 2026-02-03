@@ -159,6 +159,7 @@ def build_mail_report(
     lines.append(f"ASAGAKE DailyReplay（仮想売買） {date_tag}")
     lines.append("")
     lines.append(f"候補CSV: {cand_path.as_posix()}")
+    lines.append("（注）このメールは LIVE_STRONG をメインに表示します。LIVE_BASE / DEMO_ONLY は参考枠です。")
     cooldown_minutes = int(summary.get("cooldown_minutes", DEFAULT_COOLDOWN_MINUTES) or DEFAULT_COOLDOWN_MINUTES)
     max_trades = int(summary.get("max_trades_per_ticker", DEFAULT_MAX_TRADES_PER_TICKER) or DEFAULT_MAX_TRADES_PER_TICKER)
     stop_after_loss = bool(summary.get("stop_after_loss", False))
@@ -178,7 +179,26 @@ def build_mail_report(
     pnl_yen = float(summary.get("pnl_yen", 0.0) or 0.0)
     pnl_bp_mean = summary.get("pnl_bp_mean")
 
-    lines.append(f"結果サマリ: 取引 {trades} 回 / 合計損益 {pnl_yen:,.0f} 円")
+    focus_class = "LIVE_STRONG"
+    if "live_demo_class" in trades_df.columns:
+        focus_df = trades_df[trades_df["live_demo_class"].astype(str) == focus_class].copy()
+    else:
+        focus_df = pd.DataFrame()
+
+    focus_trades = int(len(focus_df))
+    focus_pnl_yen = float(focus_df["pnl_yen"].sum()) if focus_trades else 0.0
+    focus_pnl_bp_mean: float | None = None
+    if focus_trades and "pnl_bp" in focus_df.columns:
+        s = pd.to_numeric(focus_df["pnl_bp"], errors="coerce")
+        if not s.isna().all():
+            focus_pnl_bp_mean = float(s.mean())
+
+    lines.append(f"結果サマリ（メイン: {focus_class}）:")
+    lines.append(f"  {focus_class}: 取引 {focus_trades} 回 / 合計損益 {focus_pnl_yen:,.0f} 円")
+    if focus_pnl_bp_mean is not None:
+        lines.append(f"  （平均損益 {focus_pnl_bp_mean:.1f} bp）")
+
+    lines.append(f"参考（全体合計）: 取引 {trades} 回 / 合計損益 {pnl_yen:,.0f} 円")
     if pnl_bp_mean is not None:
         try:
             lines.append(f"（平均損益 {float(pnl_bp_mean):.1f} bp）")
@@ -204,7 +224,7 @@ def build_mail_report(
         return "\n".join(lines)
 
     # class breakdown
-    lines.append("クラス別（強/標準/デモ）:")
+    lines.append("クラス別（参考: 強/標準/デモ）:")
     if all(k in summary for k in ("LIVE_STRONG_trades", "LIVE_BASE_trades", "DEMO_ONLY_trades")):
         lines.append(
             f"  LIVE_STRONG: {int(summary.get('LIVE_STRONG_trades', 0) or 0)}回 / {float(summary.get('LIVE_STRONG_pnl_yen', 0.0) or 0.0):,.0f}円"
@@ -221,7 +241,9 @@ def build_mail_report(
             lines.append(f"  {k}: {v:,.0f}円")
 
     # exit reason breakdown
-    if "exit_reason" in trades_df.columns:
+    rank_df = focus_df if not focus_df.empty else trades_df
+    rank_label = focus_class if not focus_df.empty else "全体"
+    if "exit_reason" in rank_df.columns:
         reason_map = {
             "TP": "利確（TP）",
             "SL": "損切り（SL）",
@@ -229,10 +251,10 @@ def build_mail_report(
             "SL_SAME_BAR": "損切り（SL, 同じ1分でTPも到達の可能性）",
             "TP_SAME_BAR": "利確（TP, 同じ1分でSLも到達の可能性）",
         }
-        vc = trades_df["exit_reason"].astype(str).fillna("").replace("", "UNKNOWN").value_counts()
+        vc = rank_df["exit_reason"].astype(str).fillna("").replace("", "UNKNOWN").value_counts()
         if not vc.empty:
             lines.append("")
-            lines.append("決済理由（内訳）:")
+            lines.append(f"決済理由（内訳: {rank_label}）:")
             for k, v in vc.items():
                 label = reason_map.get(k, k)
                 lines.append(f"  {label}: {int(v)}件")
@@ -251,14 +273,14 @@ def build_mail_report(
         "budget_factor",
     ]
     for c in cols:
-        if c not in trades_df.columns:
-            trades_df[c] = ""
+        if c not in rank_df.columns:
+            rank_df[c] = ""
 
-    losses = trades_df.sort_values("pnl_yen", ascending=True).head(5)
-    wins = trades_df.sort_values("pnl_yen", ascending=False).head(5)
+    losses = rank_df.sort_values("pnl_yen", ascending=True).head(5)
+    wins = rank_df.sort_values("pnl_yen", ascending=False).head(5)
 
     lines.append("")
-    lines.append("負けが大きかった順（上位5件）:")
+    lines.append(f"負けが大きかった順（上位5件: {rank_label}）:")
     for _, r in losses.iterrows():
         exit_reason = str(r.get("exit_reason") or "")
         bars = int(float(r.get("bars") or 0))
@@ -267,7 +289,7 @@ def build_mail_report(
         )
 
     lines.append("")
-    lines.append("勝ちが大きかった順（上位5件）:")
+    lines.append(f"勝ちが大きかった順（上位5件: {rank_label}）:")
     for _, r in wins.iterrows():
         exit_reason = str(r.get("exit_reason") or "")
         bars = int(float(r.get("bars") or 0))
@@ -277,8 +299,9 @@ def build_mail_report(
 
     lines.append("")
     lines.append("かんたんな解説:")
-    min_loss = float(trades_df["pnl_yen"].min())
-    if min_loss < 0 and abs(min_loss) > abs(pnl_yen) * 0.6:
+    min_loss = float(rank_df["pnl_yen"].min())
+    pnl_ref = focus_pnl_yen if focus_trades else pnl_yen
+    if min_loss < 0 and abs(min_loss) > abs(pnl_ref) * 0.6:
         lines.append("  1つの大きな負けが、1日の結果をほぼ決めています（大負けを減らすと安定します）。")
     else:
         lines.append("  複数の勝ち/負けの合計で結果が決まっています（大負けの有無を確認してください）。")
