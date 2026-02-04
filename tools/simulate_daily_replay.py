@@ -1291,9 +1291,28 @@ def main() -> None:
         recipient = str(getattr(args, "recipient", "") or "").strip()
         smtp_cfg_path = Path(str(getattr(args, "smtp", "state/smtp.json")))
         sent_flag_path = ROOT / "logs" / f"daily_replay_sent_{args.date}.flag"
-        if sent_flag_path.exists() and not bool(getattr(args, "force_email", False)):
-            print(f"[warn] already sent today; skip email (flag={sent_flag_path})")
-            return
+        force_email = bool(getattr(args, "force_email", False))
+        email_flag_fresh_seconds = 30 * 60
+        if sent_flag_path.exists() and not force_email:
+            try:
+                flag_text = sent_flag_path.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                flag_text = ""
+            if flag_text.startswith("sent_at="):
+                print(f"[warn] already sent today; skip email (flag={sent_flag_path})")
+                return
+
+            try:
+                age_seconds = max(
+                    0.0, (dt.datetime.now(tz=JST).timestamp() - sent_flag_path.stat().st_mtime)
+                )
+            except Exception:
+                age_seconds = 0.0
+
+            if age_seconds < email_flag_fresh_seconds:
+                print(f"[warn] email in progress; skip email (flag={sent_flag_path})")
+                return
+            print(f"[warn] stale email flag; retry send (flag={sent_flag_path})")
         smtp_cfg = _load_smtp_config(smtp_cfg_path)
         if not smtp_cfg:
             print(f"[warn] smtp config not found at {smtp_cfg_path}; email failed")
@@ -1302,17 +1321,37 @@ def main() -> None:
             print("[warn] --recipient is required when --email; email failed")
             raise SystemExit(2)
         else:
+            wrote_sending_flag = False
+            if not sent_flag_path.exists():
+                try:
+                    sent_flag_path.parent.mkdir(parents=True, exist_ok=True)
+                    sent_flag_path.write_text(
+                        f"sending_at={dt.datetime.now(tz=JST).isoformat()} recipient={recipient}\n",
+                        encoding="utf-8",
+                    )
+                    wrote_sending_flag = True
+                except Exception as exc:
+                    print(f"[warn] cannot create sent flag at {sent_flag_path}: {exc!r}")
+                    raise SystemExit(2)
             try:
                 subject = f"ASAGAKE DailyReplay {args.date}{suffix}"
                 _send_mail_via_smtp(smtp_cfg, recipient, subject, report)
                 print(f"Mail sent to {recipient}")
-                sent_flag_path.parent.mkdir(parents=True, exist_ok=True)
-                sent_flag_path.write_text(
-                    f"sent_at={dt.datetime.now(tz=JST).isoformat()} recipient={recipient}\n",
-                    encoding="utf-8",
-                )
+                try:
+                    sent_flag_path.parent.mkdir(parents=True, exist_ok=True)
+                    sent_flag_path.write_text(
+                        f"sent_at={dt.datetime.now(tz=JST).isoformat()} recipient={recipient}\n",
+                        encoding="utf-8",
+                    )
+                except Exception as exc:
+                    print(f"[warn] sent flag write failed (skip duplicates anyway): {exc!r}")
             except Exception as exc:
                 print(f"[warn] email send failed: {exc!r}")
+                if wrote_sending_flag:
+                    try:
+                        sent_flag_path.unlink()
+                    except Exception:
+                        pass
                 raise SystemExit(2)
 
 
