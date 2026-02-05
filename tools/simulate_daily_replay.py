@@ -1292,27 +1292,6 @@ def main() -> None:
         smtp_cfg_path = Path(str(getattr(args, "smtp", "state/smtp.json")))
         sent_flag_path = ROOT / "logs" / f"daily_replay_sent_{args.date}.flag"
         force_email = bool(getattr(args, "force_email", False))
-        email_flag_fresh_seconds = 30 * 60
-        if sent_flag_path.exists() and not force_email:
-            try:
-                flag_text = sent_flag_path.read_text(encoding="utf-8", errors="ignore")
-            except Exception:
-                flag_text = ""
-            if flag_text.startswith("sent_at="):
-                print(f"[warn] already sent today; skip email (flag={sent_flag_path})")
-                return
-
-            try:
-                age_seconds = max(
-                    0.0, (dt.datetime.now(tz=JST).timestamp() - sent_flag_path.stat().st_mtime)
-                )
-            except Exception:
-                age_seconds = 0.0
-
-            if age_seconds < email_flag_fresh_seconds:
-                print(f"[warn] email in progress; skip email (flag={sent_flag_path})")
-                return
-            print(f"[warn] stale email flag; retry send (flag={sent_flag_path})")
         smtp_cfg = _load_smtp_config(smtp_cfg_path)
         if not smtp_cfg:
             print(f"[warn] smtp config not found at {smtp_cfg_path}; email failed")
@@ -1322,14 +1301,26 @@ def main() -> None:
             raise SystemExit(2)
         else:
             wrote_sending_flag = False
-            if not sent_flag_path.exists():
+            if not force_email:
                 try:
                     sent_flag_path.parent.mkdir(parents=True, exist_ok=True)
-                    sent_flag_path.write_text(
-                        f"sending_at={dt.datetime.now(tz=JST).isoformat()} recipient={recipient}\n",
-                        encoding="utf-8",
-                    )
+                    with sent_flag_path.open("x", encoding="utf-8") as f:
+                        f.write(f"sending_at={dt.datetime.now(tz=JST).isoformat()} recipient={recipient}\n")
                     wrote_sending_flag = True
+                except FileExistsError:
+                    try:
+                        flag_text = sent_flag_path.read_text(encoding="utf-8", errors="ignore")
+                    except Exception:
+                        flag_text = ""
+                    first_line = flag_text.splitlines()[0].strip() if flag_text else ""
+                    if first_line.startswith("sent_at="):
+                        print(f"[warn] already sent today; skip email (flag={sent_flag_path})")
+                        return
+                    if first_line.startswith("sending_at="):
+                        print(f"[warn] email already attempted today; skip email (flag={sent_flag_path})")
+                        return
+                    print(f"[warn] email flag exists; skip email (flag={sent_flag_path})")
+                    return
                 except Exception as exc:
                     print(f"[warn] cannot create sent flag at {sent_flag_path}: {exc!r}")
                     raise SystemExit(2)
