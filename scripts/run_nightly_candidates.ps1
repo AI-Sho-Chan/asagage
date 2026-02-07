@@ -1,6 +1,7 @@
 ﻿param(
     [switch]$Smoke = $false,
-    [string]$PlanFocus = ''
+    [string]$PlanFocus = '',
+    [switch]$SkipFridayWeekend = $false
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,11 +19,14 @@ if (Test-Path $candidateVenv) {
 $now = Get-Date
 "[$($now.ToString('s'))] nightly_env whoami=$([System.Security.Principal.WindowsIdentity]::GetCurrent().Name) python=$python repo=$repo" | Out-File -FilePath $logPath -Append -Encoding utf8
 
-$DisableLocalWeekend = (Test-Path (Join-Path $repo "state\disable_local_weekend.txt"))
+$legacyDisableMarker = Join-Path $repo "state\disable_local_weekend.txt"
+if (Test-Path $legacyDisableMarker) {
+    "[$($now.ToString('s'))] nightly_build_candidates ignore legacy marker $legacyDisableMarker" | Out-File -FilePath $logPath -Append -Encoding utf8
+}
 
 $isFriday = ($now.DayOfWeek -eq 'Friday')
 
-if (-not $Smoke -and -not $DisableLocalWeekend -and $isFriday) {
+if (-not $Smoke -and -not $SkipFridayWeekend -and $isFriday) {
     "[$($now.ToString('s'))] nightly_build_candidates start weekend_seq" | Out-File -FilePath $logPath -Append -Encoding utf8
     try {
         & "$repo/scripts/run_weekend_then_nightly.ps1"
@@ -44,9 +48,8 @@ if (-not $Smoke -and -not $DisableLocalWeekend -and $isFriday) {
     }
 }
 
-if (-not $Smoke -and $DisableLocalWeekend -and $isFriday) {
-    "[$($now.ToString('s'))] nightly_build_candidates skip weekend_seq (disabled locally)" | Out-File -FilePath $logPath -Append -Encoding utf8
-    "[$($now.ToString('s'))] nightly_build_candidates skip nightly (disabled locally)" | Out-File -FilePath $logPath -Append -Encoding utf8
+if (-not $Smoke -and $SkipFridayWeekend -and $isFriday) {
+    "[$($now.ToString('s'))] nightly_build_candidates skip weekend_seq (SkipFridayWeekend=1)" | Out-File -FilePath $logPath -Append -Encoding utf8
     exit 0
 }
 

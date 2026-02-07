@@ -5,7 +5,8 @@
   [int]$WeekendTimeoutMinutes = 240,
   [int]$NightlyTimeoutMinutes = 120,
   [int]$PlanTimeoutMinutes = 45,
-  [int]$MaxPlanRetries = 2
+  [int]$MaxPlanRetries = 2,
+  [switch]$WeekendMonthlyReset = $false
 )
 
 $ErrorActionPreference = 'Stop'
@@ -97,7 +98,7 @@ function Get-RemainingPlans {
 
 function Get-WeekendBaseArgs {
   param([string]$TargetDate)
-  return @(
+  $args = @(
     'scripts/nightly_build_candidates.py',
     '--universe-mode','yahoo-top','--universe-size','200',
     '--lookback','60','--chunk-days','5','--train-days','12','--forward-days','4',
@@ -107,9 +108,13 @@ function Get-WeekendBaseArgs {
     '--enable-asha','--enable-bayes','--bayes-trials',"$BayesTrialsWeekend",'--bayes-timeout','600',
     '--mask-ineffective','--mask-window','20','--mask-threshold','1.05','--cache-refresh-weekend',
     '--enable-rd-windows','--enable-market-features','--headless','--coeff-history-days','5',
-    '--weekend-incremental','--weekend-monthly-reset',
+    '--weekend-incremental',
     '--target-date', $TargetDate
   )
+  if ($WeekendMonthlyReset) {
+    $args += '--weekend-monthly-reset'
+  }
+  return $args
 }
 
 function Invoke-WeekendPlan {

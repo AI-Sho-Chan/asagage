@@ -29,6 +29,8 @@ Private Const DEFAULT_ALERT_COOLDOWN_MIN As Double = 10#
 Private Const SPIKE_RATIO_THRESHOLD As Double = 3#
 
 Private Const IMPORT_CANDIDATES_MIN_ROWS As Long = 5
+Private Const CANDIDATE_MAX_AGE_HOURS_DEFAULT As Double = 72#
+Private Const DAILY_ENTRY_CAP_DEFAULT As Long = 20
 
 Private gDashboardWatcher As cDashboardWatcher
 Private gThresholdState As Object
@@ -38,6 +40,10 @@ Private gDriverRuntime As Object
 Private gStrategyRules As Object
 Private gJStats As Object
 Private gBbBlockCache As Object
+Private gLastCandidatePath As String
+Private gLastCandidateMtime As Date
+Private gLastCandidateImportedAt As Date
+Private gLastCandidateImportedRows As Long
 Private Const J_STATS_PATH As String = "state\j_stats.csv"
 Private Const DRIVER_NKY As String = "NKY"
 Private Const DRIVER_TOPIX As String = "TOPIX"
@@ -168,6 +174,77 @@ Private Function ToTimeOfDaySafe(ByVal value As String, ByVal defaultValue As Da
     Exit Function
 Fail:
     ToTimeOfDaySafe = defaultValue
+End Function
+
+Private Function ResolveCandidatesCsvPathV2() As String
+    Dim path As String
+    path = ThisWorkbook.path & "\output\excel\candidates_nextday.csv"
+    If Len(Dir$(path)) = 0 Then
+        Dim dtTag As String: dtTag = Format$(Date, "yyyymmdd")
+        path = ThisWorkbook.path & "\output\excel\weekly_candidates_" & dtTag & ".csv"
+    End If
+    If Len(Dir$(path)) = 0 Then
+        path = "C:\AI\asagake\output\excel\candidates_nextday.csv"
+    End If
+    If Len(Dir$(path)) = 0 Then
+        path = ""
+    End If
+    ResolveCandidatesCsvPathV2 = path
+End Function
+
+Private Function IsCandidateFeedFreshV2(ByRef detail As String) As Boolean
+    On Error GoTo Fail
+    detail = ""
+
+    Dim maxAgeHours As Double
+    maxAgeHours = GetStrategyRuleDouble("candidate_max_age_hours", CANDIDATE_MAX_AGE_HOURS_DEFAULT)
+    If maxAgeHours <= 0# Then
+        IsCandidateFeedFreshV2 = True
+        Exit Function
+    End If
+
+    Dim path As String
+    path = Trim$(gLastCandidatePath)
+    If Len(path) = 0 Or Len(Dir$(path)) = 0 Then
+        path = ResolveCandidatesCsvPathV2()
+    End If
+    If Len(path) = 0 Then
+        detail = "missing_candidates_csv"
+        Exit Function
+    End If
+
+    Dim mtime As Date
+    On Error Resume Next
+    mtime = FileDateTime(path)
+    If Err.Number <> 0 Then
+        detail = "mtime_read_failed path=" & path
+        Err.Clear
+        Exit Function
+    End If
+    On Error GoTo Fail
+
+    Dim ageHours As Double
+    ageHours = (Now - mtime) * 24#
+    If ageHours < 0# Then ageHours = 0#
+
+    If gLastCandidateImportedRows > 0 And gLastCandidateImportedRows < IMPORT_CANDIDATES_MIN_ROWS Then
+        detail = "import_rows_too_small rows=" & CStr(gLastCandidateImportedRows)
+        Exit Function
+    End If
+
+    If ageHours > maxAgeHours Then
+        detail = "stale_candidates age_h=" & Format$(ageHours, "0.0") & _
+                 " limit_h=" & Format$(maxAgeHours, "0.0") & _
+                 " mtime=" & Format$(mtime, "yyyy-mm-dd hh:nn:ss") & _
+                 " path=" & path
+        Exit Function
+    End If
+
+    IsCandidateFeedFreshV2 = True
+    Exit Function
+
+Fail:
+    detail = "candidate_freshness_err " & CStr(Err.Number) & " " & Err.Description
 End Function
 
 
@@ -1648,6 +1725,7 @@ Private Function GetSlippageKey(ByVal sessionVal As String, ByVal modeVal As Str
 End Function
 
 Public Sub ApplyDynamicSignalsV2(Optional ByVal skipDriverUpdate As Boolean = False)
+    On Error GoTo Fail
 
     Dim ws As Worksheet
     On Error Resume Next
@@ -1736,6 +1814,7 @@ Public Sub ApplyDynamicSignalsV2(Optional ByVal skipDriverUpdate As Boolean = Fa
 
     Dim r As Long
     For r = DASH2_DATA_START To lastRow
+        On Error GoTo RowFail
         Dim ticker As String: ticker = Trim$(CStr(ws.Cells(r, tickerCol).Value))
         If ticker = "" Then
             If CanWriteCell(ws, r, jthCol) Then ws.Cells(r, jthCol).Value = ""
@@ -1763,7 +1842,12 @@ Public Sub ApplyDynamicSignalsV2(Optional ByVal skipDriverUpdate As Boolean = Fa
                 driverVal = driverRaw
             End If
         End If
-        Dim gapVal As Double: gapVal = ToDouble(ws.Cells(r, gapCol).Value, 0#)
+        Dim gapVal As Double
+        If gapCol > 0 Then
+            gapVal = ToDouble(ws.Cells(r, gapCol).Value, 0#)
+        Else
+            gapVal = 0#
+        End If
         Dim corrVal As Double: corrVal = ResolveDriverCorrelation(ws, r, driverVal, corrCol, corrTopixCol)
         Dim gapAbsPct As Double: gapAbsPct = Abs(gapVal) / 100#
 
@@ -1782,8 +1866,10 @@ Public Sub ApplyDynamicSignalsV2(Optional ByVal skipDriverUpdate As Boolean = Fa
         adjJth = baseJ + biasSlopeVal * (biasBpGlobal / 100#) + gapSlopeVal * gapAbsPct + corrSlopeVal * corrVal * (biasBpGlobal / 100#)
         If CanWriteCell(ws, r, jthCol) Then ws.Cells(r, jthCol).Value = adjJth
 
-        Dim vwapVal As Double: vwapVal = ToDouble(ws.Cells(r, vwapCol).Value, 0#)
-        Dim prevVal As Double: prevVal = ToDouble(ws.Cells(r, prevCol).Value, 0#)
+        Dim vwapVal As Double
+        If vwapCol > 0 Then vwapVal = ToDouble(ws.Cells(r, vwapCol).Value, 0#) Else vwapVal = 0#
+        Dim prevVal As Double
+        If prevCol > 0 Then prevVal = ToDouble(ws.Cells(r, prevCol).Value, 0#) Else prevVal = 0#
         Dim lastVal As Double: lastVal = 0#
         If lastCol > 0 Then
             lastVal = ToDouble(ws.Cells(r, lastCol).Value, 0#)
@@ -1949,7 +2035,8 @@ Public Sub ApplyDynamicSignalsV2(Optional ByVal skipDriverUpdate As Boolean = Fa
             End If
         End If
 
-        Dim atrVal As Double: atrVal = ToDouble(ws.Cells(r, atrCol).Value, 0#)
+        Dim atrVal As Double
+        If atrCol > 0 Then atrVal = ToDouble(ws.Cells(r, atrCol).Value, 0#) Else atrVal = 0#
         Dim volFactor As Double: volFactor = ComputeVolFactor(gapAbsPct, Abs(jVal), atrVal)
         If volTagCol > 0 Then ws.Cells(r, volTagCol).Value = ClassifyVolFactor(volFactor)
 
@@ -1969,19 +2056,74 @@ Public Sub ApplyDynamicSignalsV2(Optional ByVal skipDriverUpdate As Boolean = Fa
         If trailEffCol > 0 And CanWriteCell(ws, r, trailEffCol) Then ws.Cells(r, trailEffCol).Value = trailEff
 
 ContinueLoop:
+        On Error GoTo Fail
     Next r
 
+    Exit Sub
+
+RowFail:
+    LogVbaEvent "ApplyDynamicSignalsV2", "row_err row=" & CStr(r) & " err=" & CStr(Err.Number) & " " & Err.Description
+    Err.Clear
+    Resume ContinueLoop
+
+Fail:
+    LogVbaEvent "ApplyDynamicSignalsV2", "Err " & CStr(Err.Number) & ": " & Err.Description
 End Sub
+
+Private Function CountTodayEntryRowsV2(ByVal sh As Worksheet, ByVal isDemo As Boolean) As Long
+    If sh Is Nothing Then Exit Function
+
+    Dim modeNeed As String
+    modeNeed = IIf(isDemo, "preplace_demo", "preplace")
+    Dim dayTag As String: dayTag = Format$(Date, "yyyymmdd")
+
+    Dim lastRow As Long
+    lastRow = sh.Cells(sh.Rows.Count, 1).End(xlUp).Row
+    Dim r As Long
+    For r = 2 To lastRow
+        Dim modeVal As String: modeVal = LCase$(Trim$(CStr(sh.Cells(r, ORD_COL_MODE).Value)))
+        If modeVal <> modeNeed Then GoTo NextRow
+
+        Dim statusVal As String: statusVal = UCase$(Trim$(CStr(sh.Cells(r, ORD_COL_STATUS).Value)))
+        If statusVal <> "RUNNING" And statusVal <> "FILLED" And statusVal <> "CLOSED" Then GoTo NextRow
+
+        Dim tsVal As Date
+        tsVal = ToDateSafe(sh.Cells(r, ORD_COL_FILL_TS).Value, 0)
+        If tsVal = 0 Then tsVal = ToDateSafe(sh.Cells(r, ORD_COL_TS).Value, 0)
+        If tsVal = 0 Then GoTo NextRow
+
+        If Format$(DateValue(tsVal), "yyyymmdd") = dayTag Then
+            CountTodayEntryRowsV2 = CountTodayEntryRowsV2 + 1
+        End If
+NextRow:
+    Next r
+End Function
+
+Private Function IsDailyEntryCapReachedV2(ByVal sh As Worksheet, ByVal isDemo As Boolean, ByRef usedCount As Long, ByRef capCount As Long) As Boolean
+    usedCount = 0
+    capCount = 0
+
+    Dim capRaw As Double
+    capRaw = GetStrategyRuleDouble("daily_entry_cap", CDbl(DAILY_ENTRY_CAP_DEFAULT))
+    If capRaw <= 0# Then Exit Function
+
+    capCount = CLng(capRaw)
+    If capCount <= 0 Then Exit Function
+
+    usedCount = CountTodayEntryRowsV2(sh, isDemo)
+    IsDailyEntryCapReachedV2 = (usedCount >= capCount)
+End Function
 
 
 
 Public Sub PreplaceOrdersV2()
+    On Error GoTo Fail
 
     Dim ws As Worksheet
 
     On Error Resume Next
     Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
-    On Error GoTo 0
+    On Error GoTo Fail
     If ws Is Nothing Then Exit Sub
 
     Dim selCol As Long: selCol = FindColumn(ws, DASH2_HEADER_ROW, "Selected")
@@ -2005,6 +2147,25 @@ Public Sub PreplaceOrdersV2()
     Set slipDict = LoadSlippageOverrides()
 
     Dim isDemo As Boolean: isDemo = IsDemoMode()
+    Dim r As Long, lastR As Long
+    lastR = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    Dim entryStatusCol As Long: entryStatusCol = FindColumn(ws, DASH2_HEADER_ROW, "EntryStatus")
+
+    Dim freshnessDetail As String
+    If Not IsCandidateFeedFreshV2(freshnessDetail) Then
+        CancelOutstandingPreplaceRowsV2 sh, "STALE_CANDIDATES"
+        If entryStatusCol > 0 Then
+            For r = DASH2_DATA_START To lastR
+                If ws.Cells(r, selCol).Value = 1 Then
+                    ws.Cells(r, entryStatusCol).Value = "BLOCKED_STALE_CANDIDATE"
+                End If
+            Next r
+        End If
+        If CanFireAlert("candidate_freshness_block") Then
+            LogVbaEvent "PreplaceOrdersV2", "blocked stale candidates " & freshnessDetail
+        End If
+        Exit Sub
+    End If
     
     ' PERFORMANCE NOTE:
     ' Deleting many rows in Orders every tick freezes the entire Excel instance (including other workbooks).
@@ -2014,8 +2175,21 @@ Public Sub PreplaceOrdersV2()
         Exit Sub
     End If
 
-    Dim r As Long, lastR As Long
-    lastR = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    Dim usedEntries As Long, capEntries As Long
+    If IsDailyEntryCapReachedV2(sh, isDemo, usedEntries, capEntries) Then
+        CancelOutstandingPreplaceRowsV2 sh, "DAILY_CAP"
+        If entryStatusCol > 0 Then
+            For r = DASH2_DATA_START To lastR
+                If ws.Cells(r, selCol).Value = 1 Then
+                    ws.Cells(r, entryStatusCol).Value = "BLOCKED_DAILY_CAP"
+                End If
+            Next r
+        End If
+        If CanFireAlert("daily_entry_cap_" & Format$(Date, "yyyymmdd")) Then
+            LogVbaEvent "PreplaceOrdersV2", "blocked by daily_entry_cap used=" & CStr(usedEntries) & " cap=" & CStr(capEntries)
+        End If
+        Exit Sub
+    End If
     
     Dim desiredKeys As Object
     Set desiredKeys = CreateObject("Scripting.Dictionary") ' key: "<dashRow>|<side>"
@@ -2024,17 +2198,18 @@ Public Sub PreplaceOrdersV2()
     Set activeRows = CreateObject("Scripting.Dictionary") ' row indexes we chose/updated (for duplicate cleanup)
 
     For r = DASH2_DATA_START To lastR
+        On Error GoTo RowFail
         If ws.Cells(r, selCol).Value = 1 Then
             Dim hasBuy As Boolean: hasBuy = False
             Dim hasSell As Boolean: hasSell = False
             Dim tmpVal As Variant
             If eBuyCol > 0 Then
                 tmpVal = ws.Cells(r, eBuyCol).Value
-                hasBuy = IsNumeric(tmpVal) And tmpVal > 0
+                hasBuy = (ToDouble(tmpVal, 0#) > 0#)
             End If
             If eSellCol > 0 Then
                 tmpVal = ws.Cells(r, eSellCol).Value
-                hasSell = IsNumeric(tmpVal) And tmpVal > 0
+                hasSell = (ToDouble(tmpVal, 0#) > 0#)
             End If
             Dim qtyVal As Long: qtyVal = 0
             If qtyCol > 0 Then qtyVal = CLng(ToDouble(ws.Cells(r, qtyCol).Value, 0#))
@@ -2071,10 +2246,21 @@ Public Sub PreplaceOrdersV2()
                 End If
             End If
         End If
+ContinueLoop:
+        On Error GoTo Fail
     Next r
     
     ' Cancel stale/duplicate preplace rows that are no longer desired.
     CancelObsoletePreplaceRowsV2 sh, desiredKeys, activeRows, "OBSOLETE"
+    Exit Sub
+
+RowFail:
+    LogVbaEvent "PreplaceOrdersV2", "row_err row=" & CStr(r) & " err=" & CStr(Err.Number) & " " & Err.Description
+    Err.Clear
+    Resume ContinueLoop
+
+Fail:
+    LogVbaEvent "PreplaceOrdersV2", "Err " & CStr(Err.Number) & ": " & Err.Description
 
 End Sub
 
@@ -2690,6 +2876,7 @@ End Sub
 
 
 Public Sub StartDemoV2()
+    On Error GoTo Fail
     ' Prevent collateral "Excel busy" when the user is working on other files in the same Excel process.
     ' If you need ASAGAKE to run while using other Excel workbooks, open ASAGAKE in a dedicated Excel process
     ' (e.g. via: excel.exe /x "C:\AI\asagake\ASAGAKE.xlsm").
@@ -2706,18 +2893,37 @@ Public Sub StartDemoV2()
         Exit Sub
     End If
 
+    Dim freshnessDetail As String
+    If Not IsCandidateFeedFreshV2(freshnessDetail) Then
+        LogVbaEvent "StartDemoV2", "blocked stale candidates " & freshnessDetail
+        SafeSetStatusBarV2 "Start blocked: stale candidates feed"
+        Exit Sub
+    End If
+
     UpdateStatusV2 "DEMO_RUNNING"
     SetExcelIsolationV2 True
     StartAutoTickV2
+    Exit Sub
+
+Fail:
+    LogVbaEvent "StartDemoV2", "Err " & Err.Number & ": " & Err.Description
+    SafeSetStatusBarV2 "StartDemoV2 error: " & CStr(Err.Number)
 End Sub
 
 Public Sub StopDemoV2()
+    On Error GoTo Fail
     StopAutoTickV2
     SetExcelIsolationV2 False
     UpdateStatusV2 "IDLE"
+    Exit Sub
+
+Fail:
+    LogVbaEvent "StopDemoV2", "Err " & Err.Number & ": " & Err.Description
+    SafeSetStatusBarV2 "StopDemoV2 error: " & CStr(Err.Number)
 End Sub
 
 Public Sub StartLiveV2()
+    On Error GoTo Fail
     ' Same guard as DEMO: do not start LIVE when other workbooks exist in the same Excel process.
     On Error Resume Next
     Dim wbCount As Long: wbCount = Application.Workbooks.Count
@@ -2732,15 +2938,33 @@ Public Sub StartLiveV2()
         Exit Sub
     End If
 
+    Dim freshnessDetail As String
+    If Not IsCandidateFeedFreshV2(freshnessDetail) Then
+        LogVbaEvent "StartLiveV2", "blocked stale candidates " & freshnessDetail
+        SafeSetStatusBarV2 "Start blocked: stale candidates feed"
+        Exit Sub
+    End If
+
     UpdateStatusV2 "LIVE_RUNNING"
     SetExcelIsolationV2 True
     StartAutoTickV2
+    Exit Sub
+
+Fail:
+    LogVbaEvent "StartLiveV2", "Err " & Err.Number & ": " & Err.Description
+    SafeSetStatusBarV2 "StartLiveV2 error: " & CStr(Err.Number)
 End Sub
 
 Public Sub StopLiveV2()
+    On Error GoTo Fail
     StopAutoTickV2
     SetExcelIsolationV2 False
     UpdateStatusV2 "IDLE"
+    Exit Sub
+
+Fail:
+    LogVbaEvent "StopLiveV2", "Err " & Err.Number & ": " & Err.Description
+    SafeSetStatusBarV2 "StopLiveV2 error: " & CStr(Err.Number)
 End Sub
 
 Public Sub AutoTickV2()
@@ -3653,32 +3877,45 @@ Private Function IsRunningModeV2() As Boolean
 End Function
 
 Private Sub UpdateStatusV2(ByVal mode As String)
+    On Error GoTo Fail
 
     Dim ws As Worksheet: Set ws = ThisWorkbook.Worksheets(DASH2_SHEET)
 
     Dim statusCell As Range
     Set statusCell = ws.Range("A3")
 
+    Dim wasProtected As Boolean
+    On Error Resume Next
+    wasProtected = (ws.ProtectContents Or ws.ProtectDrawingObjects Or ws.ProtectScenarios)
+    If wasProtected Then ws.Unprotect
+    On Error GoTo Fail
+
     On Error Resume Next
     ws.Parent.Names.Add Name:="RunStatusV2", RefersTo:=statusCell
-    On Error GoTo 0
+    On Error GoTo Fail
 
+    On Error Resume Next
     statusCell.ClearContents
+    statusCell.Value = mode
+    statusCell.HorizontalAlignment = xlCenter
+    statusCell.VerticalAlignment = xlCenter
+    statusCell.Font.Bold = True
+    statusCell.Font.Size = 14
+    Select Case mode
+        Case "DEMO_RUNNING": statusCell.Interior.Color = RGB(220, 240, 255)
+        Case "LIVE_RUNNING": statusCell.Interior.Color = RGB(255, 230, 230)
+        Case Else: statusCell.Interior.Color = RGB(230, 230, 230)
+    End Select
+    Err.Clear
+    On Error GoTo Fail
 
-    With statusCell
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-        .Font.Bold = True
-        .Font.Size = 14
+CleanExit:
+    If wasProtected Then ProtectDashboardV2 ws
+    Exit Sub
 
-        Select Case mode
-            Case "DEMO_RUNNING": .Interior.Color = RGB(220, 240, 255)
-            Case "LIVE_RUNNING": .Interior.Color = RGB(255, 230, 230)
-            Case Else: .Interior.Color = RGB(230, 230, 230)
-        End Select
-        .Value = mode
-    End With
-
+Fail:
+    LogVbaEvent "UpdateStatusV2", "Err " & Err.Number & ": " & Err.Description & " mode=" & mode
+    Resume CleanExit
 End Sub
 
 
@@ -4145,6 +4382,15 @@ ImportFinalize:
     candSize = CStr(FileLen(path))
     candMtime = CStr(FileDateTime(path))
     On Error GoTo 0
+
+    If importedCount > 0 Then
+        gLastCandidatePath = path
+        gLastCandidateImportedAt = Now
+        gLastCandidateImportedRows = importedCount
+        On Error Resume Next
+        gLastCandidateMtime = FileDateTime(path)
+        On Error GoTo 0
+    End If
 
     LogVbaEvent "ImportCandidatesV2", "done imported=" & CStr(importedCount) & " approxRecords=" & CStr(approxRecords) & " parsedRecords=" & CStr(parsedRecords) & " nonEmptyLines=" & CStr(nonEmptyLines) & " size=" & candSize & " mtime=" & candMtime & " path=" & path
 
