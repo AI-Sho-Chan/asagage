@@ -1,4 +1,15 @@
-# Next Steps Checklist
+# Project Status
+
+- Archived on `2026-03-25`.
+- Final revalidation result: the actual-like replay on `2026-03-20` to `2026-03-25` was `-847,331 yen` overall and `-373,499 yen` for `LIVE_STRONG`.
+- The current simple replay looked better than the actual-like replay, so the previous validation path was too optimistic.
+- Do not resume development or trading operations without explicit re-approval and a new hypothesis.
+- Read first:
+  - `docs/project_archive_20260325.md`
+  - `reports/revalidation_report_march20260320_0325.md`
+  - `reports/revalidation_report_feb20260209_0218.md`
+
+## Historical Checklist
 
 1. Confirm the restored workbook opens without the repair prompt. If Excel offers recovery, cancel it and verify the ribbon buttons are present.
 2. Run `python scripts/repair_realtime_formulas.py` once to repopulate NewDashboard formulas after confirming the workbook state.
