@@ -9,6 +9,12 @@ $ErrorActionPreference = "Stop"
 
 Set-Location $BaseDir
 
+$suspendMarker = Join-Path $BaseDir "state\suspend_scheduled_jobs.txt"
+if (Test-Path $suspendMarker) {
+  Write-Host ("Scheduled jobs suspended: {0}" -f $suspendMarker)
+  exit 0
+}
+
 if ([string]::IsNullOrWhiteSpace($PythonExe)) {
   $candidateVenv = Join-Path $BaseDir ".venv\Scripts\python.exe"
   if (Test-Path $candidateVenv) {

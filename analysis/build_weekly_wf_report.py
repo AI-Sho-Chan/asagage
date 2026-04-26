@@ -10,6 +10,7 @@ import pandas as pd
 ANALYSIS_DIR = Path("analysis")
 EXCEL_OUT_DIR = Path("output/excel")
 SMTP_CFG_PATH = Path("state/smtp.json")
+EMAIL_BLOCK_MARKER = Path("state/suspend_scheduled_jobs.txt")
 
 
 def _to_date(tag: str) -> dt.date:
@@ -189,6 +190,9 @@ def build_weekly_report(week_ending: str) -> str:
 
 
 def _send_email(subject: str, body: str, recipient: str) -> None:
+    if EMAIL_BLOCK_MARKER.exists():
+        print(f"[info] weekly WF report email disabled by marker: {EMAIL_BLOCK_MARKER}")
+        return
     if not SMTP_CFG_PATH.exists():
         print(f"[warn] smtp config not found at {SMTP_CFG_PATH}; skip email")
         return

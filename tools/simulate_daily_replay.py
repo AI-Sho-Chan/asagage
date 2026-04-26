@@ -42,6 +42,8 @@ from asagake_io.csv_writer import DecisionTraceWriter, make_append_only_writer
 DATA_ROOT = Path("data/raw/yahoo_1m")
 OUT_DIR = Path("analysis")
 
+EMAIL_BLOCK_MARKER = ROOT / "state" / "suspend_scheduled_jobs.txt"
+
 COST_BP = 8.0
 
 # Replay constraints (comparison baseline)
@@ -1288,6 +1290,9 @@ def main() -> None:
     print(f"mail report written to {report_txt}")
 
     if bool(getattr(args, "email", False)):
+        if EMAIL_BLOCK_MARKER.exists():
+            print(f"[info] DailyReplay email disabled by marker: {EMAIL_BLOCK_MARKER}")
+            return
         recipient = str(getattr(args, "recipient", "") or "").strip()
         smtp_cfg_path = Path(str(getattr(args, "smtp", "state/smtp.json")))
         sent_flag_path = ROOT / "logs" / f"daily_replay_sent_{args.date}.flag"

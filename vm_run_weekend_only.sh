@@ -1,6 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SUSPEND_MARKER="${REPO_DIR}/state/suspend_scheduled_jobs.txt"
+if [ -f "$SUSPEND_MARKER" ]; then
+  echo "[vm_run_weekend_only] scheduled jobs suspended: $SUSPEND_MARKER" >&2
+  exit 0
+fi
 LOCK_FILE="/tmp/asagake_weekend_batch.lock"
 exec 9>"$LOCK_FILE"
 if command -v flock >/dev/null 2>&1; then
